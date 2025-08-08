@@ -10,6 +10,11 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.drag
+import androidx.compose.foundation.gestures.forEachGesture
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,33 +43,32 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.example.hark.ui.theme.HarkTheme
+import kotlin.math.abs
 
 // Object to hold all tunable UI parameters
 object UIConstants {
-    // This now correctly and INDEPENDENTLY controls the SLIDER LENGTH.
     val SLIDER_LENGTH: Dp = 250.dp
-
-    // This now correctly and INDEPENDENTLY controls the SLIDER THICKNESS.
     val SLIDER_THICKNESS: Dp = 60.dp
-
-    // This now correctly and INDEPENDENTLY controls the SPACING between sliders.
-    val BAND_CONTAINER_WIDTH: Dp = 65.dp
+    val BAND_CONTAINER_WIDTH: Dp = 60.dp
 }
 
 class MainActivity : ComponentActivity() {
 
     private val viewModel: EqViewModel by viewModels()
-    private lateinit  var audioManager: AudioManager
+    private lateinit var audioManager: AudioManager
 
-    // Native methods are private to the Activity
     private external fun startEngine()
     private external fun stopEngine()
     private external fun setBandGain(bandIndex: Int, gainDb: Float)
@@ -73,8 +77,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-
-        // Load the native library only when the Activity is actually created
         System.loadLibrary("hark")
 
         setContent {
@@ -95,7 +97,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun HarkAppScreen(
     viewModel: EqViewModel,
-    audioManager: AudioManager,
+    audioManager: AudioManager?,
     onStartEngine: () -> Unit = {},
     onStopEngine: () -> Unit = {},
     onSetBandGain: (Int, Float) -> Unit = { _, _ -> },
@@ -121,17 +123,16 @@ fun HarkAppScreen(
     val statusText by viewModel.statusText
 
     val centerFrequencies = if (currentMode == EqViewModel.EngineMode.BIQUAD_16_MIC) viewModel.centerFrequencies16 else viewModel.centerFrequencies8
+    val totalWidth = UIConstants.BAND_CONTAINER_WIDTH * centerFrequencies.size
 
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(vertical = 8.dp)
         ) {
-            // Top Controls
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     val activeColor = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
                     val inactiveColor = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer)
@@ -149,7 +150,7 @@ fun HarkAppScreen(
                         Text("8-Band Mode")
                     }
                 }
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("主開關")
                     Spacer(modifier = Modifier.width(8.dp))
@@ -173,64 +174,60 @@ fun HarkAppScreen(
                 }
             }
 
-            // EQ Bands
+            Spacer(modifier = Modifier.height(16.dp))
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f) // Let the bands area take the remaining vertical space
+                    .weight(1f)
                     .horizontalScroll(scrollState),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.Start
             ) {
-                for (i in centerFrequencies.indices) {
-                    EqBandControl(viewModel = viewModel, bandIndex = i, centerFreq = centerFrequencies[i], onSetBandGain = onSetBandGain)
+                Column(
+                    modifier = Modifier
+                        .width(totalWidth)
+                        .fillMaxHeight(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        centerFrequencies.forEach {
+                            Text(
+                                text = if (it >= 1000) "${it / 1000}k" else it.toString(),
+                                modifier = Modifier.width(UIConstants.BAND_CONTAINER_WIDTH),
+                                textAlign = TextAlign.Center,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
+
+                    EqualizerCurveDisplay(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        viewModel = viewModel,
+                        centerFrequencies = centerFrequencies,
+                        onSetBandGain = onSetBandGain
+                    )
+
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        viewModel.bandGains.take(centerFrequencies.size).forEach {
+                            Text(
+                                text = String.format("%.1f dB", it.value),
+                                modifier = Modifier.width(UIConstants.BAND_CONTAINER_WIDTH),
+                                textAlign = TextAlign.Center,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.Gray
+                            )
+                        }
+                    }
                 }
             }
 
-            // Master Volume Control
-            SystemVolumeSlider(audioManager)
+            Spacer(modifier = Modifier.height(16.dp))
+            audioManager?.let { SystemVolumeSlider(it) }
+            Spacer(modifier = Modifier.height(8.dp))
         }
-    }
-}
-
-@Composable
-fun EqBandControl(
-    viewModel: EqViewModel,
-    bandIndex: Int,
-    centerFreq: Int,
-    onSetBandGain: (Int, Float) -> Unit
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween, // Distribute space
-        modifier = Modifier
-            .width(UIConstants.BAND_CONTAINER_WIDTH) // This controls the spacing
-            .fillMaxHeight() // Fill the height of the parent Row
-    ) {
-        Text("${if (centerFreq >= 1000) centerFreq / 1000 else centerFreq}${if (centerFreq >= 1000) "k" else ""}", textAlign = TextAlign.Center)
-
-        // This Box now acts as a centered container for the rotated slider
-        Box(modifier = Modifier
-            .width(UIConstants.SLIDER_THICKNESS) // Box 的寬度是垂直 Slider 最終的厚度 (60dp)
-            .height(UIConstants.SLIDER_LENGTH) // Box 的高度是垂直 Slider 最終的長度 (250dp)
-            .align(Alignment.CenterHorizontally), // 確保 Box 在 Column 中水平置中
-            contentAlignment = Alignment.Center // 讓 Slider 在 Box 中置中
-        ) {
-            Slider(
-                value = viewModel.bandGains[bandIndex].value,
-                onValueChange = {
-                    viewModel.bandGains[bandIndex].value = it
-                    onSetBandGain(bandIndex, it)
-                },
-                valueRange = -15f..15f,
-                steps = 30,
-                modifier = Modifier
-                    .width(UIConstants.SLIDER_LENGTH)
-                    .height(UIConstants.SLIDER_THICKNESS)
-                    .graphicsLayer { rotationZ = 270f }
-            )
-        }
-        Text(text = "%.1f dB".format(viewModel.bandGains[bandIndex].value))
     }
 }
 
@@ -240,7 +237,7 @@ fun SystemVolumeSlider(audioManager: AudioManager) {
     var currentVolume by remember { mutableStateOf(audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)) }
     var sliderPosition by remember { mutableStateOf(currentVolume.toFloat() / maxVolume) }
 
-    Column(modifier = Modifier.fillMaxWidth()) {
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Text("系統音量")
         Slider(
             value = sliderPosition,
@@ -255,6 +252,146 @@ fun SystemVolumeSlider(audioManager: AudioManager) {
     }
 }
 
+@Composable
+fun EqualizerCurveDisplay(
+    modifier: Modifier = Modifier,
+    viewModel: EqViewModel,
+    centerFrequencies: List<Int>,
+    onSetBandGain: (Int, Float) -> Unit
+) {
+    val bandGains = viewModel.bandGains
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val waveColor = primaryColor.copy(alpha = 0.3f)
+
+    Box(modifier = modifier) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    forEachGesture {
+                        awaitPointerEventScope {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+
+                            val canvasWidth = size.width.toFloat()
+                            if (centerFrequencies.isEmpty()) return@awaitPointerEventScope
+                            val bandWidth = canvasWidth / centerFrequencies.size
+                            val bandIndex = (down.position.x / bandWidth).toInt()
+
+                            if (bandIndex !in centerFrequencies.indices) {
+                                return@awaitPointerEventScope
+                            }
+
+                            // Wait for the drag to start, distinguishing between vertical and horizontal
+                            val drag = awaitTouchSlopOrCancellation(down.id) { change, _ ->
+                                if (abs(change.position.y - down.position.y) > abs(change.position.x - down.position.x)) {
+                                    change.consume()
+                                } // Don't consume for horizontal drag
+                            }
+
+                            if (drag != null && drag.isConsumed) {
+                                val minGain = -15f
+                                val maxGain = 15f
+                                val gainRange = maxGain - minGain
+                                val canvasHeight = size.height.toFloat()
+
+                                // Apply the initial over-slop drag
+                                val currentGain = viewModel.bandGains[bandIndex].value
+                                val dragDelta = drag.position - drag.previousPosition
+                                val gainDelta = (-dragDelta.y / canvasHeight) * gainRange
+                                val newGain = (currentGain + gainDelta).coerceIn(minGain, maxGain)
+                                viewModel.bandGains[bandIndex].value = newGain
+                                onSetBandGain(bandIndex, newGain)
+
+                                // Continue dragging vertically
+                                drag(drag.id) {
+                                    val innerDragDelta = it.position - it.previousPosition
+                                    val innerGainDelta = (-innerDragDelta.y / canvasHeight) * gainRange
+                                    val innerCurrentGain = viewModel.bandGains[bandIndex].value
+                                    val innerNewGain = (innerCurrentGain + innerGainDelta).coerceIn(minGain, maxGain)
+                                    viewModel.bandGains[bandIndex].value = innerNewGain
+                                    onSetBandGain(bandIndex, innerNewGain)
+                                    it.consume()
+                                }
+                            }
+                        }
+                    }
+                }
+        ) { // onDraw scope starts here
+            if (centerFrequencies.isEmpty()) return@Canvas
+
+            val canvasWidth = size.width
+            val canvasHeight = size.height
+            val bandWidth = canvasWidth / centerFrequencies.size
+
+            val minGain = -15f
+            val maxGain = 15f
+            val gainRange = maxGain - minGain
+
+            val points = centerFrequencies.mapIndexed { index, _ ->
+                val gain = bandGains[index].value
+                val x = (index * bandWidth) + (bandWidth / 2f)
+                val y = canvasHeight - (canvasHeight * ((gain - minGain) / gainRange))
+                Offset(x, y)
+            }
+
+            val zeroGainY = canvasHeight - (canvasHeight * ((0f - minGain) / gainRange))
+
+            val fillPath = Path().apply {
+                moveTo(0f, zeroGainY)
+                if (points.isNotEmpty()) {
+                    lineTo(points.first().x, points.first().y)
+                    for (i in 0 until points.size - 1) {
+                        val p0 = points.getOrElse(i - 1) { points[i] }
+                        val p1 = points[i]
+                        val p2 = points[i + 1]
+                        val p3 = points.getOrElse(i + 2) { p2 }
+
+                        val cp1x = p1.x + (p2.x - p0.x) / 6f
+                        val cp1y = p1.y + (p2.y - p0.y) / 6f
+                        val cp2x = p2.x - (p3.x - p1.x) / 6f
+                        val cp2y = p2.y - (p3.y - p1.y) / 6f
+
+                        cubicTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y)
+                    }
+                    lineTo(points.last().x, zeroGainY)
+                }
+                lineTo(canvasWidth, zeroGainY)
+                close()
+            }
+
+            val strokePath = Path().apply {
+                if (points.isNotEmpty()) {
+                    moveTo(points.first().x, points.first().y)
+                    for (i in 0 until points.size - 1) {
+                        val p0 = points.getOrElse(i - 1) { points[i] }
+                        val p1 = points[i]
+                        val p2 = points[i + 1]
+                        val p3 = points.getOrElse(i + 2) { p2 }
+
+                        val cp1x = p1.x + (p2.x - p0.x) / 6f
+                        val cp1y = p1.y + (p2.y - p0.y) / 6f
+                        val cp2x = p2.x - (p3.x - p1.x) / 6f
+                        val cp2y = p2.y - (p3.y - p1.y) / 6f
+
+                        cubicTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y)
+                    }
+                }
+            }
+
+            // Drawing starts here
+            drawPath(path = fillPath, color = waveColor)
+            drawLine(color = Color.Gray, start = Offset(0f, zeroGainY), end = Offset(canvasWidth, zeroGainY), strokeWidth = 2f)
+            points.forEach { drawLine(color = primaryColor.copy(alpha = 0.5f), start = Offset(it.x, zeroGainY), end = it, strokeWidth = 2f) }
+            drawPath(path = strokePath, color = primaryColor, style = Stroke(width = 5f))
+
+            points.forEach { point ->
+                drawCircle(color = primaryColor, radius = 12f, center = point)
+                drawCircle(color = Color.White, radius = 8f, center = point)
+            }
+        }
+    }
+}
+
 private fun resetEqualizerBands(viewModel: EqViewModel, numBands: Int, onSetBandGain: (Int, Float) -> Unit) {
     for (i in 0 until numBands) {
         viewModel.bandGains[i].value = 0f
@@ -263,3 +400,10 @@ private fun resetEqualizerBands(viewModel: EqViewModel, numBands: Int, onSetBand
     viewModel.statusText.value = "狀態：等化器已重設"
 }
 
+@Preview(showBackground = true)
+@Composable
+fun DefaultPreview() {
+    HarkTheme {
+        HarkAppScreen(viewModel = EqViewModel(), audioManager = null)
+    }
+}

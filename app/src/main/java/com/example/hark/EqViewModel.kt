@@ -15,7 +15,7 @@ class EqViewModel : ViewModel() {
     val statusText = mutableStateOf("狀態：已停用")
 
     val centerFrequencies16 = listOf(250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000)
-    val centerFrequencies8 = listOf(250, 500, 1000, 2000, 4000, 6000, 8000, 10000) // Kept original 8 for reference
+    val centerFrequencies8 = listOf(250, 500, 1000, 1500, 2000, 4000, 6000, 8000)
 
     // Store up to 16 bands of gains and Qs
     val bandGains: List<MutableState<Float>> = List(16) { mutableStateOf(0f) }
