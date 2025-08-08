@@ -1,4 +1,19 @@
-# Hark: An Android Low-Latency Hearing Aid and Audio Enhancement Platform
+# Hark
+
+A hearing aid application for Android, utilizing the Oboe library for low-latency audio processing.
+
+## Dependencies
+
+The `oboe` directory contains a copy of the Google Oboe library source code, which is essential for the project's audio functionalities. This project directly includes the source, so no special submodule commands are needed after cloning.
+
+## Build
+
+To build the project, open it in Android Studio or run the following command from the project root:
+
+```bash
+./gradlew build
+```
+: An Android Low-Latency Hearing Aid and Audio Enhancement Platform
 
 ### Why is it called Hark?
 The name Hark draws from an old English word meaning “listen!” — not just to hear sounds, but to awaken the sense of hearing as an intentional, essential act. It appears in Shakespeare’s plays and ancient hymns as a call to pay attention to something important.
