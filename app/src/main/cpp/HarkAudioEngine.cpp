@@ -3,7 +3,9 @@
 
 #define LOG_TAG "HarkAudioEngine"
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
+#define LOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+
 
 const int NUM_BANDS = 16;
 const double centerFrequencies[] = {
@@ -11,7 +13,7 @@ const double centerFrequencies[] = {
         1600.0, 2000.0, 2500.0, 3150.0, 4000.0, 5000.0, 6300.0, 8000.0
 };
 
-HarkAudioEngine::HarkAudioEngine() : filterChain(NUM_BANDS), sampleRate(48000.0), mBandGains(NUM_BANDS, 0.0f), mBandQs(NUM_BANDS, 1.8f), mInputDeviceId(oboe::kUnspecified) { // Initialize mInputDeviceId
+HarkAudioEngine::HarkAudioEngine() : filterChain(NUM_BANDS), sampleRate(48000.0), mBandGains(NUM_BANDS, 0.0f), mBandQs(NUM_BANDS, 1.8f), mInputDeviceId(oboe::kUnspecified), mIsRunning(false) { // Initialize mIsRunning
     // Initialize filters with default values
     for (int i = 0; i < NUM_BANDS; ++i) {
         filterChain.updateBand(i, sampleRate, centerFrequencies[i], mBandGains[i], mBandQs[i]);
@@ -22,18 +24,49 @@ HarkAudioEngine::~HarkAudioEngine() {
     stop();
 }
 
-// New method to set the input device ID
 void HarkAudioEngine::setInputDeviceId(int32_t deviceId) {
+    // It's generally safer to re-create streams if the device ID changes while running.
+    // However, if the engine is stopped, just update the ID for the next start.
+    if (mIsRunning) {
+        LOGD("Input device ID changed while running. Stopping and will restart with new device.");
+        // Consider a more robust mechanism to restart with the new device ID.
+        // For now, just logging. A full restart might be needed.
+        // stop(); // This might be too abrupt or lead to complex restart logic here.
+        // A better approach might be to signal the calling layer (Java/Kotlin)
+        // to stop and then start the engine again with the new device.
+    }
     mInputDeviceId = deviceId;
 }
 
-void HarkAudioEngine::start() { // Changed return type to void to match existing code
-    if (mIsRunning) return;
+void HarkAudioEngine::start() {
+    if (mIsRunning) {
+        LOGD("HarkAudioEngine is already running.");
+        return;
+    }
     LOGD("Starting HarkAudioEngine...");
-    setupStreams();
+
+    if (setupStreams()) { // 讓 setupStreams 返回 bool 表示成功與否
+        mIsRunning = true;
+        LOGD("HarkAudioEngine started successfully.");
+
+        // 成功啟動後，可以查詢並記錄實際的 burst sizes
+        if (mInputStream) {
+            LOGD("Input stream frames per burst: %d", mInputStream->getFramesPerBurst());
+            LOGD("Input stream buffer size in frames: %d", mInputStream->getBufferSizeInFrames());
+        }
+        if (mOutputStream) {
+            LOGD("Output stream frames per burst: %d", mOutputStream->getFramesPerBurst());
+            LOGD("Output stream buffer size in frames: %d", mOutputStream->getBufferSizeInFrames());
+        }
+    } else {
+        LOGE("Failed to start HarkAudioEngine because setupStreams failed.");
+        // 確保資源在 setupStreams 失敗時被清理
+        stop(); // stop() 內部應能處理部分初始化的情況
+    }
 }
 
-void HarkAudioEngine::setupStreams() {
+
+bool HarkAudioEngine::setupStreams() {
     oboe::AudioStreamBuilder outBuilder;
     // The output stream is a "push" stream, so it needs a callback.
     outBuilder.setDirection(oboe::Direction::Output)
@@ -45,10 +78,14 @@ void HarkAudioEngine::setupStreams() {
             ->setDataCallback(this);
 
     oboe::Result result = outBuilder.openStream(&mOutputStream);
-    if (result != oboe::Result::OK) {
+    if (result != oboe::Result::OK || !mOutputStream) { // 檢查 mOutputStream 是否為 nullptr
         LOGE("Failed to open output stream. Error: %s", oboe::convertToText(result));
-        return; // Early return on failure
+        return false;
     }
+
+    // 使用 output stream 的 burst size 作為參考
+    int32_t framesPerBurst = mOutputStream->getFramesPerBurst();
+    LOGD("Output stream framesPerBurst: %d. Using this for buffer sizes.", framesPerBurst);
 
     // Now, create the input stream.
     oboe::AudioStreamBuilder inBuilder;
@@ -63,44 +100,50 @@ void HarkAudioEngine::setupStreams() {
             ->setSampleRate(static_cast<int32_t>(sampleRate));
 
     result = inBuilder.openStream(&mInputStream);
-    if (result != oboe::Result::OK) {
+    if (result != oboe::Result::OK || !mInputStream) { // 檢查 mInputStream 是否為 nullptr
         LOGE("Failed to open input stream. Error: %s", oboe::convertToText(result));
-        mOutputStream->close(); // Clean up the successfully opened output stream
-        mOutputStream = nullptr;
-        return; // Early return on failure
+        if (mOutputStream) {
+            mOutputStream->close();
+            mOutputStream = nullptr;
+        }
+        return false;
     }
 
-    // Set a small buffer size for low latency. This is a critical step.
-    int32_t framesPerBurst = mOutputStream->getFramesPerBurst();
-    mInputStream->setBufferSizeInFrames(framesPerBurst);
-    mOutputStream->setBufferSizeInFrames(framesPerBurst);
-    LOGD("Buffer size set to %d frames", framesPerBurst);
+    // 設定內部緩衝區大小
+    // 對於 LowLatency，這個設定很重要
+    oboe::Result resInput = mInputStream->setBufferSizeInFrames(framesPerBurst);
+    if (resInput != oboe::Result::OK) {
+        LOGW("Warning: Failed to set input stream buffer size to %d. Error: %s", framesPerBurst, oboe::convertToText(resInput));
+    } else {
+        LOGD("Input stream buffer size successfully set to %d frames", mInputStream->getBufferSizeInFrames());
+    }
+
+    oboe::Result resOutput = mOutputStream->setBufferSizeInFrames(framesPerBurst);
+    if (resOutput != oboe::Result::OK) {
+        LOGW("Warning: Failed to set output stream buffer size to %d. Error: %s", framesPerBurst, oboe::convertToText(resOutput));
+    } else {
+        LOGD("Output stream buffer size successfully set to %d frames", mOutputStream->getBufferSizeInFrames());
+    }
 
     result = mInputStream->requestStart();
     if (result != oboe::Result::OK) {
         LOGE("Failed to start input stream. Error: %s", oboe::convertToText(result));
-        // Clean up already started streams
-        mOutputStream->requestStop();
-        mOutputStream->close();
-        mOutputStream = nullptr;
-        mInputStream->close();
-        mInputStream = nullptr;
-        return; // Early return on failure
+        // 清理
+        if (mOutputStream) { mOutputStream->close(); mOutputStream = nullptr; }
+        if (mInputStream) { mInputStream->close(); mInputStream = nullptr; }
+        return false;
     }
 
     result = mOutputStream->requestStart();
     if (result != oboe::Result::OK) {
         LOGE("Failed to start output stream. Error: %s", oboe::convertToText(result));
-        // Clean up already started streams
-        mInputStream->requestStop();
-        mInputStream->close();
-        mInputStream = nullptr;
-        mOutputStream->close();
-        mOutputStream = nullptr;
-        return; // Early return on failure
+        // 清理
+        if (mInputStream) { mInputStream->requestStop(); mInputStream->close(); mInputStream = nullptr; }
+        if (mOutputStream) { mOutputStream->close(); mOutputStream = nullptr; } // mOutputStream 可能未 stop
+        return false;
     }
 
-    mIsRunning = true;
+    return true;
     LOGD("HarkAudioEngine started successfully.");
 }
 

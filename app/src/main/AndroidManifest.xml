@@ -2,7 +2,25 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- 錄音權限 -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- 藍牙基礎權限 (對於舊版本和某些操作仍然有用) -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+
+    <!-- Android 12 (API 31) 及更高版本的藍牙連接權限 -->
+    <!-- 這是 startBluetoothSco() 和 stopBluetoothSco() 所必需的 -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <!-- Android 12 (API 31) 及更高版本的藍牙掃描權限 -->
+    <!-- 如果您的應用程式會主動掃描設備，則添加此項 -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <!-- 根據需要決定是否需要 BLUETOOTH_SCAN。如果只是連接已配對的設備來使用 SCO，可能不是嚴格必需，但加上通常更安全 -->
+
+    <!-- 修改音訊設定的權限 -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
 
     <application
         android:allowBackup="true"

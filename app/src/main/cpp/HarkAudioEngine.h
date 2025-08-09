@@ -7,6 +7,7 @@
 
 class HarkAudioEngine : public oboe::AudioStreamDataCallback {
 public:
+    bool setupStreams();
     HarkAudioEngine();
     ~HarkAudioEngine();
 
@@ -20,7 +21,6 @@ public:
     oboe::DataCallbackResult onAudioReady(oboe::AudioStream *oboeStream, void *audioData, int32_t numFrames) override;
 
 private:
-    void setupStreams();
 
     oboe::AudioStream *mInputStream = nullptr;
     oboe::AudioStream *mOutputStream = nullptr;

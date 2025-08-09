@@ -12,3 +12,5 @@ target_link_libraries(hark ${log-lib})
 add_subdirectory(${CMAKE_SOURCE_DIR}/../../../../oboe oboe_build)
 
 target_link_libraries(hark oboe -Wl,-z,max-page-size=16384)
+
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -ffast-math")
