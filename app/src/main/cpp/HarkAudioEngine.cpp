@@ -7,11 +7,11 @@
 
 const int NUM_BANDS = 16;
 const double centerFrequencies[] = {
-    250.0, 315.0, 400.0, 500.0, 630.0, 800.0, 1000.0, 1250.0,
-    1600.0, 2000.0, 2500.0, 3150.0, 4000.0, 5000.0, 6300.0, 8000.0
+        250.0, 315.0, 400.0, 500.0, 630.0, 800.0, 1000.0, 1250.0,
+        1600.0, 2000.0, 2500.0, 3150.0, 4000.0, 5000.0, 6300.0, 8000.0
 };
 
-HarkAudioEngine::HarkAudioEngine() : filterChain(NUM_BANDS), sampleRate(48000.0), mBandGains(NUM_BANDS, 0.0f), mBandQs(NUM_BANDS, 1.8f) {
+HarkAudioEngine::HarkAudioEngine() : filterChain(NUM_BANDS), sampleRate(48000.0), mBandGains(NUM_BANDS, 0.0f), mBandQs(NUM_BANDS, 1.8f), mInputDeviceId(oboe::kUnspecified) { // Initialize mInputDeviceId
     // Initialize filters with default values
     for (int i = 0; i < NUM_BANDS; ++i) {
         filterChain.updateBand(i, sampleRate, centerFrequencies[i], mBandGains[i], mBandQs[i]);
@@ -22,7 +22,12 @@ HarkAudioEngine::~HarkAudioEngine() {
     stop();
 }
 
-void HarkAudioEngine::start() {
+// New method to set the input device ID
+void HarkAudioEngine::setInputDeviceId(int32_t deviceId) {
+    mInputDeviceId = deviceId;
+}
+
+void HarkAudioEngine::start() { // Changed return type to void to match existing code
     if (mIsRunning) return;
     LOGD("Starting HarkAudioEngine...");
     setupStreams();
@@ -42,16 +47,15 @@ void HarkAudioEngine::setupStreams() {
     oboe::Result result = outBuilder.openStream(&mOutputStream);
     if (result != oboe::Result::OK) {
         LOGE("Failed to open output stream. Error: %s", oboe::convertToText(result));
-        return;
+        return; // Early return on failure
     }
 
-    // Now, create the input stream, matching the output stream's device.
-    int32_t outputDeviceId = mOutputStream->getDeviceId();
-
+    // Now, create the input stream.
     oboe::AudioStreamBuilder inBuilder;
     inBuilder.setDirection(oboe::Direction::Input)
-            ->setDeviceId(outputDeviceId) // Match the output device
-            ->setInputPreset(oboe::InputPreset::VoiceRecognition)
+                    // If mInputDeviceId is not kUnspecified, use it. Otherwise, match the output device.
+            ->setDeviceId(mInputDeviceId == oboe::kUnspecified ? mOutputStream->getDeviceId() : mInputDeviceId)
+            ->setInputPreset(oboe::InputPreset::VoiceRecognition) // Using VoiceRecognition as in original code, can be changed to VoiceCommunication if needed
             ->setPerformanceMode(oboe::PerformanceMode::LowLatency)
             ->setSharingMode(oboe::SharingMode::Exclusive)
             ->setFormat(oboe::AudioFormat::Float)
@@ -63,7 +67,7 @@ void HarkAudioEngine::setupStreams() {
         LOGE("Failed to open input stream. Error: %s", oboe::convertToText(result));
         mOutputStream->close(); // Clean up the successfully opened output stream
         mOutputStream = nullptr;
-        return;
+        return; // Early return on failure
     }
 
     // Set a small buffer size for low latency. This is a critical step.
@@ -75,13 +79,25 @@ void HarkAudioEngine::setupStreams() {
     result = mInputStream->requestStart();
     if (result != oboe::Result::OK) {
         LOGE("Failed to start input stream. Error: %s", oboe::convertToText(result));
-        return;
+        // Clean up already started streams
+        mOutputStream->requestStop();
+        mOutputStream->close();
+        mOutputStream = nullptr;
+        mInputStream->close();
+        mInputStream = nullptr;
+        return; // Early return on failure
     }
 
     result = mOutputStream->requestStart();
     if (result != oboe::Result::OK) {
         LOGE("Failed to start output stream. Error: %s", oboe::convertToText(result));
-        return;
+        // Clean up already started streams
+        mInputStream->requestStop();
+        mInputStream->close();
+        mInputStream = nullptr;
+        mOutputStream->close();
+        mOutputStream = nullptr;
+        return; // Early return on failure
     }
 
     mIsRunning = true;

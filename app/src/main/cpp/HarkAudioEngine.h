@@ -14,6 +14,7 @@ public:
     void stop();
     void setBandGain(int bandIndex, float gainDb);
     void setBandQ(int bandIndex, float q_factor);
+    void setInputDeviceId(int32_t deviceId);
 
     // Oboe callback
     oboe::DataCallbackResult onAudioReady(oboe::AudioStream *oboeStream, void *audioData, int32_t numFrames) override;
@@ -28,4 +29,5 @@ private:
     std::vector<float> mBandGains;
     std::vector<float> mBandQs;
     bool mIsRunning = false;
+    int32_t mInputDeviceId = oboe::kUnspecified;
 };

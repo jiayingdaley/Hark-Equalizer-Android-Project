@@ -27,3 +27,8 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_example_hark_MainActivity_setEngineMode(JNIEnv *env, jobject /* this */, jint mode) {
     // Placeholder for now
 }
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_example_hark_MainActivity_setAudioInputDeviceId(JNIEnv *env, jobject thiz, jint device_id) {
+    engine.setInputDeviceId(device_id);
+}

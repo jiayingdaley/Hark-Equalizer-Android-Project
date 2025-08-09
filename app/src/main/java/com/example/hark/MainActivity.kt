@@ -3,8 +3,11 @@ package com.example.hark
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.media.AudioDeviceInfo
 import android.media.AudioManager
+import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -17,9 +20,9 @@ import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.gestures.forEachGesture
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -37,6 +40,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,12 +54,10 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.example.hark.ui.theme.HarkTheme
-import kotlin.math.abs
 
 // Object to hold all tunable UI parameters
 object UIConstants {
@@ -68,11 +70,15 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: EqViewModel by viewModels()
     private lateinit var audioManager: AudioManager
+    private var audioDeviceCallback: Any? = null
+    private var isEngineRunning by mutableStateOf(false)
 
     private external fun startEngine()
     private external fun stopEngine()
     private external fun setBandGain(bandIndex: Int, gainDb: Float)
     private external fun setBandQ(bandIndex: Int, q_factor: Float)
+    private external fun setAudioInputDeviceId(deviceId: Int)
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -84,12 +90,86 @@ class MainActivity : ComponentActivity() {
                 HarkAppScreen(
                     viewModel = viewModel,
                     audioManager = audioManager,
-                    onStartEngine = { startEngine() },
-                    onStopEngine = { stopEngine() },
-                    onSetBandGain = { band, gain -> setBandGain(band, gain) },
-                    onSetBandQ = { band, q -> setBandQ(band, q) }
+                    isEngineOn = isEngineRunning,
+                    onEngineStateChange = { newState ->
+                        isEngineRunning = newState
+                        if (isEngineRunning) {
+                            startEngine()
+                        } else {
+                            stopEngine()
+                        }
+                        viewModel.statusText.value = if (isEngineRunning) "狀態：運作中" else "狀態：已停用"
+                    },
+                    // 將 JNI 函數直接傳遞下去
+                    jniSetBandGain = { band, gain -> setBandGain(band, gain) },
+                    jniSetBandQ = { band, q -> setBandQ(band, q) }
                 )
             }
+        }
+    }
+    override fun onResume() {
+        super.onResume()
+        registerAudioDeviceCallback()
+        checkAndSetAudioDevice()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        unregisterAudioDeviceCallback()
+    }
+
+    private fun registerAudioDeviceCallback() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val callback = object : android.media.AudioDeviceCallback() {
+                override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>?) {
+                    checkAndSetAudioDevice()
+                }
+
+                override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>?) {
+                    checkAndSetAudioDevice()
+                }
+            }
+            audioManager.registerAudioDeviceCallback(callback, null)
+            audioDeviceCallback = callback
+        }
+    }
+
+    private fun unregisterAudioDeviceCallback() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && audioDeviceCallback != null) {
+            audioManager.unregisterAudioDeviceCallback(audioDeviceCallback as android.media.AudioDeviceCallback)
+            audioDeviceCallback = null
+        }
+    }
+
+    private fun checkAndSetAudioDevice() {
+        // Find the headset microphone
+        val devices = audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS)
+        var headsetMicId: Int = 0
+        val btDevice = devices.find { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO }
+        val wiredDevice = devices.find { it.type == AudioDeviceInfo.TYPE_WIRED_HEADSET }
+        val wasRunning = isEngineRunning
+
+        if (btDevice != null) {
+            headsetMicId = btDevice.id
+            // Log.d("Hark", "Bluetooth SCO Mic detected, ID: $headsetMicId")
+        } else if (wiredDevice != null) {
+            headsetMicId = wiredDevice.id
+            // Log.d("Hark", "Wired Headset Mic detected, ID: $headsetMicId")
+        } else {
+            // Log.d("Hark", "No headset mic detected, using default.")
+        }
+
+        // 如果引擎正在跑，才需要先停止它
+        if (wasRunning) {
+            stopEngine()
+        }
+
+        // 設定新的設備ID (無論引擎是否在跑，都要先設定好)
+        setAudioInputDeviceId(headsetMicId)
+
+        // 如果引擎之前就在跑，現在把它重新啟動
+        if (wasRunning) {
+            startEngine()
         }
     }
 }
@@ -98,10 +178,10 @@ class MainActivity : ComponentActivity() {
 fun HarkAppScreen(
     viewModel: EqViewModel,
     audioManager: AudioManager?,
-    onStartEngine: () -> Unit = {},
-    onStopEngine: () -> Unit = {},
-    onSetBandGain: (Int, Float) -> Unit = { _, _ -> },
-    onSetBandQ: (Int, Float) -> Unit = { _, _ -> }
+    isEngineOn: Boolean,
+    onEngineStateChange: (Boolean) -> Unit,
+    jniSetBandGain: (bandIndex: Int, gainDb: Float) -> Unit, // <--- 接收 JNI 函數
+    jniSetBandQ: (bandIndex: Int, q_factor: Float) -> Unit    // <--- 接收 JNI 函數
 ) {
     val context = LocalContext.current
     var isPermissionGranted by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) }
@@ -118,12 +198,40 @@ fun HarkAppScreen(
     }
 
     val scrollState = rememberScrollState()
-    var isEngineOn by remember { mutableStateOf(false) }
     val currentMode by viewModel.currentMode
     val statusText by viewModel.statusText
 
-    val centerFrequencies = if (currentMode == EqViewModel.EngineMode.BIQUAD_16_MIC) viewModel.centerFrequencies16 else viewModel.centerFrequencies8
-    val totalWidth = UIConstants.BAND_CONTAINER_WIDTH * centerFrequencies.size
+    // --- 修改：從 ViewModel 獲取當前模式的數據 ---
+    val centerFrequencies = viewModel.currentCenterFrequencies
+    val currentBandGains = viewModel.currentBandGains // 這是 List<MutableState<Float>>
+    // 如果需要 Q 值，也類似地獲取: val currentBandQs = viewModel.currentBandQs
+
+    val totalBandContainerWidth = UIConstants.BAND_CONTAINER_WIDTH * centerFrequencies.size
+
+    // --- 修改：LaunchedEffect 用於在模式切換時同步 JNI ---
+    LaunchedEffect(currentMode, currentBandGains) { // 依賴 currentMode 和 currentBandGains
+        Log.d("HarkAppScreen", "Mode changed to: $currentMode or gains data changed. Syncing JNI.")
+        currentBandGains.forEachIndexed { index, gainState ->
+            jniSetBandGain(index, gainState.value)
+            // 如果 JNI 層的頻段數量是固定的 (例如總是16個)，
+            // 並且當前模式的頻段較少 (例如8個)，您可能需要決定如何處理剩餘的頻段。
+            // 一種可能是將它們的增益設置為0。
+            // 但如果 JNI 的 setBandGain 只影響指定索引，這裡的遍歷是正確的。
+        }
+        // 同步 Q 值 (如果需要)
+        viewModel.currentBandQs.forEachIndexed { index, qState ->
+             jniSetBandQ(index, qState.value)
+        }
+
+        // 如果從16切到8，可能需要將8之後的頻段在JNI層重置 (如果JNI不會自動處理)
+        if (currentMode == EqViewModel.EngineMode.BIQUAD_8_MIC && viewModel.centerFrequencies16.size > centerFrequencies.size) {
+            for (i in centerFrequencies.size until viewModel.centerFrequencies16.size) {
+                // 假設 JNI 層最多支持16個頻段
+                jniSetBandGain(i, 0f) // 將未使用的頻段增益設為0
+                jniSetBandQ(i, EqViewModel.DEFAULT_Q) // 將未使用的頻段Q設為預設  <--- POTENTIAL ISSUE HERE
+            }
+        }
+    }
 
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
         Column(
@@ -156,10 +264,9 @@ fun HarkAppScreen(
                     Spacer(modifier = Modifier.width(8.dp))
                     Switch(
                         checked = isEngineOn,
-                        onCheckedChange = {
-                            isEngineOn = it
-                            if (isEngineOn) onStartEngine() else onStopEngine()
-                            viewModel.statusText.value = if (isEngineOn) "狀態：運作中" else "狀態：已停用"
+                        onCheckedChange = { newState ->
+                            onEngineStateChange(newState)
+                            // viewModel.statusText 的更新已經在 MainActivity 的 onEngineStateChange 中處理了
                         },
                         enabled = isPermissionGranted
                     )
@@ -169,7 +276,17 @@ fun HarkAppScreen(
                 }
                 Text(text = statusText, style = MaterialTheme.typography.bodyLarge)
                 Spacer(modifier = Modifier.height(8.dp))
-                Button(onClick = { resetEqualizerBands(viewModel, centerFrequencies.size, onSetBandGain) }) {
+                Button(onClick = {
+                    viewModel.resetCurrentModeBands() // 重設 ViewModel 中的數據
+                    // 將重設後的數據同步到 JNI
+                    viewModel.currentBandGains.forEachIndexed { index, gainState ->
+                        jniSetBandGain(index, gainState.value)
+                    }
+                    viewModel.currentBandQs.forEachIndexed { index, qState ->
+                        jniSetBandQ(index, qState.value)
+                    }
+                    Log.d("HarkAppScreen", "Equalizer reset for mode: $currentMode")
+                }) {
                     Text("重設等化器")
                 }
             }
@@ -186,14 +303,14 @@ fun HarkAppScreen(
             ) {
                 Column(
                     modifier = Modifier
-                        .width(totalWidth)
+                        .width(totalBandContainerWidth) // 使用計算出的總寬度
                         .fillMaxHeight(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Row(modifier = Modifier.fillMaxWidth()) {
-                        centerFrequencies.forEach {
+                        centerFrequencies.forEach { freq ->
                             Text(
-                                text = if (it >= 1000) "${it / 1000}k" else it.toString(),
+                                text = formatFrequencyLabel(freq),
                                 modifier = Modifier.width(UIConstants.BAND_CONTAINER_WIDTH),
                                 textAlign = TextAlign.Center,
                                 style = MaterialTheme.typography.bodyMedium
@@ -205,15 +322,21 @@ fun HarkAppScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f),
-                        viewModel = viewModel,
+                        bandGains = currentBandGains, // <--- 傳遞 List<MutableState<Float>>
                         centerFrequencies = centerFrequencies,
-                        onSetBandGain = onSetBandGain
+                        onDragBand = { bandIndex, newGain ->
+                            viewModel.updateBandGain(bandIndex, newGain) // 更新 ViewModel
+                            jniSetBandGain(bandIndex, newGain)          // 更新 JNI
+                            // Log.d("HarkAppScreen", "Band $bandIndex gain updated to $newGain for mode $currentMode")
+                        }
+                        // 如果Q值也通過拖拽調整，也需要類似的回調
                     )
 
                     Row(modifier = Modifier.fillMaxWidth()) {
-                        viewModel.bandGains.take(centerFrequencies.size).forEach {
+                        // currentBandGains 是 List<MutableState<Float>>，所以直接用它
+                        currentBandGains.forEach { gainState ->
                             Text(
-                                text = String.format("%.1f dB", it.value),
+                                text = String.format("%.1f dB", gainState.value),
                                 modifier = Modifier.width(UIConstants.BAND_CONTAINER_WIDTH),
                                 textAlign = TextAlign.Center,
                                 style = MaterialTheme.typography.bodySmall,
@@ -229,6 +352,17 @@ fun HarkAppScreen(
             Spacer(modifier = Modifier.height(8.dp))
         }
     }
+}
+
+private fun RowScope.formatFrequencyLabel(freq: Int): String  {
+    if (freq < 1000) {
+        return freq.toString()
+    }
+    // Perform floating point division
+    val kHz = freq / 1000.0
+    // Format to one decimal place, then remove ".0" if it's a whole number.
+    // e.g., 1000 -> 1.0 -> "1", 1250 -> 1.25 -> "1.3", 1600 -> 1.6 -> "1.6"
+    return String.format("%.1f", kHz).removeSuffix(".0") + "k"
 }
 
 @Composable
@@ -255,155 +389,103 @@ fun SystemVolumeSlider(audioManager: AudioManager) {
 @Composable
 fun EqualizerCurveDisplay(
     modifier: Modifier = Modifier,
-    viewModel: EqViewModel,
+    bandGains: List<State<Float>>, // <--- 接收 List<State<Float>> (MutableState 也是 State)
     centerFrequencies: List<Int>,
-    onSetBandGain: (Int, Float) -> Unit
+    onDragBand: (bandIndex: Int, gain: Float) -> Unit
 ) {
-    val bandGains = viewModel.bandGains
     val primaryColor = MaterialTheme.colorScheme.primary
     val waveColor = primaryColor.copy(alpha = 0.3f)
 
-    Box(modifier = modifier) {
-        Canvas(
-            modifier = Modifier
-                .fillMaxSize()
-                .pointerInput(Unit) {
-                    forEachGesture {
-                        awaitPointerEventScope {
-                            val down = awaitFirstDown(requireUnconsumed = false)
+    // Calculate the total width required by the canvas based on its content
+    val totalWidthDp = UIConstants.BAND_CONTAINER_WIDTH * centerFrequencies.size
 
-                            val canvasWidth = size.width.toFloat()
-                            if (centerFrequencies.isEmpty()) return@awaitPointerEventScope
-                            val bandWidth = canvasWidth / centerFrequencies.size
-                            val bandIndex = (down.position.x / bandWidth).toInt()
+    Canvas(
+        modifier = modifier
+            .width(totalWidthDp)
+            .fillMaxHeight()
+            .pointerInput(centerFrequencies, bandGains) { // 依賴項包含 bandGains
+                forEachGesture {
+                    awaitPointerEventScope {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        val bandWidthPx = size.width / centerFrequencies.size.toFloat() // 確保是浮點數除法
 
-                            if (bandIndex !in centerFrequencies.indices) {
-                                return@awaitPointerEventScope
-                            }
+                        var bandIndex = (down.position.x / bandWidthPx).toInt().coerceIn(0, centerFrequencies.size - 1)
+                        var initialGainAtPointerDown = bandGains[bandIndex].value // 記錄按下時的增益
 
-                            // Wait for the drag to start, distinguishing between vertical and horizontal
-                            val drag = awaitTouchSlopOrCancellation(down.id) { change, _ ->
-                                if (abs(change.position.y - down.position.y) > abs(change.position.x - down.position.x)) {
-                                    change.consume()
-                                } // Don't consume for horizontal drag
-                            }
+                        val change = awaitTouchSlopOrCancellation(down.id) { change, _ ->
+                            if (change.pressed) change.consume()
+                        }
 
-                            if (drag != null && drag.isConsumed) {
-                                val minGain = -15f
-                                val maxGain = 15f
-                                val gainRange = maxGain - minGain
-                                val canvasHeight = size.height.toFloat()
+                        if (change != null && change.pressed) {
+                            drag(down.id) { dragChange ->
+                                dragChange.consume()
 
-                                // Apply the initial over-slop drag
-                                val currentGain = viewModel.bandGains[bandIndex].value
-                                val dragDelta = drag.position - drag.previousPosition
-                                val gainDelta = (-dragDelta.y / canvasHeight) * gainRange
-                                val newGain = (currentGain + gainDelta).coerceIn(minGain, maxGain)
-                                viewModel.bandGains[bandIndex].value = newGain
-                                onSetBandGain(bandIndex, newGain)
+                                // 更新 bandIndex，以防用戶水平拖動到相鄰頻段 (可選，取決於期望的交互)
+                                // bandIndex = (dragChange.position.x / bandWidthPx).toInt().coerceIn(0, centerFrequencies.size - 1)
 
-                                // Continue dragging vertically
-                                drag(drag.id) {
-                                    val innerDragDelta = it.position - it.previousPosition
-                                    val innerGainDelta = (-innerDragDelta.y / canvasHeight) * gainRange
-                                    val innerCurrentGain = viewModel.bandGains[bandIndex].value
-                                    val innerNewGain = (innerCurrentGain + innerGainDelta).coerceIn(minGain, maxGain)
-                                    viewModel.bandGains[bandIndex].value = innerNewGain
-                                    onSetBandGain(bandIndex, innerNewGain)
-                                    it.consume()
-                                }
+                                // 計算增益變化量，基於垂直拖動距離
+                                // 0dB 在畫布中間
+                                val newY = dragChange.position.y.coerceIn(0f, size.height.toFloat())
+                                val gainRange = EqViewModel.MAX_GAIN_DB - EqViewModel.MIN_GAIN_DB // 總增益範圍
+                                val calculatedGain = EqViewModel.MAX_GAIN_DB - (newY / size.height) * gainRange
+
+                                // 或者基於拖動的相對變化 (可能更直觀)
+                                // val dragAmountY = dragChange.position.y - down.position.y // 相對於初始按下點的 Y 變化
+                                // val gainChangeRatio = -dragAmountY / (size.height / 2f) // 假設畫布一半對應 MAX_GAIN_DB
+                                // val calculatedGain = initialGainAtPointerDown + gainChangeRatio * EqViewModel.MAX_GAIN_DB
+
+                                val newGain = calculatedGain.coerceIn(EqViewModel.MIN_GAIN_DB, EqViewModel.MAX_GAIN_DB)
+
+                                onDragBand(bandIndex, newGain)
                             }
                         }
                     }
                 }
-        ) { // onDraw scope starts here
-            if (centerFrequencies.isEmpty()) return@Canvas
-
-            val canvasWidth = size.width
-            val canvasHeight = size.height
-            val bandWidth = canvasWidth / centerFrequencies.size
-
-            val minGain = -15f
-            val maxGain = 15f
-            val gainRange = maxGain - minGain
-
-            val points = centerFrequencies.mapIndexed { index, _ ->
-                val gain = bandGains[index].value
-                val x = (index * bandWidth) + (bandWidth / 2f)
-                val y = canvasHeight - (canvasHeight * ((gain - minGain) / gainRange))
-                Offset(x, y)
             }
+    ) {
+        val path = Path()
+        val bandWidth = size.width / centerFrequencies.size.toFloat()
 
-            val zeroGainY = canvasHeight - (canvasHeight * ((0f - minGain) / gainRange))
+        // 繪製中間的 0dB 線
+        val zeroDbY = size.height * ( (EqViewModel.MAX_GAIN_DB - 0f) / (EqViewModel.MAX_GAIN_DB - EqViewModel.MIN_GAIN_DB) )
+        drawLine(
+            color = Color.Gray,
+            start = Offset(0f, zeroDbY),
+            end = Offset(size.width, zeroDbY),
+            strokeWidth = 1.dp.toPx()
+        )
 
-            val fillPath = Path().apply {
-                moveTo(0f, zeroGainY)
-                if (points.isNotEmpty()) {
-                    lineTo(points.first().x, points.first().y)
-                    for (i in 0 until points.size - 1) {
-                        val p0 = points.getOrElse(i - 1) { points[i] }
-                        val p1 = points[i]
-                        val p2 = points[i + 1]
-                        val p3 = points.getOrElse(i + 2) { p2 }
 
-                        val cp1x = p1.x + (p2.x - p0.x) / 6f
-                        val cp1y = p1.y + (p2.y - p0.y) / 6f
-                        val cp2x = p2.x - (p3.x - p1.x) / 6f
-                        val cp2y = p2.y - (p3.y - p1.y) / 6f
+        if (bandGains.isNotEmpty()) {
+            val gainRange = EqViewModel.MAX_GAIN_DB - EqViewModel.MIN_GAIN_DB
+            if (gainRange <= 0) return@Canvas // 防止除以零或負數
 
-                        cubicTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y)
-                    }
-                    lineTo(points.last().x, zeroGainY)
+            var yPosition = size.height * ( (EqViewModel.MAX_GAIN_DB - bandGains[0].value) / gainRange )
+            yPosition = yPosition.coerceIn(0f, size.height)
+            path.moveTo(bandWidth * 0.5f, yPosition)
+
+            bandGains.forEachIndexed { index, gainState ->
+                val x = (index + 0.5f) * bandWidth
+                var y = size.height * ( (EqViewModel.MAX_GAIN_DB - gainState.value) / gainRange )
+                y = y.coerceIn(0f, size.height)
+
+                if (index == 0) { // 對於第一個點，也要 moveTo，或者確保 path 從這裡開始
+                    path.moveTo(x, y)
+                } else {
+                    path.lineTo(x, y)
                 }
-                lineTo(canvasWidth, zeroGainY)
-                close()
+                drawCircle(
+                    color = primaryColor.copy(alpha = 0.7f),
+                    radius = 6.dp.toPx(),
+                    center = Offset(x, y)
+                )
             }
-
-            val strokePath = Path().apply {
-                if (points.isNotEmpty()) {
-                    moveTo(points.first().x, points.first().y)
-                    for (i in 0 until points.size - 1) {
-                        val p0 = points.getOrElse(i - 1) { points[i] }
-                        val p1 = points[i]
-                        val p2 = points[i + 1]
-                        val p3 = points.getOrElse(i + 2) { p2 }
-
-                        val cp1x = p1.x + (p2.x - p0.x) / 6f
-                        val cp1y = p1.y + (p2.y - p0.y) / 6f
-                        val cp2x = p2.x - (p3.x - p1.x) / 6f
-                        val cp2y = p2.y - (p3.y - p1.y) / 6f
-
-                        cubicTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y)
-                    }
-                }
-            }
-
-            // Drawing starts here
-            drawPath(path = fillPath, color = waveColor)
-            drawLine(color = Color.Gray, start = Offset(0f, zeroGainY), end = Offset(canvasWidth, zeroGainY), strokeWidth = 2f)
-            points.forEach { drawLine(color = primaryColor.copy(alpha = 0.5f), start = Offset(it.x, zeroGainY), end = it, strokeWidth = 2f) }
-            drawPath(path = strokePath, color = primaryColor, style = Stroke(width = 5f))
-
-            points.forEach { point ->
-                drawCircle(color = primaryColor, radius = 12f, center = point)
-                drawCircle(color = Color.White, radius = 8f, center = point)
-            }
+            drawPath(
+                path = path,
+                color = primaryColor,
+                style = Stroke(width = 2.dp.toPx())
+            )
         }
     }
 }
 
-private fun resetEqualizerBands(viewModel: EqViewModel, numBands: Int, onSetBandGain: (Int, Float) -> Unit) {
-    for (i in 0 until numBands) {
-        viewModel.bandGains[i].value = 0f
-        onSetBandGain(i, 0f)
-    }
-    viewModel.statusText.value = "狀態：等化器已重設"
-}
-
-@Preview(showBackground = true)
-@Composable
-fun DefaultPreview() {
-    HarkTheme {
-        HarkAppScreen(viewModel = EqViewModel(), audioManager = null)
-    }
-}
