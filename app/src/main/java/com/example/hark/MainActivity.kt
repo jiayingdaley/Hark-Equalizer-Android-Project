@@ -64,8 +64,8 @@ import com.example.hark.ui.theme.HarkTheme
 
 // Object to hold all tunable UI parameters
 object UIConstants {
-    val SLIDER_LENGTH: Dp = 250.dp
-    val SLIDER_THICKNESS: Dp = 60.dp
+    //val SLIDER_LENGTH: Dp = 250.dp
+    //val SLIDER_THICKNESS: Dp = 60.dp
     val BAND_CONTAINER_WIDTH: Dp = 60.dp
 }
 
@@ -73,58 +73,42 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: EqViewModel by viewModels()
     private lateinit var audioManager: AudioManager
-    private var audioDeviceCallback: Any? = null
-    private var isEngineRunning by mutableStateOf(false)
+
+    // --- State Management ---
+    // 1. 使用者的「意圖」：使用者是否希望引擎處於運作狀態？
+    private var isEngineRunningByUserIntent by mutableStateOf(false)
+    // 2. 藍牙 SCO 音訊通道的「實際」狀態
     private var isScoAudioConnected by mutableStateOf(false)
 
+    private var audioDeviceCallback: Any? = null
 
+    // --- JNI Functions ---
     private external fun startEngine()
     private external fun stopEngine()
     private external fun setBandGain(bandIndex: Int, gainDb: Float)
     private external fun setBandQ(bandIndex: Int, q_factor: Float)
     private external fun setAudioInputDeviceId(deviceId: Int)
+    private external fun isEngineActuallyRunning(): Boolean // 查詢Oboe引擎的真實狀態
 
-
-    // --- Start of Bluetooth SCO Management ---
-
+    // --- Bluetooth SCO Management ---
     private val scoStateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             val state = intent.getIntExtra(AudioManager.EXTRA_SCO_AUDIO_STATE, AudioManager.SCO_AUDIO_STATE_ERROR)
             when (state) {
                 AudioManager.SCO_AUDIO_STATE_CONNECTED -> {
                     isScoAudioConnected = true
-                    Log.d("Hark", "Bluetooth SCO Audio connected")
-                    // SCO通道已連接！現在可以安全地設定設備並啟動引擎
-                    checkAndSetAudioDevice() // 確保 Oboe 使用藍牙設備
-                    // 如果引擎是因為等待 SCO 連接而尚未啟動，現在啟動它
-                    if (isEngineRunning && !isOboeEngineActuallyRunning()) { // 你需要一個方法來檢查 Oboe 引擎是否真的在跑
-                        startEngine()
-                        viewModel.statusText.value = "狀態：運作中 (藍牙)"
-                    }
+                    Log.d("Hark", "Event: Bluetooth SCO Audio connected.")
+                    checkAndSetAudioDevice()
                 }
                 AudioManager.SCO_AUDIO_STATE_DISCONNECTED -> {
                     isScoAudioConnected = false
-                    Log.d("Hark", "Bluetooth SCO Audio disconnected")
-                    // SCO通道已斷開
-                    // 如果引擎正在運行，可能需要停止或切換音訊來源
-                    if (isEngineRunning) {
-                        // 考慮在這裡停止引擎或嘗試切換到其他麥克風
-                        // stopEngine() // 或者讓 checkAndSetAudioDevice 處理切換
-                        viewModel.statusText.value = "狀態：藍牙已斷開"
-                    }
-                    checkAndSetAudioDevice() // 讓 Oboe 知道設備已更改
-                    // 你可能需要在這裡處理藍牙斷線後，切回手機麥克風的邏輯
-                    // 並且，如果之前是因為等待 SCO 而沒有啟動引擎，現在也不應該啟動
+                    Log.d("Hark", "Event: Bluetooth SCO Audio disconnected.")
+                    checkAndSetAudioDevice()
                 }
                 AudioManager.SCO_AUDIO_STATE_ERROR -> {
-                    isScoAudioConnected = false
-                    Log.e("Hark", "Bluetooth SCO Audio error")
-                    // 通知使用者或記錄錯誤
-                    if (isEngineRunning) {
-                         // 可能需要停止引擎，因為預期的藍牙音訊無法使用
-                        // stopEngine()
-                        // onEngineStateChange(false) // 透過 ViewModel 更新狀態，會呼叫 stopEngine 和 stopBluetoothSco
-                    }
+                    isScoAudioConnected = false // 即使錯誤，也更新 SCO 狀態
+                    Log.e("Hark", "Event: Bluetooth SCO Audio error.")
+                    checkAndSetAudioDevice() // 嘗試切換到其他可用設備
                 }
             }
         }
@@ -132,7 +116,12 @@ class MainActivity : ComponentActivity() {
 
     private fun registerScoStateReceiver() {
         val filter = IntentFilter(AudioManager.ACTION_SCO_AUDIO_STATE_UPDATED)
-        registerReceiver(scoStateReceiver, filter)
+        // Android 13 (TIRAMISU) and above require specifying receiver export status
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(scoStateReceiver, filter, RECEIVER_EXPORTED)
+        } else {
+            registerReceiver(scoStateReceiver, filter)
+        }
     }
     // --- End of Bluetooth SCO Management ---
 
@@ -141,37 +130,57 @@ class MainActivity : ComponentActivity() {
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         System.loadLibrary("hark")
 
+        // 檢查並請求 RECORD_AUDIO 權限
+        val permissionLauncher = registerForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { isGranted: Boolean ->
+            if (isGranted) {
+                Log.d("Hark", "RECORD_AUDIO permission granted.")
+                // 權限授予後，可以進行初始化或重新檢查設備
+                checkAndSetAudioDevice()
+            } else {
+                Log.w("Hark", "RECORD_AUDIO permission denied.")
+                viewModel.statusText.value = "狀態：麥克風權限被拒絕"
+                // 處理權限被拒絕的情況，例如提示用戶或禁用相關功能
+            }
+        }
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        } else {
+            // 如果權限已授予，可以提前做一次設備檢查
+            // 但引擎的啟動仍應由用戶操作觸發
+        }
+
         setContent {
             HarkTheme {
                 HarkAppScreen(
                     viewModel = viewModel,
                     audioManager = audioManager,
-                    isEngineOn = isEngineRunning, // isEngineRunning 反映用戶的意圖
-                    onEngineStateChange = { userWantsToRunEngine ->
-                        if (userWantsToRunEngine) {
-                            isEngineRunning = true // 設定用戶意圖
-                            viewModel.statusText.value = "狀態：正在連接藍牙..."
-                            // 當用戶想啟動引擎時，我們先啟動藍牙SCO
-                            if (!audioManager.isBluetoothScoOn && !isScoAudioConnected) {
+                    isEngineOn = isEngineRunningByUserIntent, // UI 狀態綁定到用戶意圖
+                    onEngineStateChange = { userWantsToRun ->
+                        if (userWantsToRun) {
+                            isEngineRunningByUserIntent = true
+                            viewModel.statusText.value = "狀態：正在偵測音訊裝置..."
+
+                            // 檢查是否需要啟動藍牙SCO
+                            // 這裡的 isBluetoothHeadsetConnected() 可以更精確，僅檢查 SCO 兼容設備
+                            if (isBluetoothScoHeadsetConnected() && !audioManager.isBluetoothScoOn && !isScoAudioConnected) {
+                                viewModel.statusText.value = "狀態：正在連接藍牙..."
                                 audioManager.startBluetoothSco()
-                                // 注意：我們不在這裡直接 startEngine()
-                                // 而是等待 scoStateReceiver 通知我們連接成功後，再啟動
-                            } else if (isScoAudioConnected) {
-                                // 如果 SCO 已經連接，直接嘗試啟動引擎
-                                checkAndSetAudioDevice() // 確保 Oboe 設備正確
-                                if (!isOboeEngineActuallyRunning()) { // 檢查實際狀態
-                                    startEngine()
-                                }
-                                viewModel.statusText.value = "狀態：運作中 (藍牙)"
+                                // 等待 scoStateReceiver 回調，它會呼叫 checkAndSetAudioDevice
                             } else {
-                                // isBluetoothScoOn 為 true 但 isScoAudioConnected 為 false，說明正在連接中
-                                // 等待廣播即可
+                                // 如果 SCO 已連線，或不使用藍牙，直接選擇設備並嘗試啟動引擎
+                                checkAndSetAudioDevice()
                             }
                         } else {
-                            isEngineRunning = false // 設定用戶意圖
-                            stopEngine()
+                            isEngineRunningByUserIntent = false
+                            if (isEngineActuallyRunning()) { // 先檢查引擎是否真的在跑
+                                stopEngine()
+                            }
                             if (audioManager.isBluetoothScoOn || isScoAudioConnected) {
                                 audioManager.stopBluetoothSco()
+                                // isScoAudioConnected 會在 scoStateReceiver 中被更新為 false
                             }
                             viewModel.statusText.value = "狀態：已停用"
                         }
@@ -185,49 +194,129 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        registerAudioDeviceCallback() // 用於有線耳機等設備的插拔
-        registerScoStateReceiver()   // 註冊 SCO 狀態廣播接收器
-
-        // 可選：如果應用程式恢復時，藍牙耳機已連接，可以嘗試預先啟動 SCO
-        // 但要注意，如果用戶此時並不打算使用麥克風，這可能會讓人困惑
-        // 更穩妥的做法是等待用戶明確的操作 (例如點擊錄音按鈕)
-        // if (isBluetoothHeadsetConnected() && !audioManager.isBluetoothScoOn && !isScoAudioConnected) {
-        //     audioManager.startBluetoothSco()
-        // }
+        registerAudioDeviceCallback()
+        registerScoStateReceiver()
+        // 當 App 恢復時，也檢查一次當前音訊設備狀態，以防在背景時發生變化
+        // 這確保了 UI 狀態 (如 viewModel.statusText) 和實際設備狀態的一致性
+        // 注意：這裡不主動啟動引擎，僅更新設備狀態和可能的 UI 反饋
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            checkAndSetAudioDevice()
+        }
     }
 
     override fun onPause() {
         super.onPause()
         unregisterAudioDeviceCallback()
-        unregisterReceiver(scoStateReceiver) // 取消註冊 SCO 狀態廣播接收器
+        unregisterReceiver(scoStateReceiver)
 
-        if (isEngineRunning) { // 如果引擎(用戶意圖)仍在運行
-            stopEngine() // 停止 Oboe 引擎
-            isEngineRunning = false // 更新意圖狀態
-            viewModel.statusText.value = "狀態：已停用"
-        }
-        if (audioManager.isBluetoothScoOn || isScoAudioConnected) {
-            audioManager.stopBluetoothSco() // 確保釋放 SCO 資源
-            isScoAudioConnected = false
+        // 如果 App 退到背景且引擎是由用戶意圖啟動的
+        if (isEngineRunningByUserIntent) {
+            if (isEngineActuallyRunning()) {
+                stopEngine()
+            }
+            if (audioManager.isBluetoothScoOn || isScoAudioConnected) {
+                audioManager.stopBluetoothSco()
+            }
+            // 不需要在此處設置 isEngineRunningByUserIntent = false
+            // 因為用戶的“意圖”並沒有改變，只是App暫停了。
+            // 回到 App 時，onResume 中的 checkAndSetAudioDevice 會根據意圖恢復引擎 (如果適用)
+            // 但通常更好的做法是明確停止，讓用戶在返回時重新啟動，以節省資源。
+            // 為了與你原始的 onPause 邏輯一致，這裡也停止並更新狀態：
+            isEngineRunningByUserIntent = false
+            isScoAudioConnected = false // 既然 SCO 停了，就更新狀態
+            viewModel.statusText.value = "狀態：已暫停 (App 背景)"
         }
     }
 
-    private fun isBluetoothHeadsetConnected(): Boolean {
-        val devices = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) { // Android 12+
-            audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS or AudioManager.GET_DEVICES_INPUTS) // 或者分別獲取再合併
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) { // Android 6.0 (API 23) to Android 11 (API 30)
-            // 分別獲取輸入和輸出設備，然後合併
-            // 或者，如果只關心是否有 SCO 設備存在，檢查其中一個列表即可
-            // 這裡我們檢查輸入設備，因為麥克風是 SCO 的關鍵部分
-            audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS)
-        } else {
-            // 對於 API 23 以下的版本，沒有 getDevices() 方法。
-            // 你可能需要使用已被棄用的方法，或者接受無法精確檢測的限制。
-            // 例如，可以嘗試使用 isBluetoothScoOn()，但它不保證耳機真的連接了。
-            // 為了簡化，這裡返回 false，表示在舊版本上無法可靠檢測。
-            return false // 或者實現舊版本的邏輯
+    // --- 核心設備選擇與引擎管理邏輯 ---
+    private fun checkAndSetAudioDevice() {
+        val devices = audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS)
+        var targetDeviceId: Int = 0 // 0 代表 Oboe 的預設/未指定設備 (通常是內建麥克風)
+        var deviceTypeName = "內建麥克風"
+        var deviceTypeDetail = "Default"
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            Log.w("Hark", "checkAndSetAudioDevice: RECORD_AUDIO permission not granted. Aborting.")
+            viewModel.statusText.value = "狀態：無麥克風權限"
+            // 如果引擎意外運行，則停止
+            if (isEngineActuallyRunning()) stopEngine()
+            return
         }
-        return devices.any { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO }
+
+        // 1. 優先使用已連接的藍牙 SCO
+        if (isScoAudioConnected) { // 依賴我們維護的 isScoAudioConnected 狀態
+            devices.find { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO }?.let {
+                targetDeviceId = it.id
+                deviceTypeName = "藍牙"
+                deviceTypeDetail = "Bluetooth SCO (ID: ${it.id})"
+                Log.d("Hark", "Target device selected: $deviceTypeDetail")
+            } ?: run {
+                // SCO 連接了，但在設備列表中找不到？這不應該發生，但作為防禦
+                Log.w("Hark", "SCO connected but no SCO device found in input list. Forcing SCO off.")
+                // 這種情況下，可能 SCO 狀態出錯，嘗試關閉它並重新評估
+                audioManager.stopBluetoothSco() // isScoAudioConnected 會在 Receiver 中更新
+                // 這裡不立即返回，讓後續邏輯選擇有線或內建
+            }
+        }
+
+        // 2. 如果沒有藍牙 SCO (或 SCO 查找失敗)，檢查有線耳機
+        if (targetDeviceId == 0 || !isScoAudioConnected) { // 確保 SCO 確實沒連上才檢查有線
+            devices.find { it.type == AudioDeviceInfo.TYPE_WIRED_HEADSET }?.let {
+                targetDeviceId = it.id
+                deviceTypeName = "有線耳機"
+                deviceTypeDetail = "Wired Headset (ID: ${it.id})"
+                Log.d("Hark", "Target device selected: $deviceTypeDetail")
+            }
+        }
+
+        // 3. 如果以上都沒有，使用內建麥克風 (Oboe 通常會預設選取，但明確指定ID更好)
+        if (targetDeviceId == 0) {
+            devices.find { it.type == AudioDeviceInfo.TYPE_BUILTIN_MIC }?.let {
+                targetDeviceId = it.id // 如果能找到內建麥克風的明確 ID
+                deviceTypeDetail = "Built-in Mic (ID: ${it.id})"
+            } ?: run {
+                deviceTypeDetail = "Default/Built-in Mic (ID: 0)"
+            }
+            Log.d("Hark", "Target device selected: $deviceTypeDetail (fallback)")
+        }
+
+        // --- 引擎啟動/停止/重啟邏輯 ---
+        val wasEngineActuallyRunning = isEngineActuallyRunning()
+
+        // 如果目標設備改變，或者引擎狀態與用戶意圖不符，需要調整
+        // 且 Oboe 引擎需要先停止才能安全地改變輸入設備
+        if (wasEngineActuallyRunning) {
+            Log.d("Hark", "Engine was running. Stopping it before setting new device or restarting.")
+            stopEngine()
+        }
+
+        Log.d("Hark", "Setting audio input device ID to: $targetDeviceId ($deviceTypeDetail)")
+        setAudioInputDeviceId(targetDeviceId) // 呼叫 JNI 設定 Oboe 輸入裝置
+
+        if (isEngineRunningByUserIntent) {
+            Log.d("Hark", "User intent is to run engine. Starting engine with $deviceTypeDetail.")
+            startEngine() // 根據用戶意圖啟動引擎
+            if (isEngineActuallyRunning()) { // 確認引擎真的啟動了
+                viewModel.statusText.value = "狀態：運作中 ($deviceTypeName)"
+            } else {
+                // 如果 startEngine() 失敗 (雖然比較少見，但 JNI 可能有錯誤)
+                viewModel.statusText.value = "狀態：引擎啟動失敗 ($deviceTypeName)"
+                Log.e("Hark", "Engine failed to start with $deviceTypeDetail despite user intent.")
+                // 這種情況下，可能需要將 isEngineRunningByUserIntent 設回 false 或提供更詳細錯誤
+            }
+        } else {
+            // 用戶意圖是停止，並且我們已經在前面停止了引擎 (如果它在跑)
+            // 這裡確保 UI 狀態正確
+            if (!isEngineActuallyRunning()) { // 再次確認引擎已停止
+                viewModel.statusText.value = "狀態：已停用"
+                Log.d("Hark", "User intent is to stop engine. Engine confirmed stopped.")
+            } else {
+                // 這不應該發生，如果 isEngineRunningByUserIntent 是 false，引擎應該已經停了
+                Log.w("Hark", "User intent is to stop, but engine is still running after stopEngine() and setAudioInputDeviceId(). Forcing stop again.")
+                stopEngine() // 再次嘗試停止
+                viewModel.statusText.value = "狀態：已停用 (強制)"
+            }
+        }
     }
 
 
@@ -240,89 +329,44 @@ class MainActivity : ComponentActivity() {
         return false // 暫時的佔位符
     }
 
+    // --- Helper Functions ---
+    // 這個函數判斷是否有 SCO *兼容* 的藍牙耳機連接，但不一定代表 SCO *通道* 已開啟
+    private fun isBluetoothScoHeadsetConnected(): Boolean {
+        // 僅檢查 TYPE_BLUETOOTH_SCO 更為準確，因為 A2DP 是用於高品質音訊輸出的，不適用於輸入。
+        // 有些設備可能同時支持 A2DP 和 SCO，但我們關心的是 SCO 輸入能力。
+        return audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS)
+            .any { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO }
+    }
+
     private fun registerAudioDeviceCallback() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val callback = object : android.media.AudioDeviceCallback() {
                 override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>?) {
+                    super.onAudioDevicesAdded(addedDevices) // 呼叫父類方法
+                    Log.d("Hark", "Audio device added: ${addedDevices?.joinToString { it.productName.toString() + " type " + it.type }}")
                     checkAndSetAudioDevice()
                 }
 
                 override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>?) {
+                    super.onAudioDevicesRemoved(removedDevices) // 呼叫父類方法
+                    Log.d("Hark", "Audio device removed: ${removedDevices?.joinToString { it.productName.toString() + " type " + it.type }}")
                     checkAndSetAudioDevice()
                 }
             }
-            audioManager.registerAudioDeviceCallback(callback, null)
+            audioManager.registerAudioDeviceCallback(callback, null) // Handler 為 null 表示在主線程回呼
             audioDeviceCallback = callback
         }
     }
 
     private fun unregisterAudioDeviceCallback() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && audioDeviceCallback != null) {
-            audioManager.unregisterAudioDeviceCallback(audioDeviceCallback as android.media.AudioDeviceCallback)
-            audioDeviceCallback = null
-        }
-    }
-
-    private fun checkAndSetAudioDevice() {
-        // Find the headset microphone
-        val devices = audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS)
-        var preferredDeviceId: Int = 0 // 預設為 0 (通常代表主要/內建麥克風)
-        val wasEngineActuallyRunning = isOboeEngineActuallyRunning() // 檢查引擎是否真的在跑
-
-        // 優先使用藍牙 SCO 設備 (如果 SCO 已連接)
-        if (isScoAudioConnected) { // 使用我們自己維護的 SCO 狀態
-            val btDevice = devices.find { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO }
-            if (btDevice != null) {
-                preferredDeviceId = btDevice.id
-                Log.d("Hark", "Using Bluetooth SCO device ID: $preferredDeviceId")
-            } else {
-                Log.d("Hark", "SCO connected but no SCO device found in input list? Strange.")
-                // 這種情況比較奇怪，可能需要進一步調試
+            try {
+                audioManager.unregisterAudioDeviceCallback(audioDeviceCallback as android.media.AudioDeviceCallback)
+            } catch (e: Exception) {
+                Log.e("Hark", "Error unregistering audio device callback", e)
+            } finally {
+                audioDeviceCallback = null
             }
-        } else {
-            // 如果 SCO 未連接，檢查是否有有線耳機
-            val wiredDevice = devices.find { it.type == AudioDeviceInfo.TYPE_WIRED_HEADSET }
-            if (wiredDevice != null) {
-                preferredDeviceId = wiredDevice.id
-                Log.d("Hark", "Using Wired Headset device ID: $preferredDeviceId")
-            } else {
-                // 如果都沒有，則使用預設設備 (可能是手機麥克風)
-                // 有些手機上，預設輸入設備的 id 可能不是0，可以查找 TYPE_BUILTIN_MIC
-                val builtInMic = devices.find { it.type == AudioDeviceInfo.TYPE_BUILTIN_MIC }
-                if (builtInMic != null) {
-                    preferredDeviceId = builtInMic.id
-                }
-                Log.d("Hark", "Using Built-in Mic or default device ID: $preferredDeviceId")
-            }
-        }
-
-        // 如果引擎之前真的在跑，先停止它，因為音訊設備即將改變
-        if (wasEngineActuallyRunning) {
-            stopEngine()
-        }
-
-        // 設定新的設備ID給 Oboe 引擎
-        Log.d("Hark", "Setting audio input device ID to: $preferredDeviceId")
-        setAudioInputDeviceId(preferredDeviceId) // 呼叫 JNI
-
-        // 如果引擎之前就在跑 (用戶的意圖是啟動，並且 SCO 也允許)，現在把它重新啟動
-        // 只有在用戶意圖是啟動引擎 (isEngineRunning)，並且新的首選設備不是預設/回退設備（除非沒有其他選擇）
-        // 或者更簡單：如果用戶意圖是啟動，就嘗試用新設備啟動
-        if (isEngineRunning && (isScoAudioConnected || preferredDeviceId != 0 /* 避免在 SCO 斷開且無其他設備時自動啟動預設麥克風，除非邏輯允許 */)) {
-            // 確保只有在 SCO 連接時，或者有其他有效設備時才因為 checkAndSetAudioDevice 而重新啟動
-            if (isScoAudioConnected || devices.any{it.id == preferredDeviceId && it.type != AudioDeviceInfo.TYPE_BUILTIN_MIC && preferredDeviceId !=0} ) {
-                 startEngine()
-                 // viewModel.statusText.value = "狀態：運作中" // 狀態更新應更精確
-            } else if (!isScoAudioConnected && preferredDeviceId == 0 && devices.any{it.type == AudioDeviceInfo.TYPE_BUILTIN_MIC}) {
-                 // 如果 SCO 斷開，且切換到了內建麥克風，並且用戶意圖是啟動
-                 startEngine() // 允許使用內建麥克風
-                 viewModel.statusText.value = "狀態：運作中 (內建麥克風)"
-            }
-        } else if (isEngineRunning && !isScoAudioConnected && preferredDeviceId == 0) {
-            // 用戶意圖是啟動，但 SCO 斷開，且回退到預設麥克風
-            // 這裡可能需要提示用戶，或者根據產品邏輯決定是否自動用內建麥克風啟動
-            viewModel.statusText.value = "狀態：藍牙已斷開，請檢查設備"
-            // stopEngine() // 確保引擎已停止
         }
     }
 }

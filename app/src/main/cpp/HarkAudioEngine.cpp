@@ -65,6 +65,10 @@ void HarkAudioEngine::start() {
     }
 }
 
+bool HarkAudioEngine::isEngineRunning() const {
+    // 只要 mOutputStream 存在且正在串流，就代表引擎在運作
+    return (mOutputStream && mOutputStream->getState() != oboe::StreamState::Closed);
+}
 
 bool HarkAudioEngine::setupStreams() {
     oboe::AudioStreamBuilder outBuilder;

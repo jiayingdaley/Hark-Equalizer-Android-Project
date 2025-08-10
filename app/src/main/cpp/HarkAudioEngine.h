@@ -8,6 +8,8 @@
 class HarkAudioEngine : public oboe::AudioStreamDataCallback {
 public:
     bool setupStreams();
+    bool isEngineRunning() const;
+
     HarkAudioEngine();
     ~HarkAudioEngine();
 

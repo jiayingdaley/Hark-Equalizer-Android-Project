@@ -32,3 +32,20 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_example_hark_MainActivity_setAudioInputDeviceId(JNIEnv *env, jobject thiz, jint device_id) {
     engine.setInputDeviceId(device_id);
 }
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_example_hark_MainActivity_isEngineRunning(JNIEnv *env, jobject thiz) {
+return (jboolean) engine.isEngineRunning();
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_example_hark_MainActivity_isEngineActuallyRunning(JNIEnv *env, jobject /* this */) {
+    // 假設 engine.isEngineRunning() 回傳 C++ 的 bool
+    // bool isRunning = engine.isEngineRunning();
+    // return (jboolean)isRunning;
+
+    return (jboolean) engine.isEngineRunning();
+
+    // 如果只是測試，可以這樣：
+    return JNI_TRUE; // 或 JNI_FALSE
+}
