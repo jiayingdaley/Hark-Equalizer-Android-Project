@@ -6,6 +6,8 @@
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
+#define DEFAULT_MAKEUP_GAIN_DB 22.0f // <--- 在這裡調整音量！試試 6.0 到 12.0 之間的值
+
 
 const int NUM_BANDS = 16;
 const double centerFrequencies[] = {
@@ -18,6 +20,18 @@ HarkAudioEngine::HarkAudioEngine() : filterChain(NUM_BANDS), sampleRate(48000.0)
     for (int i = 0; i < NUM_BANDS; ++i) {
         filterChain.updateBand(i, sampleRate, centerFrequencies[i], mBandGains[i], mBandQs[i]);
     }
+
+    // --- 初始化 WDRC 和 Limiter ---
+    // WDRC: 低閾值，低壓縮比，反應速度適中
+    // 目的：將日常聲音壓縮到舒適範圍
+    mWdrc.setParameters(-45.0f, 2.5f, 5.0f, 100.0f, sampleRate);
+    // Limiter: 高閾值，極高壓縮比，極快反應速度
+    // 目的：防止任何削波，保護聽力
+    mLimiter.setParameters(-1.0f, 20.0f, 1.0f, 50.0f, sampleRate);
+
+    // --- 初始化補償增益 ---
+    setMakeupGain(DEFAULT_MAKEUP_GAIN_DB);
+
 }
 
 HarkAudioEngine::~HarkAudioEngine() {
@@ -38,8 +52,10 @@ void HarkAudioEngine::setInputDeviceId(int32_t deviceId) {
     mInputDeviceId = deviceId;
 }
 
-void HarkAudioEngine::setOutputDeviceId(int32_t deviceId) {
-    mOutputDeviceId = deviceId;
+void HarkAudioEngine::setMakeupGain(float gainDb) {
+    mMakeupGainDb = gainDb;
+    mMakeupGainLinear = powf(10.0f, mMakeupGainDb / 20.0f);
+    LOGD("Makeup gain set to %.2f dB (Linear: %.4f)", mMakeupGainDb, mMakeupGainLinear);
 }
 
 void HarkAudioEngine::start() {
@@ -187,20 +203,43 @@ void HarkAudioEngine::setBandQ(int bandIndex, float q_factor) {
     }
 }
 
+// --- 新增參數設定函數的實作 ---
+void HarkAudioEngine::setWdrcParameters(float thresholdDb, float ratio, float attackMs, float releaseMs) {
+    mWdrc.setParameters(thresholdDb, ratio, attackMs, releaseMs, sampleRate);
+}
+
+void HarkAudioEngine::setLimiterParameters(float thresholdDb, float ratio, float attackMs, float releaseMs) {
+    mLimiter.setParameters(thresholdDb, ratio, attackMs, releaseMs, sampleRate);
+}
+
+
+// --- 最關鍵的修改：更新 onAudioReady 處理鏈 ---
 oboe::DataCallbackResult HarkAudioEngine::onAudioReady(oboe::AudioStream *oboeStream, void *audioData, int32_t numFrames) {
-    // Read audio from the input stream directly into the output buffer.
     auto result = mInputStream->read(audioData, numFrames, 0);
 
-    if (!result) { // Note: Oboe V3 uses !result to check for errors.
+    if (!result) {
         LOGE("Input stream read error: %s", oboe::convertToText(result.error()));
-        // Fill buffer with silence in case of an error to avoid loud noise.
-        memset(audioData, 0, sizeof(float) * numFrames);
+        memset(audioData, 0, sizeof(float) * numFrames); // 將緩衝區填滿靜音以避免錯誤時產生雜訊
+        return oboe::DataCallbackResult::Continue;
     }
 
-    // Apply the filter chain.
-    auto *outputData = static_cast<float *>(audioData);
+    auto *buffer = static_cast<float *>(audioData);
     for (int i = 0; i < numFrames; ++i) {
-        outputData[i] = filterChain.process(outputData[i]);
+        float sample = buffer[i];
+
+        // Stage 1: IIR 等化器
+        sample = filterChain.process(sample);
+
+        // Stage 2: WDRC
+        sample = mWdrc.process(sample);
+
+        // Stage 3: Limiter
+        sample = mLimiter.process(sample);
+
+        // --- Stage 4: Makeup Gain (最終放大) ---
+        sample = sample * mMakeupGainLinear; // <-- 就是這一步！
+
+        buffer[i] = sample;
     }
 
     return oboe::DataCallbackResult::Continue;

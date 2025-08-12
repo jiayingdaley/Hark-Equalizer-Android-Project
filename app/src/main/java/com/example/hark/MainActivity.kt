@@ -628,9 +628,8 @@ fun EqualizerCurveDisplay(
 
     Canvas(
         modifier = modifier
-            .width(totalWidthDp)
-            .fillMaxHeight()
-            .pointerInput(centerFrequencies) {
+            .fillMaxSize()
+            .pointerInput(centerFrequencies) { // key1 ensures re-launch on band count change
                 forEachGesture {
                     awaitPointerEventScope {
                         awaitFirstDown(requireUnconsumed = false).also {

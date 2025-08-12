@@ -3,7 +3,13 @@ cmake_minimum_required(VERSION 3.22.1)
 
 project("hark")
 
-add_library(hark SHARED native-lib.cpp HarkAudioEngine.cpp BiquadFilter.cpp FilterChain.cpp)
+add_library(hark SHARED
+        native-lib.cpp
+        HarkAudioEngine.cpp
+        BiquadFilter.cpp
+        FilterChain.cpp
+        DynamicsProcessor.cpp
+)
 
 find_library(log-lib log)
 
