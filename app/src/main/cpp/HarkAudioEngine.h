@@ -26,6 +26,8 @@ public:
     // 設定補償增益的函數 (可選，我們先在內部設定)
     void setMakeupGain(float gainDb);
 
+    void setPreGain(float gainDb);
+
     // Oboe callback
     oboe::DataCallbackResult onAudioReady(oboe::AudioStream *oboeStream, void *audioData, int32_t numFrames) override;
 
@@ -47,4 +49,6 @@ private:
     // --- 補償增益成員 ---
     float mMakeupGainDb;      // 以 dB 為單位的值，方便理解和調整
     float mMakeupGainLinear;  // 線性乘數，用於實際計算
+
+    float mPreGainLinear;
 };

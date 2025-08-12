@@ -4,8 +4,14 @@
 
 class BiquadFilter {
 public:
+    enum class Type {
+        Peaking,
+        LowShelf,
+        HighShelf
+    };
+
     BiquadFilter();
-    void updateCoefficients(double sampleRate, double centerHz, double gainDb, double q_factor);
+    void updateCoefficients(Type type, double sampleRate, double centerHz, double gainDb, double q_factor);
     float process(float in);
 
 private:

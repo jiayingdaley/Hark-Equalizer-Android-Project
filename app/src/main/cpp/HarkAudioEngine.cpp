@@ -6,36 +6,49 @@
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
-#define DEFAULT_MAKEUP_GAIN_DB 22.0f // <--- 在這裡調整音量！試試 6.0 到 12.0 之間的值
+#define DEFAULT_MAKEUP_GAIN_DB 6.0f // <--- 在這裡調整音量！試試 6.0 到 20.0 之間的值
+#define DEFAULT_PRE_GAIN_DB 15.0f
 
+const int NUM_SHELF_FILTERS = 2;
+const int NUM_PEAK_FILTERS = 16; // 這個對應到原本的 NUM_BANDS
+const int TOTAL_FILTERS = NUM_SHELF_FILTERS + NUM_PEAK_FILTERS; // 總共 18 個並聯濾波器
 
-const int NUM_BANDS = 16;
 const double centerFrequencies[] = {
         250.0, 315.0, 400.0, 500.0, 630.0, 800.0, 1000.0, 1250.0,
         1600.0, 2000.0, 2500.0, 3150.0, 4000.0, 5000.0, 6300.0, 8000.0
 };
 
-HarkAudioEngine::HarkAudioEngine() : filterChain(NUM_BANDS), sampleRate(48000.0), mBandGains(NUM_BANDS, 0.0f), mBandQs(NUM_BANDS, 1.8f), mInputDeviceId(oboe::kUnspecified), mIsRunning(false) { // Initialize mIsRunning
-    // Initialize filters with default values
-    for (int i = 0; i < NUM_BANDS; ++i) {
-        filterChain.updateBand(i, sampleRate, centerFrequencies[i], mBandGains[i], mBandQs[i]);
+HarkAudioEngine::HarkAudioEngine() : filterChain(NUM_PEAK_FILTERS), sampleRate(48000.0), mBandGains(NUM_PEAK_FILTERS, 0.0f), mBandQs(NUM_PEAK_FILTERS, 1.8f), mInputDeviceId(oboe::kUnspecified), mIsRunning(false) { // Initialize mIsRunning
+    // --- 初始化前級增益 ---
+    setPreGain(DEFAULT_PRE_GAIN_DB);
+
+    // --- 初始化並聯濾波器組 ---
+    // 0: Low-Shelf
+    filterChain.updateBand(0, BiquadFilter::Type::LowShelf, sampleRate, 250.0, -3.0, 0.707); // 預設稍微降低低頻雜音
+    // 1 to 16: Peaking EQs (使用者可調)
+    for (int i = 0; i < NUM_PEAK_FILTERS; ++i) {
+        // UI 控制的頻段現在索引是 i + 1
+        filterChain.updateBand(i + 1, BiquadFilter::Type::Peaking, sampleRate, centerFrequencies[i], mBandGains[i], mBandQs[i]);
     }
+    // 17: High-Shelf
+    filterChain.updateBand(TOTAL_FILTERS - 1, BiquadFilter::Type::HighShelf, sampleRate, 8000.0, 0.0, 0.707); // 預設保留高頻細節
 
-    // --- 初始化 WDRC 和 Limiter ---
-    // WDRC: 低閾值，低壓縮比，反應速度適中
-    // 目的：將日常聲音壓縮到舒適範圍
-    mWdrc.setParameters(-45.0f, 2.5f, 5.0f, 100.0f, sampleRate);
-    // Limiter: 高閾值，極高壓縮比，極快反應速度
-    // 目的：防止任何削波，保護聽力
+    // --- 修改 WDRC 閾值 ---
+    // 提高閾值，只處理較大的聲音
+    mWdrc.setParameters(-25.0f, 2.5f, 5.0f, 100.0f, sampleRate);
+
+    // Limiter 和 Makeup Gain 初始化保持不變
     mLimiter.setParameters(-1.0f, 20.0f, 1.0f, 50.0f, sampleRate);
-
-    // --- 初始化補償增益 ---
     setMakeupGain(DEFAULT_MAKEUP_GAIN_DB);
 
 }
 
 HarkAudioEngine::~HarkAudioEngine() {
     stop();
+}
+
+void HarkAudioEngine::setPreGain(float gainDb) {
+    mPreGainLinear = powf(10.0f, gainDb / 20.0f);
 }
 
 void HarkAudioEngine::setInputDeviceId(int32_t deviceId) {
@@ -189,17 +202,28 @@ void HarkAudioEngine::stop() {
     LOGD("HarkAudioEngine stopped.");
 }
 
+// 注意索引偏移
 void HarkAudioEngine::setBandGain(int bandIndex, float gainDb) {
-    if (bandIndex >= 0 && bandIndex < NUM_BANDS) {
+    if (bandIndex >= 0 && bandIndex < NUM_PEAK_FILTERS) {
         mBandGains[bandIndex] = gainDb;
-        filterChain.updateBand(bandIndex, sampleRate, centerFrequencies[bandIndex], mBandGains[bandIndex], mBandQs[bandIndex]);
+        // 注意索引 +1，因為第 0 個濾波器是 Low-Shelf
+        filterChain.updateBand(bandIndex + 1, BiquadFilter::Type::Peaking, sampleRate, centerFrequencies[bandIndex], mBandGains[bandIndex], mBandQs[bandIndex]);
     }
 }
 
 void HarkAudioEngine::setBandQ(int bandIndex, float q_factor) {
-    if (bandIndex >= 0 && bandIndex < NUM_BANDS) {
-        mBandQs[bandIndex] = q_factor;
-        filterChain.updateBand(bandIndex, sampleRate, centerFrequencies[bandIndex], mBandGains[bandIndex], mBandQs[bandIndex]);
+    if (bandIndex >= 0 && bandIndex < NUM_PEAK_FILTERS) {
+        mBandQs[bandIndex] = q_factor; // 更新 mBandQs 陣列中的 Q 值
+        // 確保傳遞正確的參數數量和順序
+        // Peaking EQ 從濾波器鏈的索引 1 開始，對應 UI 的 bandIndex 0
+        filterChain.updateBand(
+            bandIndex + 1,                 // 1. 濾波器在鏈中的實際索引 (+1)
+            BiquadFilter::Type::Peaking,   // 2. 濾波器類型
+            sampleRate,                    // 3. 取樣率
+            centerFrequencies[bandIndex],  // 4. 中心頻率
+            mBandGains[bandIndex],         // 5. 該頻段的增益 (從 mBandGains 獲取)
+            mBandQs[bandIndex]             // 6. 新的 Q 值 (剛剛在上面這行賦值的)
+        );
     }
 }
 
@@ -227,20 +251,20 @@ oboe::DataCallbackResult HarkAudioEngine::onAudioReady(oboe::AudioStream *oboeSt
     for (int i = 0; i < numFrames; ++i) {
         float sample = buffer[i];
 
-        // Stage 1: IIR 等化器
+        // Stage 1: Pre-Gain
+        sample = sample * mPreGainLinear;
+
+        // Stage 2: Parallel Filter Bank
         sample = filterChain.process(sample);
 
-        // Stage 2: WDRC
+        // Stage 3 & 4: WDRC and Limiter
         sample = mWdrc.process(sample);
-
-        // Stage 3: Limiter
         sample = mLimiter.process(sample);
 
-        // --- Stage 4: Makeup Gain (最終放大) ---
-        sample = sample * mMakeupGainLinear; // <-- 就是這一步！
+        // Stage 5: Post-Gain (Makeup)
+        sample = sample * mMakeupGainLinear;
 
         buffer[i] = sample;
     }
-
     return oboe::DataCallbackResult::Continue;
 }

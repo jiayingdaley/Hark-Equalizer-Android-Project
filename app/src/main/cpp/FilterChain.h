@@ -6,7 +6,7 @@
 class FilterChain {
 public:
     FilterChain(int numBands);
-    void updateBand(int bandIndex, double sampleRate, double centerHz, double gainDb, double q_factor);
+    void updateBand(int bandIndex, BiquadFilter::Type type, double sampleRate, double centerHz, double gainDb, double q_factor);
     float process(float in);
 
 private:
