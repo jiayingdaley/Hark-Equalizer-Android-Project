@@ -38,6 +38,10 @@ void HarkAudioEngine::setInputDeviceId(int32_t deviceId) {
     mInputDeviceId = deviceId;
 }
 
+void HarkAudioEngine::setOutputDeviceId(int32_t deviceId) {
+    mOutputDeviceId = deviceId;
+}
+
 void HarkAudioEngine::start() {
     if (mIsRunning) {
         LOGD("HarkAudioEngine is already running.");

@@ -18,14 +18,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
-import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.gestures.forEachGesture
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -57,20 +54,23 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import com.example.hark.ui.theme.HarkTheme
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 // Object to hold all tunable UI parameters
 object UIConstants {
-    //val SLIDER_LENGTH: Dp = 250.dp
-    //val SLIDER_THICKNESS: Dp = 60.dp
-    val BAND_CONTAINER_WIDTH: Dp = 60.dp
+    val BAND_CONTAINER_WIDTH: Dp = 70.dp
 }
 
 class MainActivity : ComponentActivity() {
-
+    private val deviceChangeMutex = Mutex()
     private val viewModel: EqViewModel by viewModels()
     private lateinit var audioManager: AudioManager
 
@@ -88,7 +88,7 @@ class MainActivity : ComponentActivity() {
     private external fun setBandGain(bandIndex: Int, gainDb: Float)
     private external fun setBandQ(bandIndex: Int, q_factor: Float)
     private external fun setAudioInputDeviceId(deviceId: Int)
-    private external fun isEngineActuallyRunning(): Boolean // 查詢Oboe引擎的真實狀態
+    private external fun isEngineActuallyRunning(): Boolean
 
     // --- Bluetooth SCO Management ---
     private val scoStateReceiver = object : BroadcastReceiver() {
@@ -96,19 +96,29 @@ class MainActivity : ComponentActivity() {
             val state = intent.getIntExtra(AudioManager.EXTRA_SCO_AUDIO_STATE, AudioManager.SCO_AUDIO_STATE_ERROR)
             when (state) {
                 AudioManager.SCO_AUDIO_STATE_CONNECTED -> {
+                    val previouslyConnected = isScoAudioConnected
                     isScoAudioConnected = true
                     Log.d("Hark", "Event: Bluetooth SCO Audio connected.")
-                    checkAndSetAudioDevice()
+                    // 只有在狀態改變時才觸發，避免不必要的重複調用
+                    if (!previouslyConnected) {
+                        lifecycleScope.launch { checkAndSetAudioDevice() }
+                    }
                 }
                 AudioManager.SCO_AUDIO_STATE_DISCONNECTED -> {
+                    val previouslyConnected = isScoAudioConnected
                     isScoAudioConnected = false
                     Log.d("Hark", "Event: Bluetooth SCO Audio disconnected.")
-                    checkAndSetAudioDevice()
+                    if (previouslyConnected) {
+                        lifecycleScope.launch { checkAndSetAudioDevice() }
+                    }
                 }
                 AudioManager.SCO_AUDIO_STATE_ERROR -> {
+                    val previouslyConnected = isScoAudioConnected
                     isScoAudioConnected = false // 即使錯誤，也更新 SCO 狀態
                     Log.e("Hark", "Event: Bluetooth SCO Audio error.")
-                    checkAndSetAudioDevice() // 嘗試切換到其他可用設備
+                    if (previouslyConnected) { // 或者即使之前沒連接也檢查，因為錯誤可能意味著需要切換
+                        lifecycleScope.launch { checkAndSetAudioDevice() }
+                    }
                 }
             }
         }
@@ -118,8 +128,9 @@ class MainActivity : ComponentActivity() {
         val filter = IntentFilter(AudioManager.ACTION_SCO_AUDIO_STATE_UPDATED)
         // Android 13 (TIRAMISU) and above require specifying receiver export status
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(scoStateReceiver, filter, RECEIVER_EXPORTED)
+            registerReceiver(scoStateReceiver, filter, Context.RECEIVER_EXPORTED)
         } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
             registerReceiver(scoStateReceiver, filter)
         }
     }
@@ -130,26 +141,19 @@ class MainActivity : ComponentActivity() {
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         System.loadLibrary("hark")
 
-        // 檢查並請求 RECORD_AUDIO 權限
-        val permissionLauncher = registerForActivityResult(
-            ActivityResultContracts.RequestPermission()
-        ) { isGranted: Boolean ->
+        // 權限請求
+        val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
             if (isGranted) {
                 Log.d("Hark", "RECORD_AUDIO permission granted.")
-                // 權限授予後，可以進行初始化或重新檢查設備
-                checkAndSetAudioDevice()
+                lifecycleScope.launch { checkAndSetAudioDevice() } // 獲取權限後檢查設備
             } else {
                 Log.w("Hark", "RECORD_AUDIO permission denied.")
                 viewModel.statusText.value = "狀態：麥克風權限被拒絕"
-                // 處理權限被拒絕的情況，例如提示用戶或禁用相關功能
             }
         }
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-        } else {
-            // 如果權限已授予，可以提前做一次設備檢查
-            // 但引擎的啟動仍應由用戶操作觸發
         }
 
         setContent {
@@ -157,36 +161,42 @@ class MainActivity : ComponentActivity() {
                 HarkAppScreen(
                     viewModel = viewModel,
                     audioManager = audioManager,
-                    isEngineOn = isEngineRunningByUserIntent, // UI 狀態綁定到用戶意圖
+                    isEngineOn = isEngineRunningByUserIntent,
                     onEngineStateChange = { userWantsToRun ->
-                        if (userWantsToRun) {
-                            isEngineRunningByUserIntent = true
-                            viewModel.statusText.value = "狀態：正在偵測音訊裝置..."
+                    if (userWantsToRun) {
+                        isEngineRunningByUserIntent = true
+                        viewModel.statusText.value = "狀態：正在偵測音訊裝置..."
 
-                            // 檢查是否需要啟動藍牙SCO
-                            // 這裡的 isBluetoothHeadsetConnected() 可以更精確，僅檢查 SCO 兼容設備
-                            if (isBluetoothScoHeadsetConnected() && !audioManager.isBluetoothScoOn && !isScoAudioConnected) {
-                                viewModel.statusText.value = "狀態：正在連接藍牙..."
-                                audioManager.startBluetoothSco()
-                                // 等待 scoStateReceiver 回調，它會呼叫 checkAndSetAudioDevice
-                            } else {
-                                // 如果 SCO 已連線，或不使用藍牙，直接選擇設備並嘗試啟動引擎
-                                checkAndSetAudioDevice()
-                            }
+                        // 檢查是否需要啟動藍牙 SCO
+                        // isBluetoothScoHeadsetConnected() 檢查是否有 SCO *兼容* 設備
+                        if (isBluetoothScoHeadsetConnected() && !audioManager.isBluetoothScoOn) {
+                            Log.d("Hark", "User wants to run engine. Bluetooth SCO compatible device detected and SCO is off. Starting SCO...")
+                            viewModel.statusText.value = "狀態：正在連接藍牙..."
+                            audioManager.isSpeakerphoneOn = false // 嘗試確保音訊路由到藍牙
+                            audioManager.startBluetoothSco()
+                            // scoStateReceiver 會在 SCO 連接成功或失敗後調用 checkAndSetAudioDevice
                         } else {
-                            isEngineRunningByUserIntent = false
-                            if (isEngineActuallyRunning()) { // 先檢查引擎是否真的在跑
-                                stopEngine()
+                            // 如果 SCO 已連線，或不使用藍牙 (例如使用有線耳機)，直接檢查設備並嘗試啟動引擎
+                            Log.d("Hark", "User wants to run engine. SCO not needed or already on. Calling checkAndSetAudioDevice.")
+                            lifecycleScope.launch { checkAndSetAudioDevice() }
+                        }
+                    } else {
+                        isEngineRunningByUserIntent = false
+                        Log.d("Hark", "User wants to stop engine.")
+                        // checkAndSetAudioDevice 內部會處理停止引擎的邏輯
+                        lifecycleScope.launch { checkAndSetAudioDevice() } // 即使是關閉，也調用一次以確保狀態正確
+
+                        // 如果之前啟動了 SCO，現在應該關閉它
+                        if (audioManager.isBluetoothScoOn) {
+                            Log.d("Hark", "Stopping Bluetooth SCO as engine is being turned off.")
+                            audioManager.stopBluetoothSco()
+                            isScoAudioConnected = false // 立即更新狀態，儘管 receiver 也會收到通知
                             }
-                            if (audioManager.isBluetoothScoOn || isScoAudioConnected) {
-                                audioManager.stopBluetoothSco()
-                                // isScoAudioConnected 會在 scoStateReceiver 中被更新為 false
-                            }
-                            viewModel.statusText.value = "狀態：已停用"
                         }
                     },
-                    jniSetBandGain = { band, gain -> setBandGain(band, gain) },
-                    jniSetBandQ = { band, q -> setBandQ(band, q) }
+                    // Pass the JNI functions as method references
+                    onSetBandGain = ::setBandGain,
+                    onSetBandQ = ::setBandQ
                 )
             }
         }
@@ -196,11 +206,23 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         registerAudioDeviceCallback()
         registerScoStateReceiver()
-        // 當 App 恢復時，也檢查一次當前音訊設備狀態，以防在背景時發生變化
-        // 這確保了 UI 狀態 (如 viewModel.statusText) 和實際設備狀態的一致性
-        // 注意：這裡不主動啟動引擎，僅更新設備狀態和可能的 UI 反饋
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-            checkAndSetAudioDevice()
+
+        if (isEngineRunningByUserIntent) {
+            Log.d("Hark", "Resuming app with user intent to run engine.")
+            // 觸發一次完整的檢查與啟動流程
+            // 如果上次是因為藍牙耳機而運行的，嘗試重新連接 SCO
+            if (isBluetoothScoHeadsetConnected() && !audioManager.isBluetoothScoOn) {
+                Log.d("Hark", "onResume: Attempting to restart Bluetooth SCO.")
+                audioManager.startBluetoothSco()
+                // 等待 scoStateReceiver 回調
+            } else {
+                // 其他情況（有線耳機，或 SCO 已連接）
+                Log.d("Hark", "onResume: Calling checkAndSetAudioDevice directly.")
+                lifecycleScope.launch { checkAndSetAudioDevice() }
+            }
+        } else {
+            Log.d("Hark", "Resuming app, user intent is engine off. Updating status.")
+            viewModel.statusText.value = "狀態：已停用" // 確保UI同步
         }
     }
 
@@ -209,164 +231,194 @@ class MainActivity : ComponentActivity() {
         unregisterAudioDeviceCallback()
         unregisterReceiver(scoStateReceiver)
 
-        // 如果 App 退到背景且引擎是由用戶意圖啟動的
-        if (isEngineRunningByUserIntent) {
-            if (isEngineActuallyRunning()) {
-                stopEngine()
-            }
-            if (audioManager.isBluetoothScoOn || isScoAudioConnected) {
-                audioManager.stopBluetoothSco()
-            }
-            // 不需要在此處設置 isEngineRunningByUserIntent = false
-            // 因為用戶的“意圖”並沒有改變，只是App暫停了。
-            // 回到 App 時，onResume 中的 checkAndSetAudioDevice 會根據意圖恢復引擎 (如果適用)
-            // 但通常更好的做法是明確停止，讓用戶在返回時重新啟動，以節省資源。
-            // 為了與你原始的 onPause 邏輯一致，這裡也停止並更新狀態：
-            isEngineRunningByUserIntent = false
-            isScoAudioConnected = false // 既然 SCO 停了，就更新狀態
-            viewModel.statusText.value = "狀態：已暫停 (App 背景)"
+        if (isEngineActuallyRunning()) {
+            Log.d("Hark", "Pausing app. Stopping engine.")
+            stopEngine() // stopEngine() 應該只停止 JNI 引擎
+            // viewModel.statusText.value = "狀態：已暫停" // 移到 checkAndSetAudioDevice 或引擎停止後
         }
+
+        // App 退到背景時，如果 SCO 是開啟的，考慮停止它以釋放資源
+        // 除非你的應用需要在背景持續使用 SCO
+        if (audioManager.isBluetoothScoOn) {
+            Log.d("Hark", "Pausing app. Stopping Bluetooth SCO.")
+            audioManager.stopBluetoothSco()
+            isScoAudioConnected = false
+        }
+
+        // 狀態更新應基於 isEngineRunningByUserIntent
+        if (isEngineRunningByUserIntent) {
+            viewModel.statusText.value = "狀態：已暫停 (請連接耳機以恢復)" // 或者更通用的暫停提示
+        } else {
+            viewModel.statusText.value = "狀態：已停用"
+        }
+        // 注意：isEngineRunningByUserIntent 保持不變，以便 onResume 時可以知道是否需要重啟
     }
 
     // --- 核心設備選擇與引擎管理邏輯 ---
-    private fun checkAndSetAudioDevice() {
-        val devices = audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS)
-        var targetDeviceId: Int = 0 // 0 代表 Oboe 的預設/未指定設備 (通常是內建麥克風)
-        var deviceTypeName = "內建麥克風"
-        var deviceTypeDetail = "Default"
+    // 將函數標記為 suspend
+private suspend fun checkAndSetAudioDevice() {
+    deviceChangeMutex.withLock {
+        Log.d("Hark", "Running checkAndSetAudioDevice under lock...")
 
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            Log.w("Hark", "checkAndSetAudioDevice: RECORD_AUDIO permission not granted. Aborting.")
-            viewModel.statusText.value = "狀態：無麥克風權限"
-            // 如果引擎意外運行，則停止
-            if (isEngineActuallyRunning()) stopEngine()
-            return
+        // 1. 檢查是否有任何形式的耳機作為「輸出」設備
+        //    這是為了判斷是否可以安全地播放音訊而不打擾他人（或產生回授）
+        val outputDevices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+        val isAnyHeadphonesOutputConnected = outputDevices.any {
+            it.type == AudioDeviceInfo.TYPE_WIRED_HEADSET ||
+            it.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES ||
+            it.type == AudioDeviceInfo.TYPE_USB_HEADSET ||
+            it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO || // SCO 通常也意味著輸出到耳機
+            it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP    // A2DP 是高品質音訊輸出到藍牙設備
+            // 你可以根據需要添加或移除類型，例如 TYPE_USB_DEVICE 如果它確實代表耳機輸出
+        }
+        Log.d("Hark", "Is any headphones output connected: $isAnyHeadphonesOutputConnected")
+
+        // 2. 如果使用者意圖是開啟引擎，但「沒有任何耳機輸出」，則提示並停止
+        if (isEngineRunningByUserIntent && !isAnyHeadphonesOutputConnected) {
+            Log.w("Hark", "No headphones output detected. Forcing engine stop.")
+            if (isEngineActuallyRunning()) {
+                stopEngine()
+            }
+            viewModel.statusText.value = "狀態：請連接耳機"
+            // 如果之前因為 SCO 連接問題而停止了藍牙，這裡可以考慮是否要再次嘗試連接
+            // 但通常在此情況下，用戶應先連接耳機。
+            if (audioManager.isBluetoothScoOn) { // 如果 SCO 意外開啟，也關掉
+                audioManager.stopBluetoothSco()
+                isScoAudioConnected = false
+            }
+            return@withLock // 終止後續流程
         }
 
-        // 1. 優先使用已連接的藍牙 SCO
-        if (isScoAudioConnected) { // 依賴我們維護的 isScoAudioConnected 狀態
-            devices.find { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO }?.let {
+        // 3. 選擇「輸入」設備 (如果需要啟動引擎或引擎已在運行)
+        //    即使有耳機輸出，我們仍需選擇正確的輸入源。
+        val inputDevices = audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS)
+        var targetDeviceId = 0 // 預設為 0 (通常是內建麥克風)
+        var deviceTypeName = "內建麥克風" // 預設名稱
+
+        // 優先級 1: 已連接的藍牙 SCO (如果 isScoAudioConnected 為 true)
+        if (isScoAudioConnected) { // isScoAudioConnected 應由 BroadcastReceiver 更新
+            inputDevices.find { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO }?.let {
                 targetDeviceId = it.id
-                deviceTypeName = "藍牙"
-                deviceTypeDetail = "Bluetooth SCO (ID: ${it.id})"
-                Log.d("Hark", "Target device selected: $deviceTypeDetail")
-            } ?: run {
-                // SCO 連接了，但在設備列表中找不到？這不應該發生，但作為防禦
-                Log.w("Hark", "SCO connected but no SCO device found in input list. Forcing SCO off.")
-                // 這種情況下，可能 SCO 狀態出錯，嘗試關閉它並重新評估
-                audioManager.stopBluetoothSco() // isScoAudioConnected 會在 Receiver 中更新
-                // 這裡不立即返回，讓後續邏輯選擇有線或內建
+                deviceTypeName = "藍牙耳機"
+                Log.d("Hark", "Input device selected: Bluetooth SCO (ID: $targetDeviceId)")
             }
         }
 
-        // 2. 如果沒有藍牙 SCO (或 SCO 查找失敗)，檢查有線耳機
-        if (targetDeviceId == 0 || !isScoAudioConnected) { // 確保 SCO 確實沒連上才檢查有線
-            devices.find { it.type == AudioDeviceInfo.TYPE_WIRED_HEADSET }?.let {
+        // 優先級 2: USB 音訊設備 (耳機或麥克風)
+        if (targetDeviceId == 0) { // 只有在藍牙 SCO 未選中時才檢查 USB
+            // 首先查找 USB 耳麥 (同時具備輸入輸出)
+            inputDevices.find { it.type == AudioDeviceInfo.TYPE_USB_HEADSET }?.let {
                 targetDeviceId = it.id
-                deviceTypeName = "有線耳機"
-                deviceTypeDetail = "Wired Headset (ID: ${it.id})"
-                Log.d("Hark", "Target device selected: $deviceTypeDetail")
+                deviceTypeName = "USB 耳機"
+                Log.d("Hark", "Input device selected: USB Headset (ID: $targetDeviceId)")
+            } ?: inputDevices.find { it.type == AudioDeviceInfo.TYPE_USB_DEVICE }?.let {
+                // 然後查找通用的 USB 音訊設備 (可能是獨立麥克風)
+                // 注意：TYPE_USB_DEVICE 可能也包括沒有麥克風的 USB DAC，需要根據實際情況調整
+                targetDeviceId = it.id
+                deviceTypeName = "USB 麥克風/設備"
+                Log.d("Hark", "Input device selected: USB Device (ID: $targetDeviceId)")
             }
         }
 
-        // 3. 如果以上都沒有，使用內建麥克風 (Oboe 通常會預設選取，但明確指定ID更好)
-        if (targetDeviceId == 0) {
-            devices.find { it.type == AudioDeviceInfo.TYPE_BUILTIN_MIC }?.let {
-                targetDeviceId = it.id // 如果能找到內建麥克風的明確 ID
-                deviceTypeDetail = "Built-in Mic (ID: ${it.id})"
-            } ?: run {
-                deviceTypeDetail = "Default/Built-in Mic (ID: 0)"
+        // 優先級 3: 有線耳機 (3.5mm)
+        if (targetDeviceId == 0) { // 只有在前兩者都未選中時才檢查有線耳機
+            inputDevices.find { it.type == AudioDeviceInfo.TYPE_WIRED_HEADSET }?.let {
+                targetDeviceId = it.id
+                deviceTypeName = "有線耳機 (3.5mm)"
+                Log.d("Hark", "Input device selected: Wired Headset (ID: $targetDeviceId)")
             }
-            Log.d("Hark", "Target device selected: $deviceTypeDetail (fallback)")
         }
 
-        // --- 引擎啟動/停止/重啟邏輯 ---
-        val wasEngineActuallyRunning = isEngineActuallyRunning()
+        Log.d("Hark", "Final input device decision. Target Device: $deviceTypeName (ID: $targetDeviceId)")
 
-        // 如果目標設備改變，或者引擎狀態與用戶意圖不符，需要調整
-        // 且 Oboe 引擎需要先停止才能安全地改變輸入設備
-        if (wasEngineActuallyRunning) {
-            Log.d("Hark", "Engine was running. Stopping it before setting new device or restarting.")
+        // 4. 根據最終結果和用戶意圖，管理引擎狀態
+        val engineWasActuallyRunning = isEngineActuallyRunning()
+
+        // 停止當前引擎（如果正在運行），以便使用新選擇的設備ID重新啟動
+        // 或者如果用戶意圖是關閉，也需要停止。
+        if (engineWasActuallyRunning) {
             stopEngine()
+            Log.d("Hark", "Engine stopped to apply new settings or due to user intent.")
         }
 
-        Log.d("Hark", "Setting audio input device ID to: $targetDeviceId ($deviceTypeDetail)")
-        setAudioInputDeviceId(targetDeviceId) // 呼叫 JNI 設定 Oboe 輸入裝置
+        // 設定選擇的音訊輸入設備 ID
+        setAudioInputDeviceId(targetDeviceId)
+        Log.d("Hark", "Audio input device ID set to: $targetDeviceId")
+
 
         if (isEngineRunningByUserIntent) {
-            Log.d("Hark", "User intent is to run engine. Starting engine with $deviceTypeDetail.")
-            startEngine() // 根據用戶意圖啟動引擎
-            if (isEngineActuallyRunning()) { // 確認引擎真的啟動了
-                viewModel.statusText.value = "狀態：運作中 ($deviceTypeName)"
+            // 只有在檢測到耳機輸出 (或沒有強制停止的情況下) 且用戶意圖開啟時才嘗試啟動
+            if (isAnyHeadphonesOutputConnected) { // 再次確認，以防萬一狀態在鎖內改變 (可能性小但安全)
+                Log.d("Hark", "Attempting to start engine...")
+                startEngine()
+                if (isEngineActuallyRunning()) {
+                    viewModel.statusText.value = "狀態：運作中 ($deviceTypeName)"
+                    Log.i("Hark", "Engine started successfully with $deviceTypeName")
+                } else {
+                    viewModel.statusText.value = "狀態：引擎啟動失敗"
+                    Log.e("Hark", "Engine failed to start after setting device to $deviceTypeName (ID: $targetDeviceId)")
+                    // isEngineRunningByUserIntent = false // 可以考慮如果啟動失敗，是否重置用戶意圖
+                }
             } else {
-                // 如果 startEngine() 失敗 (雖然比較少見，但 JNI 可能有錯誤)
-                viewModel.statusText.value = "狀態：引擎啟動失敗 ($deviceTypeName)"
-                Log.e("Hark", "Engine failed to start with $deviceTypeDetail despite user intent.")
-                // 這種情況下，可能需要將 isEngineRunningByUserIntent 設回 false 或提供更詳細錯誤
+                // 這個分支理論上不應該執行到，因為前面已經有 return@withLock
+                // 但作為防禦性程式碼保留
+                Log.w("Hark", "Engine start aborted as no headphones output detected (should have been caught earlier).")
+                if (isEngineActuallyRunning()) stopEngine() // 確保停止
+                viewModel.statusText.value = "狀態：請連接耳機"
             }
         } else {
-            // 用戶意圖是停止，並且我們已經在前面停止了引擎 (如果它在跑)
-            // 這裡確保 UI 狀態正確
-            if (!isEngineActuallyRunning()) { // 再次確認引擎已停止
-                viewModel.statusText.value = "狀態：已停用"
-                Log.d("Hark", "User intent is to stop engine. Engine confirmed stopped.")
-            } else {
-                // 這不應該發生，如果 isEngineRunningByUserIntent 是 false，引擎應該已經停了
-                Log.w("Hark", "User intent is to stop, but engine is still running after stopEngine() and setAudioInputDeviceId(). Forcing stop again.")
-                stopEngine() // 再次嘗試停止
-                viewModel.statusText.value = "狀態：已停用 (強制)"
-            }
+            // 用戶意圖是關閉引擎
+            // 引擎已在上面被停止 (if engineWasActuallyRunning)，這裡只需更新狀態
+            viewModel.statusText.value = "狀態：已停用"
+            Log.d("Hark", "User intent is to keep engine off. Status: Disabled.")
         }
     }
-
-
-    // 你可能需要一個方法來判斷 Oboe 引擎是否真的在運作 (而不是用戶的意圖 isEngineRunning)
-    // 這取決於你的 C++ 引擎的實現
-    private fun isOboeEngineActuallyRunning(): Boolean {
-        // TODO: 實現這個方法，例如，檢查 C++ 層的一個狀態變數
-        // external fun isEngineReallyRunning(): Boolean
-        // return isEngineReallyRunning()
-        return false // 暫時的佔位符
-    }
+}
 
     // --- Helper Functions ---
     // 這個函數判斷是否有 SCO *兼容* 的藍牙耳機連接，但不一定代表 SCO *通道* 已開啟
     private fun isBluetoothScoHeadsetConnected(): Boolean {
-        // 僅檢查 TYPE_BLUETOOTH_SCO 更為準確，因為 A2DP 是用於高品質音訊輸出的，不適用於輸入。
-        // 有些設備可能同時支持 A2DP 和 SCO，但我們關心的是 SCO 輸入能力。
-        return audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS)
-            .any { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO }
+        // 檢查是否有任何輸入設備是 TYPE_BLUETOOTH_SCO
+        // 這表示有一個藍牙設備聲稱它支持 SCO (通常是耳麥)
+        // 這不代表 SCO 音訊通道 *已經* 建立，只是表示有這個可能性
+        val devices = audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS) // 或者 GET_DEVICES_ALL
+        val scoCompatibleDeviceExists = devices.any { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO }
+        if (scoCompatibleDeviceExists) {
+            Log.d("Hark_Debug", "isBluetoothScoHeadsetConnected: Found SCO compatible input device.")
+        }
+
+        // 有些情況下，輸出設備列表也可能包含 SCO 設備信息
+        val outputDevices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+        val scoCompatibleOutputExists = outputDevices.any { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO }
+        if (scoCompatibleOutputExists) {
+            Log.d("Hark_Debug", "isBluetoothScoHeadsetConnected: Found SCO compatible output device.")
+        }
+
+        return scoCompatibleDeviceExists || scoCompatibleOutputExists
     }
 
     private fun registerAudioDeviceCallback() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val callback = object : android.media.AudioDeviceCallback() {
                 override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>?) {
-                    super.onAudioDevicesAdded(addedDevices) // 呼叫父類方法
-                    Log.d("Hark", "Audio device added: ${addedDevices?.joinToString { it.productName.toString() + " type " + it.type }}")
-                    checkAndSetAudioDevice()
+                    Log.d("Hark", "Audio device added.")
+                    lifecycleScope.launch { checkAndSetAudioDevice() }
                 }
 
                 override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>?) {
-                    super.onAudioDevicesRemoved(removedDevices) // 呼叫父類方法
-                    Log.d("Hark", "Audio device removed: ${removedDevices?.joinToString { it.productName.toString() + " type " + it.type }}")
-                    checkAndSetAudioDevice()
+                    Log.d("Hark", "Audio device removed.")
+                    lifecycleScope.launch { checkAndSetAudioDevice() }
                 }
             }
-            audioManager.registerAudioDeviceCallback(callback, null) // Handler 為 null 表示在主線程回呼
+            audioManager.registerAudioDeviceCallback(callback, null)
             audioDeviceCallback = callback
         }
     }
 
     private fun unregisterAudioDeviceCallback() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && audioDeviceCallback != null) {
-            try {
-                audioManager.unregisterAudioDeviceCallback(audioDeviceCallback as android.media.AudioDeviceCallback)
-            } catch (e: Exception) {
-                Log.e("Hark", "Error unregistering audio device callback", e)
-            } finally {
-                audioDeviceCallback = null
-            }
+            audioManager.unregisterAudioDeviceCallback(audioDeviceCallback as android.media.AudioDeviceCallback)
+            audioDeviceCallback = null
         }
     }
 }
@@ -377,19 +429,21 @@ fun HarkAppScreen(
     audioManager: AudioManager?,
     isEngineOn: Boolean,
     onEngineStateChange: (Boolean) -> Unit,
-    jniSetBandGain: (bandIndex: Int, gainDb: Float) -> Unit, // <--- 接收 JNI 函數
-    jniSetBandQ: (bandIndex: Int, q_factor: Float) -> Unit    // <--- 接收 JNI 函數
+    onSetBandGain: (bandIndex: Int, gain: Float) -> Unit, // Explicitly define the contract
+    onSetBandQ: (bandIndex: Int, q: Float) -> Unit       // Explicitly define the contract
 ) {
     val context = LocalContext.current
-    var isPermissionGranted by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) }
+    val isPermissionGranted by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) }
 
+    // This launcher is for UI feedback, the main logic is in MainActivity's onCreate
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
-        onResult = { isGranted -> isPermissionGranted = isGranted }
+        onResult = { /* isGranted -> you can update a UI state here if needed */ }
     )
 
+    // This LaunchedEffect is good for one-time actions like checking permission on start
     LaunchedEffect(Unit) {
-        if (!isPermissionGranted) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
@@ -405,28 +459,19 @@ fun HarkAppScreen(
 
     val totalBandContainerWidth = UIConstants.BAND_CONTAINER_WIDTH * centerFrequencies.size
 
-    // --- 修改：LaunchedEffect 用於在模式切換時同步 JNI ---
-    LaunchedEffect(currentMode, currentBandGains) { // 依賴 currentMode 和 currentBandGains
-        Log.d("HarkAppScreen", "Mode changed to: $currentMode or gains data changed. Syncing JNI.")
-        currentBandGains.forEachIndexed { index, gainState ->
-            jniSetBandGain(index, gainState.value)
-            // 如果 JNI 層的頻段數量是固定的 (例如總是16個)，
-            // 並且當前模式的頻段較少 (例如8個)，您可能需要決定如何處理剩餘的頻段。
-            // 一種可能是將它們的增益設置為0。
-            // 但如果 JNI 的 setBandGain 只影響指定索引，這裡的遍歷是正確的。
-        }
-        // 同步 Q 值 (如果需要)
-        viewModel.currentBandQs.forEachIndexed { index, qState ->
-             jniSetBandQ(index, qState.value)
-        }
-
-        // 如果從16切到8，可能需要將8之後的頻段在JNI層重置 (如果JNI不會自動處理)
-        if (currentMode == EqViewModel.EngineMode.BIQUAD_8_MIC && viewModel.centerFrequencies16.size > centerFrequencies.size) {
-            for (i in centerFrequencies.size until viewModel.centerFrequencies16.size) {
-                // 假設 JNI 層最多支持16個頻段
-                jniSetBandGain(i, 0f) // 將未使用的頻段增益設為0
-                jniSetBandQ(i, EqViewModel.DEFAULT_Q) // 將未使用的頻段Q設為預設  <--- POTENTIAL ISSUE HERE
-            }
+    // This effect syncs the ViewModel state to the JNI layer whenever the mode changes.
+    LaunchedEffect(currentMode) {
+        Log.d("HarkAppScreen", "Mode changed to: $currentMode. Syncing JNI state.")
+        // Sync all 16 potential bands to ensure clean state
+        for (i in 0 until 16) {
+            val gain = viewModel.bandGains16.getOrNull(i)?.value ?: 0f
+            val q = viewModel.bandQs16.getOrNull(i)?.value ?: EqViewModel.DEFAULT_Q
+            // For 8-band mode, gains/Qs for bands 8-15 will be from the 16-band default values (likely 0 and default Q)
+            // if the current mode is 8-band, we still set them to a neutral state.
+            val gainForSync = if (currentMode == EqViewModel.EngineMode.BIQUAD_8_MIC && i >= 8) 0f else gain
+            val qForSync = if (currentMode == EqViewModel.EngineMode.BIQUAD_8_MIC && i >= 8) EqViewModel.DEFAULT_Q else q
+            onSetBandGain(i, gainForSync)
+            onSetBandQ(i, qForSync)
         }
     }
 
@@ -445,44 +490,33 @@ fun HarkAppScreen(
                     Button(
                         onClick = { viewModel.currentMode.value = EqViewModel.EngineMode.BIQUAD_16_MIC },
                         colors = if (currentMode == EqViewModel.EngineMode.BIQUAD_16_MIC) activeColor else inactiveColor
-                    ) {
-                        Text("16-Band Mode")
-                    }
+                    ) { Text("16-Band Mode") }
+
                     Button(
                         onClick = { viewModel.currentMode.value = EqViewModel.EngineMode.BIQUAD_8_MIC },
                         colors = if (currentMode == EqViewModel.EngineMode.BIQUAD_8_MIC) activeColor else inactiveColor
-                    ) {
-                        Text("8-Band Mode")
-                    }
+                    ) { Text("8-Band Mode") }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
+                // Master switch
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("主開關")
                     Spacer(modifier = Modifier.width(8.dp))
                     Switch(
                         checked = isEngineOn,
-                        onCheckedChange = { newState ->
-                            onEngineStateChange(newState)
-                            // viewModel.statusText 的更新已經在 MainActivity 的 onEngineStateChange 中處理了
-                        },
+                        onCheckedChange = onEngineStateChange,
                         enabled = isPermissionGranted
                     )
                 }
                 if (!isPermissionGranted) {
-                    Text("請授予麥克風權限以啟用", color = Color.Red)
+                    Text("請授予麥克風權限以啟用", color = MaterialTheme.colorScheme.error)
                 }
                 Text(text = statusText, style = MaterialTheme.typography.bodyLarge)
                 Spacer(modifier = Modifier.height(8.dp))
+                // Reset button
                 Button(onClick = {
-                    viewModel.resetCurrentModeBands() // 重設 ViewModel 中的數據
-                    // 將重設後的數據同步到 JNI
-                    viewModel.currentBandGains.forEachIndexed { index, gainState ->
-                        jniSetBandGain(index, gainState.value)
-                    }
-                    viewModel.currentBandQs.forEachIndexed { index, qState ->
-                        jniSetBandQ(index, qState.value)
-                    }
-                    Log.d("HarkAppScreen", "Equalizer reset for mode: $currentMode")
+                    viewModel.resetCurrentModeBands()
+                    // The LaunchedEffect above will automatically sync the changes to JNI
                 }) {
                     Text("重設等化器")
                 }
@@ -490,6 +524,7 @@ fun HarkAppScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Equalizer UI
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -504,6 +539,7 @@ fun HarkAppScreen(
                         .fillMaxHeight(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    // Frequency labels
                     Row(modifier = Modifier.fillMaxWidth()) {
                         centerFrequencies.forEach { freq ->
                             Text(
@@ -514,19 +550,17 @@ fun HarkAppScreen(
                             )
                         }
                     }
-
+                    // The interactive curve display
                     EqualizerCurveDisplay(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f),
-                        bandGains = currentBandGains, // <--- 傳遞 List<MutableState<Float>>
+                        bandGains = currentBandGains,
                         centerFrequencies = centerFrequencies,
                         onDragBand = { bandIndex, newGain ->
-                            viewModel.updateBandGain(bandIndex, newGain) // 更新 ViewModel
-                            jniSetBandGain(bandIndex, newGain)          // 更新 JNI
-                            // Log.d("HarkAppScreen", "Band $bandIndex gain updated to $newGain for mode $currentMode")
+                            viewModel.updateBandGain(bandIndex, newGain)
+                            onSetBandGain(bandIndex, newGain)
                         }
-                        // 如果Q值也通過拖拽調整，也需要類似的回調
                     )
 
                     Row(modifier = Modifier.fillMaxWidth()) {
@@ -551,11 +585,9 @@ fun HarkAppScreen(
     }
 }
 
-private fun RowScope.formatFrequencyLabel(freq: Int): String  {
-    if (freq < 1000) {
-        return freq.toString()
-    }
-    // Perform floating point division
+
+private fun formatFrequencyLabel(freq: Int): String  {
+    if (freq < 1000) return freq.toString()
     val kHz = freq / 1000.0
     // Format to one decimal place, then remove ".0" if it's a whole number.
     // e.g., 1000 -> 1.0 -> "1", 1250 -> 1.25 -> "1.3", 1600 -> 1.6 -> "1.6"
@@ -586,54 +618,41 @@ fun SystemVolumeSlider(audioManager: AudioManager) {
 @Composable
 fun EqualizerCurveDisplay(
     modifier: Modifier = Modifier,
-    bandGains: List<State<Float>>, // <--- 接收 List<State<Float>> (MutableState 也是 State)
+    bandGains: List<State<Float>>,
     centerFrequencies: List<Int>,
     onDragBand: (bandIndex: Int, gain: Float) -> Unit
 ) {
     val primaryColor = MaterialTheme.colorScheme.primary
     val waveColor = primaryColor.copy(alpha = 0.3f)
-
-    // Calculate the total width required by the canvas based on its content
     val totalWidthDp = UIConstants.BAND_CONTAINER_WIDTH * centerFrequencies.size
 
     Canvas(
         modifier = modifier
             .width(totalWidthDp)
             .fillMaxHeight()
-            .pointerInput(centerFrequencies, bandGains) { // 依賴項包含 bandGains
+            .pointerInput(centerFrequencies) {
                 forEachGesture {
                     awaitPointerEventScope {
-                        val down = awaitFirstDown(requireUnconsumed = false)
-                        val bandWidthPx = size.width / centerFrequencies.size.toFloat() // 確保是浮點數除法
-
-                        var bandIndex = (down.position.x / bandWidthPx).toInt().coerceIn(0, centerFrequencies.size - 1)
-                        var initialGainAtPointerDown = bandGains[bandIndex].value // 記錄按下時的增益
-
-                        val change = awaitTouchSlopOrCancellation(down.id) { change, _ ->
-                            if (change.pressed) change.consume()
+                        awaitFirstDown(requireUnconsumed = false).also {
+                            it.consume()
+                            val bandWidthPx = size.width / centerFrequencies.size.toFloat()
+                            val bandIndex = (it.position.x / bandWidthPx).toInt().coerceIn(0, centerFrequencies.size - 1)
+                            val gainRange = EqViewModel.MAX_GAIN_DB - EqViewModel.MIN_GAIN_DB
+                            val calculatedGain = EqViewModel.MAX_GAIN_DB - (it.position.y / size.height) * gainRange
+                            onDragBand(bandIndex, calculatedGain.coerceIn(EqViewModel.MIN_GAIN_DB, EqViewModel.MAX_GAIN_DB))
                         }
 
-                        if (change != null && change.pressed) {
-                            drag(down.id) { dragChange ->
-                                dragChange.consume()
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            if (event.changes.all { !it.pressed }) break // Exit if all pointers are up
 
-                                // 更新 bandIndex，以防用戶水平拖動到相鄰頻段 (可選，取決於期望的交互)
-                                // bandIndex = (dragChange.position.x / bandWidthPx).toInt().coerceIn(0, centerFrequencies.size - 1)
-
-                                // 計算增益變化量，基於垂直拖動距離
-                                // 0dB 在畫布中間
-                                val newY = dragChange.position.y.coerceIn(0f, size.height.toFloat())
-                                val gainRange = EqViewModel.MAX_GAIN_DB - EqViewModel.MIN_GAIN_DB // 總增益範圍
-                                val calculatedGain = EqViewModel.MAX_GAIN_DB - (newY / size.height) * gainRange
-
-                                // 或者基於拖動的相對變化 (可能更直觀)
-                                // val dragAmountY = dragChange.position.y - down.position.y // 相對於初始按下點的 Y 變化
-                                // val gainChangeRatio = -dragAmountY / (size.height / 2f) // 假設畫布一半對應 MAX_GAIN_DB
-                                // val calculatedGain = initialGainAtPointerDown + gainChangeRatio * EqViewModel.MAX_GAIN_DB
-
-                                val newGain = calculatedGain.coerceIn(EqViewModel.MIN_GAIN_DB, EqViewModel.MAX_GAIN_DB)
-
-                                onDragBand(bandIndex, newGain)
+                            event.changes.firstOrNull()?.let {
+                                it.consume()
+                                val bandWidthPx = size.width / centerFrequencies.size.toFloat()
+                                val bandIndex = (it.position.x / bandWidthPx).toInt().coerceIn(0, centerFrequencies.size - 1)
+                                val gainRange = EqViewModel.MAX_GAIN_DB - EqViewModel.MIN_GAIN_DB
+                                val calculatedGain = EqViewModel.MAX_GAIN_DB - (it.position.y / size.height) * gainRange
+                                onDragBand(bandIndex, calculatedGain.coerceIn(EqViewModel.MIN_GAIN_DB, EqViewModel.MAX_GAIN_DB))
                             }
                         }
                     }
@@ -642,9 +661,10 @@ fun EqualizerCurveDisplay(
     ) {
         val path = Path()
         val bandWidth = size.width / centerFrequencies.size.toFloat()
+        val gainRange = EqViewModel.MAX_GAIN_DB - EqViewModel.MIN_GAIN_DB
+        if (gainRange <= 0) return@Canvas
 
-        // 繪製中間的 0dB 線
-        val zeroDbY = size.height * ( (EqViewModel.MAX_GAIN_DB - 0f) / (EqViewModel.MAX_GAIN_DB - EqViewModel.MIN_GAIN_DB) )
+        val zeroDbY = size.height * (1f - (0f - EqViewModel.MIN_GAIN_DB) / gainRange)
         drawLine(
             color = Color.Gray,
             start = Offset(0f, zeroDbY),
@@ -652,37 +672,36 @@ fun EqualizerCurveDisplay(
             strokeWidth = 1.dp.toPx()
         )
 
-
         if (bandGains.isNotEmpty()) {
-            val gainRange = EqViewModel.MAX_GAIN_DB - EqViewModel.MIN_GAIN_DB
-            if (gainRange <= 0) return@Canvas // 防止除以零或負數
-
-            var yPosition = size.height * ( (EqViewModel.MAX_GAIN_DB - bandGains[0].value) / gainRange )
-            yPosition = yPosition.coerceIn(0f, size.height)
-            path.moveTo(bandWidth * 0.5f, yPosition)
-
-            bandGains.forEachIndexed { index, gainState ->
+            val points = bandGains.mapIndexed { index, gainState ->
                 val x = (index + 0.5f) * bandWidth
-                var y = size.height * ( (EqViewModel.MAX_GAIN_DB - gainState.value) / gainRange )
-                y = y.coerceIn(0f, size.height)
-
-                if (index == 0) { // 對於第一個點，也要 moveTo，或者確保 path 從這裡開始
-                    path.moveTo(x, y)
-                } else {
-                    path.lineTo(x, y)
-                }
-                drawCircle(
-                    color = primaryColor.copy(alpha = 0.7f),
-                    radius = 6.dp.toPx(),
-                    center = Offset(x, y)
-                )
+                val y = size.height * (1f - (gainState.value - EqViewModel.MIN_GAIN_DB) / gainRange)
+                Offset(x, y.coerceIn(0f, size.height))
             }
-            drawPath(
-                path = path,
-                color = primaryColor,
-                style = Stroke(width = 2.dp.toPx())
-            )
+
+            path.moveTo(points.first().x, points.first().y)
+            points.forEach { path.lineTo(it.x, it.y) }
+
+            drawPath(path = path, color = primaryColor, style = Stroke(width = 2.dp.toPx()))
+            points.forEach { point ->
+                drawCircle(color = primaryColor.copy(alpha = 0.7f), radius = 6.dp.toPx(), center = point)
+            }
         }
     }
 }
 
+// Preview remains the same, but we need to provide mock functions for the new parameters
+@Preview(showBackground = true)
+@Composable
+fun DefaultPreview() {
+    HarkTheme {
+        HarkAppScreen(
+            viewModel = EqViewModel(),
+            audioManager = null,
+            isEngineOn = false,
+            onEngineStateChange = {},
+            onSetBandGain = { _, _ -> },
+            onSetBandQ = { _, _ -> }
+        )
+    }
+}
