@@ -1,15 +1,21 @@
 #include "DynamicsProcessor.h"
-#include <android/log.h>
 #include <cmath>
 
+#ifdef __ANDROID__
+#include <android/log.h>
 #define LOG_TAG "DynamicsProcessor"
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
+#else
+#include <cstdio>
+#define LOGE(...) do { std::fprintf(stderr, __VA_ARGS__); std::fprintf(stderr, "\n"); } while(0)
+#define LOGW(...) do { std::fprintf(stderr, __VA_ARGS__); std::fprintf(stderr, "\n"); } while(0)
+#endif
 
 DynamicsProcessor::DynamicsProcessor() :
-        mCompressThreshold(1.0f),
+        mCompressThreshold(1.0f),   // Will be set via setParameters()
         mCompressRatio(1.0f),
-        mExpanderThreshold(0.0f),
+        mExpanderThreshold(1e-4f),  // Bug fix: MUST NOT be 0.0f (log10(0)=-inf). Default ~-80dB
         mExpanderRatio(1.0f),
         mAttackCoeff(1.0f),
         mReleaseCoeff(1.0f),
@@ -85,9 +91,12 @@ float DynamicsProcessor::process(float inputSample) {
         float gain = 1.0f;
 
         // Calculate current envelope in dB for precise processing
-        float envelopeDb = (mEnvelope > 1e-12f) ? 20.0f * log10f(mEnvelope) : -240.0f;
+        float envelopeDb = (mEnvelope > 1e-9f) ? 20.0f * log10f(mEnvelope) : -180.0f;
         float compressThresholdDb = 20.0f * log10f(mCompressThreshold);
-        float expanderThresholdDb = 20.0f * log10f(mExpanderThreshold);
+        // Guard: mExpanderThreshold must be > 0 to avoid log10(0)
+        float expanderThresholdDb = (mExpanderThreshold > 1e-9f)
+                                    ? 20.0f * log10f(mExpanderThreshold)
+                                    : -180.0f;
 
         if (envelopeDb > compressThresholdDb - mKneeDb) {
             // Soft-Knee Downward Compression
@@ -113,8 +122,10 @@ float DynamicsProcessor::process(float inputSample) {
         mTargetGain = gain;
     }
 
-    // 3. Smooth Gain Transition (Linear interpolation)
-    mCurrentGain = 0.9f * mCurrentGain + 0.1f * mTargetGain;
+    // 3. Smooth Gain Transition
+    // Faster smoothing (0.7/0.3 vs 0.9/0.1) to track signal better and avoid
+    // the oscillation artefact that sounds like "waterfall" or radio noise.
+    mCurrentGain = 0.7f * mCurrentGain + 0.3f * mTargetGain;
 
     // 4. Apply Gain
     return inputSample * mCurrentGain;

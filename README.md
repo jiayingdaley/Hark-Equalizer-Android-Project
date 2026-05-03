@@ -1,110 +1,152 @@
-# Hark: An Android Low-Latency Hearing Aid and Audio Enhancement Platform
+# Hark - 專業助聽器音訊等化器與 DSP 引擎
 
-## Why is it called Hark?
-The name Hark draws from an old English word meaning “listen!” — not just to hear sounds, but to awaken the sense of hearing as an intentional, essential act. It appears in Shakespeare’s plays and ancient hymns as a call to pay attention to something important.
+Hark 是一款專為聽損者設計的高階 Android 助聽應用程式。它結合了實時音訊處理技術 (DSP) 與現代 Android 開發範式，旨在提供低延遲、高保真且符合醫療級標準的聽力輔助體驗。
 
-In the same spirit, Hark is an app that helps users truly listen again — whether to a conversation, a melody, or the world around them. Much like the technique of [*sonification*](https://science.nasa.gov/mission/hubble/multimedia/sonifications/), which turns cosmic data into sound, Hark transforms digital signals into accessible hearing. It’s not just a hearing aid; it’s a hearing awakening.
+---
 
-## 1. Project Overview
+## 1. 專案願景與目標
+*   **低延遲處理**：利用 Oboe (C++) 實作實時音訊處理，將延遲降至最低。
+*   **醫療級 DSP**：整合 WDRC (寬動態範圍壓縮)、噪音閘門 (Expander) 與自動增益控制 (AGC-O)。
+*   **FDA 合規設計**：遵循美國 FDA 對 OTC 助聽器的安全性要求，具備軟削波 (Soft-Clipping) 與輸出限制。
+*   **極簡現代 UI**：使用 Jetpack Compose 打造流暢且直覺的 16 段等化器控制介面。
 
-Hark is an advanced Android application designed to function as a versatile, low-latency hearing-assistance and audio enhancement platform. Going beyond a simple equalizer, Hark transforms any standard wired (3.5mm/USB-C) or Bluetooth earphones into a powerful, real-time audio processing device.
+---
 
-The project's core mission is to provide a real-world solution for everyday listening challenges, from enhancing live conversations in noisy environments to providing a personalized media consumption experience. Hark is built upon a high-performance, modular C++ audio engine, making it a robust platform for both practical daily use and academic research into real-time digital signal processing (DSP) on mobile devices.
+## 2. 專案目錄結構 (Project Structure)
 
-## 2. Core Features
-
-- **Ultra-Low Latency Audio Engine**: Utilizes the **Google Oboe** library within a C++/NDK-based audio pipeline to achieve minimal round-trip latency, ensuring a natural and artifact-free listening experience.
-- **Advanced Audio Processing Architecture**: Implements a professional-grade signal chain inspired by modern digital hearing aids:
-    - **Pre-Gain Stage**: Provides initial amplification for a "super hearing" effect, boosting faint or distant sounds.
-    - **Parallel Filter Bank**: A sophisticated parallel structure of IIR filters preserves full-spectrum audio detail, unlike traditional cascaded EQs. This includes:
-        - **Low-Shelf Filter**: Manages low-frequency rumble and noise.
-        - **16-Band Peaking EQ**: Allows for precise, user-configurable frequency shaping.
-        - **High-Shelf Filter**: Retains high-frequency "air" and transient crispness.
-    - **Dynamics Processing**: A two-stage system to manage audio dynamics for clarity and safety:
-        - **Wide Dynamic Range Compression (WDRC)**: Compresses the dynamic range to make soft sounds audible without letting loud sounds become uncomfortable.
-        - **Brick-wall Limiter**: Acts as a final safety measure to prevent any sudden, loud noises from causing digital clipping or harming the user's hearing.
-    - **Post-Gain (Makeup Gain)**: Compensates for volume changes during dynamics processing to deliver a loud, clear final output.
-- **Intelligent Device Management**: A robust state machine in Kotlin manages audio device connections, automatically handling hot-swapping between the built-in microphone, wired headsets (3.5mm & USB-C), and Bluetooth (SCO) devices.
-- **Real-time Latency Monitoring**: The engine includes a mechanism to calculate and display the true round-trip audio latency in milliseconds, providing critical performance data for analysis and optimization.
-- **Interactive Equalizer UI**: A custom-drawn, scrollable equalizer interface built with Jetpack Compose allows users to intuitively manipulate the gain of each frequency band.
-- **Persistent Equalizer Profiles**: Employs **Jetpack DataStore (Preferences)** to securely and efficiently save user-defined audio profiles (8-band or 16-band gains and Q-factors), ensuring custom settings persist across app restarts without delay.
-- **Enterprise-Grade Stability & Observability**: Integrated with **Firebase Crashlytics** to monitor native NDK/C++ and JVM crashes, and **Firebase Analytics** to optionally study user engagement with different hearing aid profiles via quantitative data.
-- **Structured Logging**: Uses **Timber** to replace standard `Log.d`, allowing dynamic rerouting of logs to cloud crash reports in production release builds.
-- **Safe & Reliable Operation**: The app includes protection against acoustic feedback by disabling the engine when outputting to the device's main speaker.
-
-## 3. Technical Architecture
-
-Hark's architecture is centered around a unified, modular audio processing pipeline implemented in C++ for maximum performance and control.
-
-**Signal Chain:**
-`Input -> [Pre-Gain] -> [Parallel Filter Bank] -> [Summing] -> [WDRC] -> [Limiter] -> [Post-Gain] -> Output`
-
-- **Pre-Gain Stage**: A linear amplifier that boosts the raw input signal level, enhancing sensitivity to quiet sounds before any frequency shaping occurs.
-
-- **Parallel Filter Bank**: The core of Hark's sound shaping capabilities. The input signal is simultaneously fed into all filters in the bank, and their outputs are summed together. This preserves the full frequency spectrum, preventing the signal roll-off that occurs with cascaded EQs. The bank consists of:
-    - **1 Low-Shelf Filter**: Controls the gain of frequencies below 250 Hz to manage ambient noise.
-    - **16 Peaking IIR Filters**: User-configurable bands for detailed equalization based on audiogram data or user preference.
-    - **1 High-Shelf Filter**: Controls the gain of frequencies above 8 kHz to maintain high-frequency detail and naturalness.
-
-- **Dynamics Processing Stage**:
-    - **WDRC**: A custom `DynamicsProcessor` class applies gentle compression with a moderate threshold and ratio, making the overall sound more consistent and intelligible.
-    - **Limiter**: The same `DynamicsProcessor` class is used with "brick-wall" settings (high threshold, high ratio, fast attack) to catch and suppress any sudden peaks, preventing distortion and ensuring a safe listening level.
-
-- **Post-Gain (Makeup Gain) Stage**: A final linear amplification stage to compensate for any gain reduction from the dynamics processing, ensuring the final output is powerful and clear.
-
-## 4. Center Frequencies
-
-The custom engine supports two modes with audiologically-standard center frequencies for the 16 user-configurable Peaking EQ bands.
-
-#### 16-Band Mode
-- 250 Hz, 315 Hz, 400 Hz, 500 Hz, 630 Hz, 800 Hz, 1000 Hz, 1250 Hz, 1600 Hz, 2000 Hz, 2500 Hz, 3150 Hz, 4000 Hz, 5000 Hz, 6300 Hz, 8000 Hz
-
-#### 8-Band Mode
-- 250 Hz, 500 Hz, 1000 Hz, 1500 Hz, 2000 Hz, 4000 Hz, 6000 Hz, 8000 Hz
-
-## 5. Tech Stack
-
-- **Language**: Kotlin (for UI, App Logic, State Management) & C++ (for Real-time Audio Engine via NDK)
-- **Core Audio API**: **Oboe** for low-latency audio I/O.
-- **UI**: Jetpack Compose for a modern, declarative, and interactive user interface.
-- **State & Persistence**: MVVM architecture utilizing Kotlin `StateFlow`/`mutableStateOf` alongside **Jetpack DataStore** for persistent, asynchronous storage of user audiogram settings.
-- **Concurrency**: Kotlin Coroutines with `Mutex` for safe, asynchronous management of device state changes.
-- **Observability**: **Firebase Analytics & Crashlytics** for remote monitoring, aligned with **Timber** for robust local/remote logging.
-
-## 6. How to Build and Run
-
-1.  Ensure you have the latest Android Studio, along with the Android **NDK** and **CMake** installed via the SDK Manager.
-2.  Clone this repository.
-3.  **Important configuration**: To use Firebase features (Crashlytics/Analytics required for production), add your specific `google-services.json` file downloaded from your Firebase console to the `/app` directory. If you are just testing locally, the build may complain about this missing file unless you disable the crashlytics plugin in `build.gradle.kts`.
-4.  Open the project in Android Studio. It will automatically sync Gradle and CMake configurations.
-4.  Connect an Android device (with USB debugging enabled) or start an emulator.
-5.  Click the "Run 'app'" button.
-
-## 7. Usage Instructions
-
-1.  **Permissions**: Grant the "Record Audio" permission when prompted.
-2.  **Connect Headphones**: For the best experience and to prevent acoustic feedback, please connect any type of wired or Bluetooth headphones. The engine will not start if the phone's speaker is the only audio output.
-3.  **Activation**: Use the master power switch to start or stop the audio processing.
-4.  **Mode Selection**: Use the "16-Band" and "8-Band" buttons to select the desired equalization detail.
-5.  **Gain Adjustment**:
-    - **Vertical Drag**: Touch and drag vertically on a frequency column to adjust the gain for that specific band.
-    - **Horizontal Drag**: Touch and drag horizontally across the equalizer view to scroll and see bands that are off-screen.
-
-## 8. Citation
-
-If you use this work in your research, please cite our paper:
-
-```bibtex
-@article{Wu2025HarkAA,
-  title={Hark: An Android-Based Hearing Assistance System with Integrated Audiometry and Low-Latency NDK Audio Processing},
-  author={Chia-Yin Wu and Cheng-Lun Tsai},
-  journal={2025 International Automatic Control Conference (CACS)},
-  year={2025},
-  pages={1-5},
-  url={https://api.semanticscholar.org/CorpusID:284158249}
-}
+```text
+Hark/
+├── app/src/main/
+│   ├── cpp/ (原生音訊引擎 - C++)
+│   │   ├── HarkAudioEngine.{h,cpp}    # 核心引擎 (Oboe 管理與處理鏈)
+│   │   ├── DynamicsProcessor.{h,cpp}  # 動態處理 (WDRC, Expander, Limiter)
+│   │   ├── FilterChain.{h,cpp}       # 濾波器組管理 (16-band EQ)
+│   │   ├── BiquadFilter.{h,cpp}      # 雙二階濾波器基礎邏輯
+│   │   └── native-lib.cpp            # JNI 橋接層
+│   ├── java/com/wcy/hark/ (App 邏輯 - Kotlin)
+│   │   ├── MainActivity.kt           # 程式入口與權限管理
+│   │   ├── HarkApplication.kt        # 初始化 Firebase 與 DI
+│   │   ├── EqViewModel.kt            # 業務邏輯與狀態管理
+│   │   ├── audio/
+│   │   │   ├── AudioDeviceManager.kt # 藍牙 SCO 與音訊路由控制
+│   │   │   └── HarkAudioBridge.kt    # JNI 封裝類別
+│   │   ├── data/
+│   │   │   └── EqSettingsRepository.kt# 等化器參數持久化 (DataStore)
+│   │   └── ui/
+│   │       ├── screen/MainScreen.kt  # 主介面 UI
+│   │       └── components/           # 自定義 UI 元件
+└── README.md
 ```
 
-## 9. License
+---
 
-This project is licensed under the **Apache License 2.0**. See the [LICENSE](LICENSE) file for details.
+## 3. 系統流程圖 (System Architecture)
+
+### 總體資料流 (Overall Data Flow)
+```mermaid
+graph TD
+    A[麥克風 Microphone] -->|PCM 資料| B[Oboe Input Stream]
+    B --> C[HarkAudioEngine C++]
+    C --> D[DSP 處理鏈]
+    D --> E[Oboe Output Stream]
+    E -->|處理後音訊| F[耳機/喇叭 Speaker]
+    
+    G[UI Compose] <-->|StateFlow| H[EqViewModel]
+    H <-->|JNI| C
+    H <-->|Persistence| I[DataStore]
+```
+
+### DSP 處理鏈邏輯 (DSP Pipeline)
+```mermaid
+graph LR
+    In[Input] --> Pre[Pre-Gain]
+    Pre --> EQ[16-Band EQ FilterChain]
+    EQ --> WDRC[WDRC Compressor/Expander]
+    WDRC --> MU[Makeup Gain]
+    MU --> Lim[Safety Limiter]
+    Lim --> SC[Soft-Clipping]
+    SC --> Out[Output]
+```
+
+### 執行生命週期 (App Execution Flow)
+```mermaid
+flowchart TD
+    A["App Startup\nHarkApplication.onCreate()"] --> B["Initialize Timber / Firebase"]
+    B --> C["Initialize EqSettingsRepository\n(DataStore)"]
+    C --> D["MainActivity.onCreate()"]
+    D --> E["Load hark.so\n(System.loadLibrary)"]
+    E --> F["Request RECORD_AUDIO Permission"]
+    F --> G["EqViewModel Initialization\nLoad EQ settings from DataStore"]
+    G --> H["setContent → MainScreen\n(Compose UI)"]
+
+    H --> I{User Toggles Master Switch}
+    I -->|ON| J["checkAndSetAudioDevice()"]
+    J --> K{Detect Headphone Output}
+    K -->|None| L["UI: Please connect headphones"]
+    K -->|Connected| M["Select Input Device\n(Bluetooth > USB > Wired)"]
+    M --> N["Set AudioManager Mode\n= IN_COMMUNICATION"]
+    N --> O["setAudioInputDeviceId() JNI"]
+    O --> P["startEngine() JNI"]
+    P --> Q["C++: HarkAudioEngine::start()\nsetupStreams()"]
+    Q --> R["Create Oboe InputStream\n& OutputStream"]
+    R --> S["onAudioReady() Callback Loop"]
+    S --> T["DSP Pipeline:\nPre-Gain → EQ → WDRC → Makeup → Limiter → Soft-Clipping"]
+    T --> S
+
+    I -->|OFF| U["stopEngine() JNI"]
+    U --> V["Close Oboe Streams\nState: Idle"]
+```
+
+---
+
+## 4. 關鍵模組介紹
+
+### 原生引擎層 (C++ / NDK)
+*   **HarkAudioEngine**:
+    - 負責 Oboe 串流的生命週期（開啟、暫停、重啟）。
+    - 實作 `onAudioReady` 回調，執行實時音訊處理循環。
+    - **AGC-O 策略**：根據 EQ 增益自動預留 Headroom，防止數位破音。
+*   **DynamicsProcessor**:
+    - **WDRC**：提供針對不同聽力閾值的非線性壓縮。
+    - **Expander (Noise Gate)**：抑制低於門檻值的環境噪音（解決「瀑布聲」）。
+    - **Soft-Knee**：平滑的壓縮過渡，提升聽感自然度。
+*   **FilterChain & BiquadFilter**:
+    - 串聯 16 組雙二階濾波器。
+    - 支持 Peaking、Low-Shelf、High-Shelf 等多種濾波類型。
+
+### 應用程式層 (Kotlin / Compose)
+*   **EqViewModel**:
+    - 使用 `StateFlow` 管理 16 段增益值。
+    - 確保 UI 更新與底層 DSP 參數變更同步。
+*   **AudioDeviceManager**:
+    - 處理 Android 複雜的藍牙 SCO 路由切換。
+    - 確保在藍牙連接後自動重啟引擎。
+*   **MainScreen**:
+    - 提供可視化的頻率響應曲線與系統音量同步控制。
+
+---
+
+## 5. 技術棧 (Tech Stack)
+
+*   **語言**: Kotlin (UI/邏輯) & C++ (DSP 引擎)
+*   **音訊 API**: **Oboe** (AAudio & OpenSL ES 封裝)
+*   **介面框架**: Jetpack Compose
+*   **架構**: MVVM (ViewModel + Repository)
+*   **監測工具**: Firebase Analytics & Crashlytics
+
+---
+
+## 6. 使用與測試
+1.  開啟 App 後，請授予「麥克風」權限。
+2.  連接藍牙耳機，系統會自動切換至助聽模式。
+3.  調整 16 段等化器以補償特定頻段的聽力損失。
+4.  按下「重設」可恢復至「通透模式」。
+
+## DSP 參數與設計
+
+詳細的 DSP 設計參數（壓縮曲線、Attack/Release、MPO/Limiter、signal chain、驗證步驟）請參考 [docs/DSP_PARAMETERS.md](docs/DSP_PARAMETERS.md).
+
+---
+
+## 7. 聯絡與支援
+如有任何問題或改進建議，歡迎提交 Issue。
