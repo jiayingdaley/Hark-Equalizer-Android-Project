@@ -1,4 +1,4 @@
-package com.example.hark
+package com.wcy.hark
 
 import org.junit.Test
 

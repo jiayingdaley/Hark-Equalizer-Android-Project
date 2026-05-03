@@ -1,4 +1,4 @@
-package com.example.hark.ui.theme
+package com.wcy.hark.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

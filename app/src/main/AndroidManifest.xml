@@ -23,6 +23,7 @@
 
 
     <application
+        android:name=".HarkApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -36,6 +37,7 @@
             android:exported="true"
             android:label="@string/app_name"
             android:largeHeap="true"
+            android:screenOrientation="portrait"
             android:theme="@style/Theme.Hark">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

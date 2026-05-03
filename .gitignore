@@ -13,3 +13,10 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# clangd / IDE IntelliSense (machine-local paths, regenerate after each build)
+/compile_commands.json
+.cache/
+.vscode/
+.clangd
+.idea/appInsightsSettings.xml

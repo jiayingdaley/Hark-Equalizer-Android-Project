@@ -27,7 +27,10 @@ The project's core mission is to provide a real-world solution for everyday list
 - **Intelligent Device Management**: A robust state machine in Kotlin manages audio device connections, automatically handling hot-swapping between the built-in microphone, wired headsets (3.5mm & USB-C), and Bluetooth (SCO) devices.
 - **Real-time Latency Monitoring**: The engine includes a mechanism to calculate and display the true round-trip audio latency in milliseconds, providing critical performance data for analysis and optimization.
 - **Interactive Equalizer UI**: A custom-drawn, scrollable equalizer interface built with Jetpack Compose allows users to intuitively manipulate the gain of each frequency band.
-- **Safe & Reliable Operation**: The app includes protection against acoustic feedback by disabling the engine when outputting to the device's main speaker and uses a foreground service to ensure processing continues reliably in the background.
+- **Persistent Equalizer Profiles**: Employs **Jetpack DataStore (Preferences)** to securely and efficiently save user-defined audio profiles (8-band or 16-band gains and Q-factors), ensuring custom settings persist across app restarts without delay.
+- **Enterprise-Grade Stability & Observability**: Integrated with **Firebase Crashlytics** to monitor native NDK/C++ and JVM crashes, and **Firebase Analytics** to optionally study user engagement with different hearing aid profiles via quantitative data.
+- **Structured Logging**: Uses **Timber** to replace standard `Log.d`, allowing dynamic rerouting of logs to cloud crash reports in production release builds.
+- **Safe & Reliable Operation**: The app includes protection against acoustic feedback by disabling the engine when outputting to the device's main speaker.
 
 ## 3. Technical Architecture
 
@@ -61,17 +64,19 @@ The custom engine supports two modes with audiologically-standard center frequen
 
 ## 5. Tech Stack
 
-- **Language**: Kotlin (for UI and App Logic) & C++ (for Real-time Audio Engine via NDK)
+- **Language**: Kotlin (for UI, App Logic, State Management) & C++ (for Real-time Audio Engine via NDK)
 - **Core Audio API**: **Oboe** for low-latency audio I/O.
 - **UI**: Jetpack Compose for a modern, declarative, and interactive user interface.
+- **State & Persistence**: MVVM architecture utilizing Kotlin `StateFlow`/`mutableStateOf` alongside **Jetpack DataStore** for persistent, asynchronous storage of user audiogram settings.
 - **Concurrency**: Kotlin Coroutines with `Mutex` for safe, asynchronous management of device state changes.
-- **Architecture**: MVVM (ViewModel) on the Kotlin side, with a clear separation between the UI (`MainActivity`) and the native audio engine (`HarkAudioEngine`).
+- **Observability**: **Firebase Analytics & Crashlytics** for remote monitoring, aligned with **Timber** for robust local/remote logging.
 
 ## 6. How to Build and Run
 
 1.  Ensure you have the latest Android Studio, along with the Android **NDK** and **CMake** installed via the SDK Manager.
 2.  Clone this repository.
-3.  Open the project in Android Studio. It will automatically sync Gradle and CMake configurations.
+3.  **Important configuration**: To use Firebase features (Crashlytics/Analytics required for production), add your specific `google-services.json` file downloaded from your Firebase console to the `/app` directory. If you are just testing locally, the build may complain about this missing file unless you disable the crashlytics plugin in `build.gradle.kts`.
+4.  Open the project in Android Studio. It will automatically sync Gradle and CMake configurations.
 4.  Connect an Android device (with USB debugging enabled) or start an emulator.
 5.  Click the "Run 'app'" button.
 
@@ -84,3 +89,22 @@ The custom engine supports two modes with audiologically-standard center frequen
 5.  **Gain Adjustment**:
     - **Vertical Drag**: Touch and drag vertically on a frequency column to adjust the gain for that specific band.
     - **Horizontal Drag**: Touch and drag horizontally across the equalizer view to scroll and see bands that are off-screen.
+
+## 8. Citation
+
+If you use this work in your research, please cite our paper:
+
+```bibtex
+@article{Wu2025HarkAA,
+  title={Hark: An Android-Based Hearing Assistance System with Integrated Audiometry and Low-Latency NDK Audio Processing},
+  author={Chia-Yin Wu and Cheng-Lun Tsai},
+  journal={2025 International Automatic Control Conference (CACS)},
+  year={2025},
+  pages={1-5},
+  url={https://api.semanticscholar.org/CorpusID:284158249}
+}
+```
+
+## 9. License
+
+This project is licensed under the **Apache License 2.0**. See the [LICENSE](LICENSE) file for details.

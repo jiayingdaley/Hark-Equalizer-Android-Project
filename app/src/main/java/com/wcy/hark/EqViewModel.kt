@@ -1,10 +1,15 @@
-package com.example.hark
+package com.wcy.hark
 
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import com.wcy.hark.data.EqSettingsRepository
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
-class EqViewModel : ViewModel() {
+class EqViewModel(private val repository: EqSettingsRepository) : ViewModel() {
 
     enum class EngineMode {
         BIQUAD_16_MIC,
@@ -20,6 +25,7 @@ class EqViewModel : ViewModel() {
 
     val currentMode = mutableStateOf(EngineMode.BIQUAD_16_MIC)
     val statusText = mutableStateOf("狀態：已停用")
+    val isDataLoaded = mutableStateOf(false) // 追蹤從 DataStore 讀取完成的狀態
 
     // 中心頻率 (這些可以保持不變，因為它們只是標籤)
     val centerFrequencies16 = listOf(250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000)
@@ -42,6 +48,35 @@ class EqViewModel : ViewModel() {
     // 為 8-band 模式獨立管理 Q 值
     private val _bandQs8 = List(centerFrequencies8.size) { mutableStateOf(DEFAULT_Q) }
     val bandQs8: List<MutableState<Float>> = _bandQs8
+
+    init {
+        // Load saved state from DataStore upon initialization
+        viewModelScope.launch {
+            val savedMode = repository.engineModeFlow.first()
+            currentMode.value = if (savedMode == 1) EngineMode.BIQUAD_8_MIC else EngineMode.BIQUAD_16_MIC
+
+            // Load 16 bands
+            val savedGains16 = repository.getBandGainsFlow(0, 16).first()
+            savedGains16.forEachIndexed { index, gain -> _bandGains16[index].value = gain }
+            val savedQs16 = repository.getBandQsFlow(0, 16).first()
+            savedQs16.forEachIndexed { index, q -> _bandQs16[index].value = q }
+
+            // Load 8 bands
+            val savedGains8 = repository.getBandGainsFlow(1, 8).first()
+            savedGains8.forEachIndexed { index, gain -> _bandGains8[index].value = gain }
+            val savedQs8 = repository.getBandQsFlow(1, 8).first()
+            savedQs8.forEachIndexed { index, q -> _bandQs8[index].value = q }
+
+            isDataLoaded.value = true // 非同步資料讀取完全結束，通知 UI 同步 JNI
+        }
+    }
+
+    fun setMode(mode: EngineMode) {
+        currentMode.value = mode
+        viewModelScope.launch {
+            repository.saveEngineMode(if (mode == EngineMode.BIQUAD_16_MIC) 0 else 1)
+        }
+    }
 
 
     /**
@@ -72,7 +107,14 @@ class EqViewModel : ViewModel() {
     fun updateBandGain(bandIndex: Int, gain: Float) {
         val gains = currentBandGains
         if (bandIndex >= 0 && bandIndex < gains.size) {
-            gains[bandIndex].value = gain.coerceIn(MIN_GAIN_DB, MAX_GAIN_DB)
+            val coercedGain = gain.coerceIn(MIN_GAIN_DB, MAX_GAIN_DB)
+            gains[bandIndex].value = coercedGain
+            
+            // Save to DataStore
+            val is16Band = currentMode.value == EngineMode.BIQUAD_16_MIC
+            viewModelScope.launch {
+                repository.saveBandGain(if (is16Band) 0 else 1, bandIndex, coercedGain)
+            }
         }
     }
 
@@ -84,8 +126,13 @@ class EqViewModel : ViewModel() {
     fun updateBandQ(bandIndex: Int, q: Float) {
         val qs = currentBandQs
         if (bandIndex >= 0 && bandIndex < qs.size) {
-            // 在這裡可以添加 Q 值的範圍限制，如果需要的話
             qs[bandIndex].value = q
+            
+            // Save to DataStore
+            val is16Band = currentMode.value == EngineMode.BIQUAD_16_MIC
+            viewModelScope.launch {
+                repository.saveBandQ(if (is16Band) 0 else 1, bandIndex, q)
+            }
         }
     }
 
@@ -95,6 +142,21 @@ class EqViewModel : ViewModel() {
     fun resetCurrentModeBands() {
         currentBandGains.forEach { it.value = 0f }
         currentBandQs.forEach { it.value = DEFAULT_Q }
+        
+        val is16Band = currentMode.value == EngineMode.BIQUAD_16_MIC
+        viewModelScope.launch {
+            repository.resetBands(if (is16Band) 0 else 1, if (is16Band) 16 else 8)
+        }
     }
+}
 
+// Factory to inject repository into ViewModel
+class EqViewModelFactory(private val repository: EqSettingsRepository) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(EqViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return EqViewModel(repository) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
 }

@@ -2,14 +2,16 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.google.services)
+    alias(libs.plugins.firebase.crashlytics)
 }
 
 android {
-    namespace = "com.example.hark"
+    namespace = "com.wcy.hark"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.hark"
+        applicationId = "com.wcy.hark"
         minSdk = 29
         targetSdk = 36
         versionCode = 1
@@ -60,6 +62,17 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+
+    // DataStore
+    implementation(libs.androidx.datastore.preferences)
+
+    // Firebase BOM (Bill of Materials)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.analytics)
+    implementation(libs.firebase.crashlytics)
+
+    // Timber
+    implementation(libs.timber)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

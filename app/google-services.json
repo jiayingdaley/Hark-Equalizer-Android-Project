@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "572249536314",
+    "project_id": "wcyhark",
+    "storage_bucket": "wcyhark.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:572249536314:android:368597fda0dc5117fa4203",
+        "android_client_info": {
+          "package_name": "com.wcy.hark"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB5ChlZeeRvYgzRRAcD28kBQ8cBkc22mv8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
