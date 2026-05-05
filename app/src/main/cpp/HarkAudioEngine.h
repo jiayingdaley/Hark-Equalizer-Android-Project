@@ -58,6 +58,7 @@ private:
     HarkAudioEngine(HarkAudioEngine&&) = delete;
     HarkAudioEngine& operator=(HarkAudioEngine&&) = delete;
     void updateDSPParameters();
+    void recalculateHeadroom();
 
     oboe::AudioStream *mInputStream = nullptr;
     oboe::AudioStream *mOutputStream = nullptr;

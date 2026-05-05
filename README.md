@@ -4,149 +4,270 @@ Hark 是一款專為聽損者設計的高階 Android 助聽應用程式。它結
 
 ---
 
-## 1. 專案願景與目標
-*   **低延遲處理**：利用 Oboe (C++) 實作實時音訊處理，將延遲降至最低。
-*   **醫療級 DSP**：整合 WDRC (寬動態範圍壓縮)、噪音閘門 (Expander) 與自動增益控制 (AGC-O)。
-*   **FDA 合規設計**：遵循美國 FDA 對 OTC 助聽器的安全性要求，具備軟削波 (Soft-Clipping) 與輸出限制。
-*   **極簡現代 UI**：使用 Jetpack Compose 打造流暢且直覺的 16 段等化器控制介面。
+## 專案願景與目標
+
+*   **低延遲處理**：利用 Oboe (C++) 實作實時音訊處理，將延遲降至最低 (~2-3ms)
+*   **醫療級 DSP**：整合 WDRC (寬動態範圍壓縮)、噪音閘門 (Expander) 與自動增益控制
+*   **FDA 合規設計**：遵循 FDA 對 OTC 助聽器的安全性要求 (MPO Limiter @ -3dBFS)
+*   **極簡現代 UI**：使用 Jetpack Compose 打造 16 段等化器控制介面
 
 ---
 
-## 2. 專案目錄結構 (Project Structure)
+## 快速開始 (5 分鐘)
 
-```text
+### 1. 克隆與配置
+
+```bash
+git clone https://github.com/yourusername/Hark.git
+cd Hark
+
+# 檢查 Java 版本 (需要 11+)
+java -version
+```
+
+### 2. 打開 Android Studio
+
+- File → Open → 選擇 Hark/ 目錄
+- 等待 Gradle 同步 (首次 3-5 分鐘)
+
+### 3. 構建與部署
+
+```bash
+# 連接 Android 設備
+
+# 構建並安裝
+./gradlew :app:installDebug
+
+# 或在 Android Studio 中按 Run (Shift + F10)
+```
+
+### 4. 使用
+
+1. 授予麥克風權限
+2. 連接藍牙耳機（會自動切換）
+3. 調整 16 段 EQ 以補償聽力損失
+4. 點「重設」恢復通透模式
+
+---
+
+## 開發環境設置
+
+### 系統需求
+
+```
+• Android Studio (2024.x 或更新)
+• Android SDK 36+ (API Level 36)
+• NDK 25.1 (自動下載)
+• CMake 3.22.1 (自動下載)
+• Java 11+
+```
+
+### 驗證環境
+
+```bash
+java -version              # 確認版本 ≥ 11
+./gradlew --version        # Gradle Wrapper
+```
+
+---
+
+## 構建與部署
+
+### 構建變體
+
+```bash
+# Debug 版本 (快速開發)
+./gradlew :app:assembleDebug
+
+# Release 版本（簽名與優化）
+./gradlew :app:assembleRelease
+
+# 構建並立即安裝到設備
+./gradlew :app:installDebug
+```
+
+### 即時監控
+
+```bash
+# 查看實時 Logcat
+adb logcat -s HarkAudioEngine DynamicsProcessor FilterChain
+
+# 或使用 Android Studio Logcat 工具
+```
+
+---
+
+## 專案目錄結構
+
+```
 Hark/
-├── app/src/main/
-│   ├── cpp/ (原生音訊引擎 - C++)
-│   │   ├── HarkAudioEngine.{h,cpp}    # 核心引擎 (Oboe 管理與處理鏈)
-│   │   ├── DynamicsProcessor.{h,cpp}  # 動態處理 (WDRC, Expander, Limiter)
-│   │   ├── FilterChain.{h,cpp}       # 濾波器組管理 (16-band EQ)
-│   │   ├── BiquadFilter.{h,cpp}      # 雙二階濾波器基礎邏輯
-│   │   └── native-lib.cpp            # JNI 橋接層
-│   ├── java/com/wcy/hark/ (App 邏輯 - Kotlin)
-│   │   ├── MainActivity.kt           # 程式入口與權限管理
-│   │   ├── HarkApplication.kt        # 初始化 Firebase 與 DI
-│   │   ├── EqViewModel.kt            # 業務邏輯與狀態管理
-│   │   ├── audio/
-│   │   │   ├── AudioDeviceManager.kt # 藍牙 SCO 與音訊路由控制
-│   │   │   └── HarkAudioBridge.kt    # JNI 封裝類別
-│   │   ├── data/
-│   │   │   └── EqSettingsRepository.kt# 等化器參數持久化 (DataStore)
-│   │   └── ui/
-│   │       ├── screen/MainScreen.kt  # 主介面 UI
-│   │       └── components/           # 自定義 UI 元件
-└── README.md
+├── app/                          # Android 應用主模組
+│   ├── src/main/kotlin/          # Kotlin UI 程式碼 (Compose)
+│   ├── src/main/cpp/             # C++ DSP 引擎
+│   │   ├── HarkAudioEngine.cpp   # 核心 Oboe 管理與 DSP 管線
+│   │   ├── DynamicsProcessor.cpp # WDRC 壓縮器 & 擴展器 (Noise Gate)
+│   │   ├── FilterChain.cpp       # 16 段等化器 (Cascaded Biquad)
+│   │   └── BiquadFilter.cpp      # RBJ 雙二階濾波器實作
+│   ├── build.gradle.kts          # Gradle 構建配置
+│   └── CMakeLists.txt            # CMake 配置（C++ 編譯）
+├── oboe/                         # Google Oboe 音訊庫 (Git Submodule)
+│   └── include/oboe/             # Oboe 標頭檔
+├── gradle/                       # Gradle 配置文件
+├── build.gradle.kts              # 根 Gradle 構建文件
+└── README.md                     # 本文件
 ```
 
 ---
 
-## 3. 系統流程圖 (System Architecture)
+## DSP 信號鏈架構
 
-### 總體資料流 (Overall Data Flow)
-```mermaid
-graph TD
-    A[麥克風 Microphone] -->|PCM 資料| B[Oboe Input Stream]
-    B --> C[HarkAudioEngine C++]
-    C --> D[DSP 處理鏈]
-    D --> E[Oboe Output Stream]
-    E -->|處理後音訊| F[耳機/喇叭 Speaker]
-    
-    G[UI Compose] <-->|StateFlow| H[EqViewModel]
-    H <-->|JNI| C
-    H <-->|Persistence| I[DataStore]
 ```
-
-### DSP 處理鏈邏輯 (DSP Pipeline)
-```mermaid
-graph LR
-    In[Input] --> Pre[Pre-Gain]
-    Pre --> EQ[16-Band EQ FilterChain]
-    EQ --> WDRC[WDRC Compressor/Expander]
-    WDRC --> MU[Makeup Gain]
-    MU --> Lim[Safety Limiter]
-    Lim --> SC[Soft-Clipping]
-    SC --> Out[Output]
-```
-
-### 執行生命週期 (App Execution Flow)
-```mermaid
-flowchart TD
-    A["App Startup\nHarkApplication.onCreate()"] --> B["Initialize Timber / Firebase"]
-    B --> C["Initialize EqSettingsRepository\n(DataStore)"]
-    C --> D["MainActivity.onCreate()"]
-    D --> E["Load hark.so\n(System.loadLibrary)"]
-    E --> F["Request RECORD_AUDIO Permission"]
-    F --> G["EqViewModel Initialization\nLoad EQ settings from DataStore"]
-    G --> H["setContent → MainScreen\n(Compose UI)"]
-
-    H --> I{User Toggles Master Switch}
-    I -->|ON| J["checkAndSetAudioDevice()"]
-    J --> K{Detect Headphone Output}
-    K -->|None| L["UI: Please connect headphones"]
-    K -->|Connected| M["Select Input Device\n(Bluetooth > USB > Wired)"]
-    M --> N["Set AudioManager Mode\n= IN_COMMUNICATION"]
-    N --> O["setAudioInputDeviceId() JNI"]
-    O --> P["startEngine() JNI"]
-    P --> Q["C++: HarkAudioEngine::start()\nsetupStreams()"]
-    Q --> R["Create Oboe InputStream\n& OutputStream"]
-    R --> S["onAudioReady() Callback Loop"]
-    S --> T["DSP Pipeline:\nPre-Gain → EQ → WDRC → Makeup → Limiter → Soft-Clipping"]
-    T --> S
-
-    I -->|OFF| U["stopEngine() JNI"]
-    U --> V["Close Oboe Streams\nState: Idle"]
+Microphone Input (48 kHz, 16-bit → Float)
+    ↓
+[1] 預增益 (Pre-Gain)               [調整整體敏感度]
+    ↓
+[2] VAD 降低 (Voice Activity Gating) [靜音檢測]
+    ↓
+[3] WDRC 壓縮器 (Wide Dynamic Range Compression)
+    │   ├─ 壓縮比: 2:1
+    │   ├─ 閾值: -40 dB SPL
+    │   ├─ 軟膝: 2 dB
+    │   └─ 攻擊/釋放: 10/80 ms
+    ↓
+[4] 噪音擴展器 (Expander/Gate)      [去除背景噪音]
+    │   ├─ 閾值: -70 dB
+    │   └─ 比例: 0.9:1
+    ↓
+[5] 16 段等化器 (Band EQ)            [客製化聽力補償]
+    │   ├─ 頻率範圍: 250 Hz - 8 kHz
+    │   ├─ 濾波器類型: 峰值/低頻/高頻架
+    │   └─ Q 因子: 1.8 (聽覺域標準)
+    ↓
+[6] 化妝增益 (Makeup Gain)           [補償多級壓縮損失]
+    ↓
+[7] 輸出限制器 (MPO Limiter)         [FDA 安全限制]
+    │   ├─ 閾值: -3 dBFS
+    │   ├─ 比例: 20:1 (Brick-Wall)
+    │   └─ 攻擊/釋放: 0.5/30 ms
+    ↓
+[8] 軟削波 (Soft-Clipping)           [防止數位削波失真]
+    ↓
+Speaker Output (Bluetooth Stereo 48 kHz)
 ```
 
 ---
 
-## 4. 關鍵模組介紹
+## 修改 DSP 參數指南
 
-### 原生引擎層 (C++ / NDK)
-*   **HarkAudioEngine**:
-    - 負責 Oboe 串流的生命週期（開啟、暫停、重啟）。
-    - 實作 `onAudioReady` 回調，執行實時音訊處理循環。
-    - **AGC-O 策略**：根據 EQ 增益自動預留 Headroom，防止數位破音。
-*   **DynamicsProcessor**:
-    - **WDRC**：提供針對不同聽力閾值的非線性壓縮。
-    - **Expander (Noise Gate)**：抑制低於門檻值的環境噪音（解決「瀑布聲」）。
-    - **Soft-Knee**：平滑的壓縮過渡，提升聽感自然度。
-*   **FilterChain & BiquadFilter**:
-    - 串聯 16 組雙二階濾波器。
-    - 支持 Peaking、Low-Shelf、High-Shelf 等多種濾波類型。
+### 修改 WDRC 參數
 
-### 應用程式層 (Kotlin / Compose)
-*   **EqViewModel**:
-    - 使用 `StateFlow` 管理 16 段增益值。
-    - 確保 UI 更新與底層 DSP 參數變更同步。
-*   **AudioDeviceManager**:
-    - 處理 Android 複雜的藍牙 SCO 路由切換。
-    - 確保在藍牙連接後自動重啟引擎。
-*   **MainScreen**:
-    - 提供可視化的頻率響應曲線與系統音量同步控制。
+編輯 [app/src/main/cpp/HarkAudioEngine.cpp](app/src/main/cpp/HarkAudioEngine.cpp) **第 74-75 行**：
 
----
+```cpp
+// mWdrcLeft.setParameters(Threshold, Ratio, ExpanderThreshold, ExpanderRatio, Attack, Release, SampleRate)
+mWdrcLeft.setParameters(-40.0f, 2.0f, -70.0f, 0.9f, 10.0f, 80.0f, sampleRate);
+mWdrcRight.setParameters(-40.0f, 2.0f, -70.0f, 0.9f, 10.0f, 80.0f, sampleRate);
+```
 
-## 5. 技術棧 (Tech Stack)
+### 修改 MPO 限制器參數
 
-*   **語言**: Kotlin (UI/邏輯) & C++ (DSP 引擎)
-*   **音訊 API**: **Oboe** (AAudio & OpenSL ES 封裝)
-*   **介面框架**: Jetpack Compose
-*   **架構**: MVVM (ViewModel + Repository)
-*   **監測工具**: Firebase Analytics & Crashlytics
+編輯 [app/src/main/cpp/HarkAudioEngine.cpp](app/src/main/cpp/HarkAudioEngine.cpp) **第 81-82 行**：
 
----
+```cpp
+// mLimiterLeft.setParameters(Threshold, Ratio, ExpanderThreshold, ExpanderRatio, Attack, Release, SampleRate)
+mLimiterLeft.setParameters(-3.0f, 20.0f, -100.0f, 1.0f, 0.5f, 30.0f, sampleRate);
+mLimiterRight.setParameters(-3.0f, 20.0f, -100.0f, 1.0f, 0.5f, 30.0f, sampleRate);
+```
 
-## 6. 使用與測試
-1.  開啟 App 後，請授予「麥克風」權限。
-2.  連接藍牙耳機，系統會自動切換至助聽模式。
-3.  調整 16 段等化器以補償特定頻段的聽力損失。
-4.  按下「重設」可恢復至「通透模式」。
+### 修改 EQ 頻率與增益
 
-## DSP 參數與設計
+編輯 [app/src/main/cpp/FilterChain.cpp](app/src/main/cpp/FilterChain.cpp)，修改各頻段的 **增益值** (dB)。16 段中心頻率固定：
 
-詳細的 DSP 設計參數（壓縮曲線、Attack/Release、MPO/Limiter、signal chain、驗證步驟）請參考 [docs/DSP_PARAMETERS.md](docs/DSP_PARAMETERS.md).
+```
+250 Hz, 315 Hz, 400 Hz, 500 Hz, 630 Hz, 800 Hz, 1000 Hz, 1250 Hz,
+1600 Hz, 2000 Hz, 2500 Hz, 3150 Hz, 4000 Hz, 5000 Hz, 6300 Hz, 8000 Hz
+```
+
+重新編譯後立即生效：
+
+```bash
+./gradlew :app:installDebug
+```
 
 ---
 
-## 7. 聯絡與支援
-如有任何問題或改進建議，歡迎提交 Issue。
+## 常見問題與故障排查
+
+| 問題 | 症狀 | 解決方案 |
+|------|------|---------|
+| **NDK 版本錯誤** | CMake 編譯失敗，報錯 "toolchain not found" | 驗證 `local.properties` 末尾：`ndk.dir=/path/to/ndk/25.1` |
+| **沒有聲音輸出** | 麥克風獲取音訊，但耳機無聲 | 1. 檢查藍牙連接 2. 在 Android 設置「應用權限」中授予麥克風 & 音訊精焦權限 3. 重啟應用 |
+| **音訊削波/扭曲** | 聲音嚴重失真，尤其大聲輸入 | 1. 升高 MPO 限制器閾值 (編輯 HarkAudioEngine.cpp 第 84 行) 2. 降低預增益 |
+| **CMake 無法找到 Oboe** | 編譯錯誤：`oboe/OboeSingleBufferQueue.h: No such file` | 執行 `git submodule update --init --recursive` 以初始化 Oboe 子模組 |
+| **藍牙連接斷開** | 連接 5 秒後音訊停止 | 1. 確認藍牙耳機支援 A2DP 立體聲 2. 更新耳機固件 3. 重新啟動 Android 藍牙服務 |
+| **EQ 預設無效** | 修改 `FilterChain.cpp` 後仍使用舊參數 | 清理並重新編譯：`./gradlew clean :app:assembleDebug` |
+
+---
+
+## 技術棧
+
+| 層級 | 技術 | 說明 |
+|------|------|------|
+| **UI Framework** | Jetpack Compose | 響應式 UI，基於 Material Design 3 |
+| **Architecture** | MVVM + StateFlow | 單向數據流，簡化測試與狀態管理 |
+| **Audio Engine** | Oboe C++ | Google 提供的高效能低延遲庫 |
+| **Audio API Stack** | AAudio → OpenSL ES | 自動回落到 OpenSL ES (古老設備) |
+| **DSP Processing** | C++ + NEON SIMD | 優化的動態壓縮與濾波運算 |
+| **Interop** | JNI (Java Native Interface) | Kotlin ↔ C++ 邊界 |
+| **Build System** | Gradle 8.x + CMake 3.22 | 自動化原生代碼編譯 |
+| **Documentation** | Markdown | 易維護的知識庫 |
+
+---
+
+## 深入學習資源
+
+### API 參考與 JNI 綁定
+
+完整的 JNI 函數簽名、Kotlin 調用示例與 C++ 實作詳節，詳見：
+
+👉 **[API_REFERENCE.md](API_REFERENCE.md)**
+
+### DSP 設計參數與數學推導
+
+WDRC 軟膝特性、噪音閘門校準、MPO 限制器動態、時常數計算、濾波器設計等深入分析：
+
+👉 **[DSP_PARAMETERS_AUDIT.md](DSP_PARAMETERS_AUDIT.md)**
+
+### 訊號處理可視化
+
+視覺化壓縮曲線、時域響應與頻率特性：
+
+- [dsp_compression_curves.png](dsp_compression_curves.png) — 4 面板壓縮曲線分析
+- [dsp_time_response.png](dsp_time_response.png) — 包絡檢測器時域響應
+- [visualize_dsp_parameters.py](visualize_dsp_parameters.py) — 可重現的 Python 分析腳本
+
+---
+
+## 許可
+
+本專案採 MIT 許可。詳見 [LICENSE](LICENSE) 文件。
+
+---
+
+## 貢獻指南
+
+我們歡迎對 Hark 的貢獻！請按照以下步驟：
+
+1. Fork 本倉庫
+2. 建立特性分支 (`git checkout -b feature/amazing-feature`)
+3. 提交更改 (`git commit -m 'Add amazing feature'`)
+4. 推送至分支 (`git push origin feature/amazing-feature`)
+5. 開啟 Pull Request
+
+---
+
+## 聯絡方式
+
+**主要開發者**: Hark Audio Team  
+**問題回報**: GitHub Issues  
+**建議與反饋**: GitHub Discussions

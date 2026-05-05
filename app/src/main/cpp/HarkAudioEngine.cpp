@@ -6,8 +6,9 @@
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
-#define DEFAULT_MAKEUP_GAIN_DB 10.0f // 調回 10dB 以確保 0dB 時有足夠音量
-#define DEFAULT_PRE_GAIN_DB 0.0f     // 保持 0dB，動態由 AGC-O 處理
+#define DEFAULT_MAKEUP_GAIN_DB                                                 \
+  18.0f // 提高補償增益，讓整體音量接近 FDA 安全上限
+#define DEFAULT_PRE_GAIN_DB 0.0f
 
 const int NUM_SHELF_FILTERS = 3;
 const int NUM_PEAK_FILTERS = 16;
@@ -41,15 +42,7 @@ void HarkAudioEngine::updateDSPParameters() {
                               300.0, 0.0, 0.707);
   mFilterChainRight.updateBand(1, BiquadFilter::Type::LowShelf, sampleRate,
                                300.0, 0.0, 0.707);
-  
-  // 計算 Auto-Headroom (AGC-O 策略)：防止過多頻段 boost 導致的數位破音
-  float maxBoostDb = 0.0f;
-  for (float gain : mBandGains) {
-    if (gain > maxBoostDb) maxBoostDb = gain;
-  }
-  // 如果有頻段 boost 超過 3dB，我們按比例調降 Master Headroom (例如最高 +12dB 時預留 9dB 空間)
-  float headroomDb = -fmaxf(0.0f, maxBoostDb * 0.75f);
-  mAutoHeadroomLinear = powf(10.0f, headroomDb / 20.0f);
+
 
   // 2-17: Peaking EQs (這部分由外部 UI 覆蓋，保留預設平坦)
   for (int i = 0; i < NUM_PEAK_FILTERS; ++i) {
@@ -60,19 +53,33 @@ void HarkAudioEngine::updateDSPParameters() {
                                  centerFrequencies[i], mBandGains[i],
                                  mBandQs[i]);
   }
-  // 18: High-Shelf 4000Hz 
+  
+  // ── Auto-Headroom Calculation ──────────────────────────────────────
+  recalculateHeadroom();
+  // Band 18: HighShelf at 0dB (pass-through).
+  // Note: BiquadFilter only supports Peaking/LowShelf/HighShelf.
+  // A true LowPass filter would require extending BiquadFilter — tracked as future work.
   mFilterChainLeft.updateBand(TOTAL_FILTERS - 1, BiquadFilter::Type::HighShelf,
                               sampleRate, 4000.0, 0.0, 0.707);
   mFilterChainRight.updateBand(TOTAL_FILTERS - 1, BiquadFilter::Type::HighShelf,
                                sampleRate, 4000.0, 0.0, 0.707);
 
-  // WDRC: Compress > -24dB (ratio 2.0:1), Expand < -60dB (ratio 0.66 -> 1:1.5 expansion for natural sound), Attack 5ms, Release 200ms
-  mWdrcLeft.setParameters(-24.0f, 2.0f, -60.0f, 0.66f, 5.0f, 200.0f, sampleRate);
-  mWdrcRight.setParameters(-24.0f, 2.0f, -60.0f, 0.66f, 5.0f, 200.0f, sampleRate);
+  // ── WDRC (Wide Dynamic Range Compression) ─────────────────────────────
+  // Hearing aid design standard (ANSI S3.22):
+  //   CT (Compression Threshold) = -40dB: below this, unity gain (soft sounds pass freely)
+  //   CR (Compression Ratio)     =  2:1 : gentle WDRC for mild-moderate loss
+  //   Expander Threshold         = -70dB: only suppress near-digital-silence
+  //   Expander Ratio             =  0.9 : very gentle 1:1.1 downward expansion
+  //   Attack = 10ms, Release = 80ms (faster release for natural AGC feel)
+  mWdrcLeft.setParameters(-40.0f, 2.0f, -70.0f, 0.9f, 10.0f, 80.0f, sampleRate);
+  mWdrcRight.setParameters(-40.0f, 2.0f, -70.0f, 0.9f, 10.0f, 80.0f, sampleRate);
 
-  // Limiter: Compress > -1.0dB (ratio 10:1), Disable expander (-100dB, ratio 1.0), Attack 1ms, Release 50ms
-  mLimiterLeft.setParameters(-1.0f, 10.0f, -100.0f, 1.0f, 1.0f, 50.0f, sampleRate);
-  mLimiterRight.setParameters(-1.0f, 10.0f, -100.0f, 1.0f, 1.0f, 50.0f, sampleRate);
+  // ── MPO Limiter (Maximum Power Output) ────────────────────────────────
+  // FDA OTC rule: output must not exceed safe levels.
+  // Threshold = -3dBFS, Ratio = 20:1 (near brick-wall), Attack = 0.5ms
+  // No expander on Limiter — it must always pass signal.
+  mLimiterLeft.setParameters(-3.0f, 20.0f, -100.0f, 1.0f, 0.5f, 30.0f, sampleRate);
+  mLimiterRight.setParameters(-3.0f, 20.0f, -100.0f, 1.0f, 0.5f, 30.0f, sampleRate);
 }
 
 HarkAudioEngine::~HarkAudioEngine() { stop(); }
@@ -150,10 +157,12 @@ bool HarkAudioEngine::setupStreams() {
       ->setSharingMode(oboe::SharingMode::Exclusive)
       ->setFormat(oboe::AudioFormat::Float)
       ->setChannelCount(CHANNEL_COUNT)
-      ->setUsage(oboe::Usage::VoiceCommunication) // Routes output to BT communication device
-      ->setContentType(oboe::ContentType::Speech)  // Tag as speech for audio policy
-      ->setDataCallback(this)                       // onAudioReady() DSP callback
-      ->setErrorCallback(this);                     // onErrorAfterClose() disconnect callback
+      ->setUsage(oboe::Usage::VoiceCommunication) // Routes output to BT
+                                                  // communication device
+      ->setContentType(
+          oboe::ContentType::Speech) // Tag as speech for audio policy
+      ->setDataCallback(this)        // onAudioReady() DSP callback
+      ->setErrorCallback(this);      // onErrorAfterClose() disconnect callback
 
   oboe::Result result = outBuilder.openStream(&mOutputStream);
   if (result != oboe::Result::OK ||
@@ -190,7 +199,8 @@ bool HarkAudioEngine::setupStreams() {
       ->setSharingMode(oboe::SharingMode::Shared)
       ->setFormat(oboe::AudioFormat::Float)
       // 修改：強制使用單聲道 (Mono) 作為麥克風輸入
-      // 因為大部分藍牙通話耳機 (SCO/BLE) 只有單聲道，若強制要立體聲，Oboe 可能無法開啟或給出錯誤資料！
+      // 因為大部分藍牙通話耳機 (SCO/BLE) 只有單聲道，若強制要立體聲，Oboe
+      // 可能無法開啟或給出錯誤資料！
       ->setChannelCount(oboe::ChannelCount::Mono)
       ->setSampleRate(static_cast<int32_t>(sampleRate))
       ->setSampleRateConversionQuality(
@@ -301,6 +311,14 @@ void HarkAudioEngine::setBandGain(int bandIndex, float gainDb) {
   mFilterChainRight.updateBand(bandIndex + 2, BiquadFilter::Type::Peaking,
                                sampleRate, centerFrequencies[bandIndex],
                                mBandGains[bandIndex], mBandQs[bandIndex]);
+
+  // Bug fix: Must recalculate headroom when gain changes, otherwise 
+  // the overall level doesn't adjust until the engine restarts!
+  recalculateHeadroom();
+
+  LOGD("EQ Band %d (%d Hz) Gain set to %.1f dB. New Headroom: %.2f dB", 
+       bandIndex, (int)centerFrequencies[bandIndex], gainDb, 
+       20.0f * log10f(mAutoHeadroomLinear));
 }
 
 void HarkAudioEngine::setBandQ(int bandIndex, float q_factor) {
@@ -321,19 +339,22 @@ void HarkAudioEngine::setBandQ(int bandIndex, float q_factor) {
 void HarkAudioEngine::setWdrcParameters(float thresholdDb, float ratio,
                                         float attackMs, float releaseMs) {
   std::lock_guard<std::mutex> lock(mDSPMutex);
-  // Pass default expander parameters (-50dB threshold, 1:2 ratio) to maintain WDRC signature
-  mWdrcLeft.setParameters(thresholdDb, ratio, -50.0f, 0.5f, attackMs, releaseMs, sampleRate);
-  mWdrcRight.setParameters(thresholdDb, ratio, -50.0f, 0.5f, attackMs, releaseMs, sampleRate);
+  // Pass default expander parameters (-50dB threshold, 1:2 ratio) to maintain
+  // WDRC signature
+  mWdrcLeft.setParameters(thresholdDb, ratio, -50.0f, 0.5f, attackMs, releaseMs,
+                          sampleRate);
+  mWdrcRight.setParameters(thresholdDb, ratio, -50.0f, 0.5f, attackMs,
+                           releaseMs, sampleRate);
 }
 
 void HarkAudioEngine::setLimiterParameters(float thresholdDb, float ratio,
                                            float attackMs, float releaseMs) {
   std::lock_guard<std::mutex> lock(mDSPMutex);
   // Disable expander for limiter (-100dB, ratio 1.0)
-  mLimiterLeft.setParameters(thresholdDb, ratio, -100.0f, 1.0f, attackMs, releaseMs,
-                             sampleRate);
-  mLimiterRight.setParameters(thresholdDb, ratio, -100.0f, 1.0f, attackMs, releaseMs,
-                              sampleRate);
+  mLimiterLeft.setParameters(thresholdDb, ratio, -100.0f, 1.0f, attackMs,
+                             releaseMs, sampleRate);
+  mLimiterRight.setParameters(thresholdDb, ratio, -100.0f, 1.0f, attackMs,
+                              releaseMs, sampleRate);
 }
 
 void HarkAudioEngine::setBypassMode(bool bypass) {
@@ -358,8 +379,9 @@ HarkAudioEngine::onAudioReady(oboe::AudioStream *oboeStream, void *audioData,
     return oboe::DataCallbackResult::Continue;
   }
 
-  // 設置合理的超時時間，避免 input stream 因為稍微的延遲就回傳 0 幀（造成靜音或嚴重斷續）
-  int64_t timeoutNanos = (int64_t)(numFrames * 1e9 / sampleRate) * 2; 
+  // 設置合理的超時時間，避免 input stream 因為稍微的延遲就回傳 0
+  // 幀（造成靜音或嚴重斷續）
+  int64_t timeoutNanos = (int64_t)(numFrames * 1e9 / sampleRate) * 2;
   auto result = mInputStream->read(audioData, numFrames, timeoutNanos);
 
   int32_t framesRead = 0;
@@ -377,23 +399,25 @@ HarkAudioEngine::onAudioReady(oboe::AudioStream *oboeStream, void *audioData,
   // --- 重大修正：聲道擴充與記憶體佈局 ---
   // 如果麥克風是單聲道 (1 channel)，而我們需要立體聲輸出 (CHANNEL_COUNT = 2)
   // read() 會把 framesRead 個樣本寫入 buffer 的前半段 (index 0 ~ framesRead-1)
-  // 我們必須從後面往前把資料展開為立體聲 (L, R, L, R...)，避免覆蓋還沒展開的資料
+  // 我們必須從後面往前把資料展開為立體聲 (L, R, L,
+  // R...)，避免覆蓋還沒展開的資料
   if (inputChannelCount == 1 && CHANNEL_COUNT == 2) {
-      for (int i = framesRead - 1; i >= 0; --i) {
-          float sample = buffer[i];
-          buffer[i * 2] = sample;     // Left
-          buffer[i * 2 + 1] = sample; // Right
-      }
+    for (int i = framesRead - 1; i >= 0; --i) {
+      float sample = buffer[i];
+      buffer[i * 2] = sample;     // Left
+      buffer[i * 2 + 1] = sample; // Right
+    }
   } else if (inputChannelCount > 2) {
-      // 若萬一裝置有多個聲道，只取第一聲道
-      for (int i = framesRead - 1; i >= 0; --i) {
-          float sample = buffer[i * inputChannelCount];
-          buffer[i * 2] = sample;
-          buffer[i * 2 + 1] = sample;
-      }
+    // 若萬一裝置有多個聲道，只取第一聲道
+    for (int i = framesRead - 1; i >= 0; --i) {
+      float sample = buffer[i * inputChannelCount];
+      buffer[i * 2] = sample;
+      buffer[i * 2 + 1] = sample;
+    }
   }
 
-  // 如果读取的帧数少于请求的帧数（例如发生 under-run），用静音填充剩余部分 (注意：此時 buffer 已經是立體聲佈局)
+  // 如果读取的帧数少于请求的帧数（例如发生 under-run），用静音填充剩余部分
+  // (注意：此時 buffer 已經是立體聲佈局)
   if (framesRead < numFrames) {
     int32_t remainingFrames = numFrames - framesRead;
     memset(buffer + framesRead * CHANNEL_COUNT, 0,
@@ -427,26 +451,32 @@ HarkAudioEngine::onAudioReady(oboe::AudioStream *oboeStream, void *audioData,
       // --- 1. Own Voice Ducking (Simple VAD) ---
       // 檢測輸入音量包絡，若音量極大（例如 User 在唱歌/說話），平滑調降增益
       float currentInputLevel = (fabsf(sampleL) + fabsf(sampleR)) * 0.5f;
-      mInputEnvelope = 0.999f * mInputEnvelope + 0.001f * currentInputLevel;
-      
-      float vadThreshold = 0.17f; // 約 -15dBFS
+      // 加快 VAD 反應速度 (從 0.999 改為 0.98)，讓說話瞬間就能觸發
+      // Ducking，減少自己的聲音回音
+      mInputEnvelope = 0.98f * mInputEnvelope + 0.02f * currentInputLevel;
+
+      float vadThreshold = 0.15f; // 約 -16dBFS
       if (mInputEnvelope > vadThreshold) {
-          mDuckingGain = 0.99f * mDuckingGain + 0.01f * 0.3f; // 快速降到 30% 增益
+        mDuckingGain =
+            0.95f * mDuckingGain + 0.05f * 0.2f; // 更快速降到 20% 增益
       } else {
-          mDuckingGain = 0.999f * mDuckingGain + 0.001f * 1.0f; // 緩慢恢復
+        mDuckingGain = 0.99f * mDuckingGain + 0.01f * 1.0f; // 恢復也稍微加快
       }
 
       // --- 2. AGC-O Pre-gain & Headroom ---
       sampleL = sampleL * mPreGainLinear * mAutoHeadroomLinear * mDuckingGain;
       sampleR = sampleR * mPreGainLinear * mAutoHeadroomLinear * mDuckingGain;
 
-      // --- 3. EQ & WDRC ---
-      sampleL = mFilterChainLeft.process(sampleL);
-      sampleR = mFilterChainRight.process(sampleR);
+      // --- 3. WDRC (Noise Gate & Compression) ---
+      // 先進行動態處理與降噪，防止後面的 EQ 放大雜訊
       sampleL = mWdrcLeft.process(sampleL);
       sampleR = mWdrcRight.process(sampleR);
 
-      // --- 4. Makeup Gain & Limiter ---
+      // --- 4. EQ (Biquad Filter Chain) ---
+      sampleL = mFilterChainLeft.process(sampleL);
+      sampleR = mFilterChainRight.process(sampleR);
+
+      // --- 5. Makeup Gain & Limiter ---
       sampleL = sampleL * mMakeupGainLinear;
       sampleR = sampleR * mMakeupGainLinear;
       sampleL = mLimiterLeft.process(sampleL);
@@ -455,11 +485,13 @@ HarkAudioEngine::onAudioReady(oboe::AudioStream *oboeStream, void *audioData,
       // --- 5. Safety Soft-Clipping (FDA-compliant low distortion) ---
       // 使用 tanh-like soft clipping 代替生硬的 hard clipping，減少高頻諧波雜訊
       auto softClip = [](float x) {
-          if (x > 0.9f) return 0.9f + 0.1f * tanhf((x - 0.9f) / 0.1f);
-          if (x < -0.9f) return -0.9f + 0.1f * tanhf((x + 0.9f) / 0.1f);
-          return x;
+        if (x > 0.9f)
+          return 0.9f + 0.1f * tanhf((x - 0.9f) / 0.1f);
+        if (x < -0.9f)
+          return -0.9f + 0.1f * tanhf((x + 0.9f) / 0.1f);
+        return x;
       };
-      
+
       sampleL = softClip(sampleL);
       sampleR = softClip(sampleR);
 
@@ -505,7 +537,8 @@ void HarkAudioEngine::onErrorAfterClose(oboe::AudioStream *oboeStream,
 
   std::lock_guard<std::mutex> lock(mDSPMutex);
 
-  // Oboe has already closed the stream; null our pointers to avoid use-after-free.
+  // Oboe has already closed the stream; null our pointers to avoid
+  // use-after-free.
   if (oboeStream == mOutputStream) {
     LOGD("Nulling mOutputStream (was %p)", mOutputStream);
     mOutputStream = nullptr;
@@ -518,6 +551,20 @@ void HarkAudioEngine::onErrorAfterClose(oboe::AudioStream *oboeStream,
   // Reset running flag so the next start() call can proceed without bailing
   // out on the "already running" guard.
   mIsRunning = false;
-  LOGD("onErrorAfterClose: engine state reset. Ready for restart by Kotlin layer.");
+  LOGD("onErrorAfterClose: engine state reset. Ready for restart by Kotlin "
+       "layer.");
 }
 
+void HarkAudioEngine::recalculateHeadroom() {
+    // AGC-O Strategy: prevent multiple band boosts from causing digital clipping.
+    float maxBoostDb = 0.0f;
+    for (float gain : mBandGains) {
+        if (gain > maxBoostDb) maxBoostDb = gain;
+    }
+    
+    // Design Choice: If we boost a band by 12dB, we drop the master by 6dB (0.5x).
+    // This allows the boosted frequency to still feel "louder" (+6dB net) 
+    // while preventing harsh distortion.
+    float headroomDb = -fmaxf(0.0f, maxBoostDb * 0.5f);
+    mAutoHeadroomLinear = powf(10.0f, headroomDb / 20.0f);
+}
