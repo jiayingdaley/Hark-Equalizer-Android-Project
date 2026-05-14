@@ -8,19 +8,25 @@
 BiquadFilter::BiquadFilter() : b0(1.0), b1(0.0), b2(0.0), a1(0.0), a2(0.0), x1(0.0), x2(0.0), y1(0.0), y2(0.0) {}
 
 void BiquadFilter::updateCoefficients(Type type, double sampleRate, double centerHz, double gainDb, double q_factor) {
-    // 参数验证
-    if (sampleRate <= 0.0) {
-        LOGE("Invalid sampleRate: %.0f", sampleRate);
+    // parameter guards (mirror C++ guards)
+    if (sampleRate <= 0.0) { LOGE("Invalid sampleRate: %.0f", sampleRate); return; }
+    if (centerHz  <= 0.0) { LOGE("Invalid centerHz: %.0f",  centerHz);  return; }
+    if (q_factor  <= 0.0) { LOGE("Invalid q_factor: %.2f",  q_factor);  return; }
+
+    // BUG-03 fix: Peaking/Shelf filters at 0dB are pure pass-through.
+    // Mark as inactive so process() skips all IIR computation, preventing
+    // per-band floating-point noise accumulation amplified by Makeup Gain.
+    // HighPass/LowPass/BandPass are structural (always active).
+    const bool isGainType = (type == Type::Peaking ||
+                             type == Type::LowShelf ||
+                             type == Type::HighShelf);
+    if (isGainType && std::abs(gainDb) < 0.02) {
+        mIsActive = false;
+        // Reset state so re-activation starts clean
+        x1 = x2 = y1 = y2 = 0.0;
         return;
     }
-    if (centerHz <= 0.0) {
-        LOGE("Invalid centerHz: %.0f", centerHz);
-        return;
-    }
-    if (q_factor <= 0.0) {
-        LOGE("Invalid q_factor: %.2f", q_factor);
-        return;
-    }
+    mIsActive = true;
     
     // 截止频率不能超过 Nyquist 频率
     double nyquist = sampleRate / 2.0;
@@ -66,6 +72,34 @@ void BiquadFilter::updateCoefficients(Type type, double sampleRate, double cente
             a1 = 2.0 * ((A - 1.0) - (A + 1.0) * cos_w0);
             a2 = (A + 1.0) - (A - 1.0) * cos_w0 - 2.0 * sqrt(A) * alpha;
             break;
+            
+        case Type::HighPass:
+            b0 = (1.0 + cos_w0) / 2.0;
+            b1 = -(1.0 + cos_w0);
+            b2 = (1.0 + cos_w0) / 2.0;
+            a0_inv = 1.0 / (1.0 + alpha);
+            a1 = -2.0 * cos_w0;
+            a2 = 1.0 - alpha;
+            break;
+
+        case Type::LowPass:
+            b0 = (1.0 - cos_w0) / 2.0;
+            b1 = 1.0 - cos_w0;
+            b2 = (1.0 - cos_w0) / 2.0;
+            a0_inv = 1.0 / (1.0 + alpha);
+            a1 = -2.0 * cos_w0;
+            a2 = 1.0 - alpha;
+            break;
+
+        case Type::BandPass:
+            // Standard BandPass (peak gain Q)
+            b0 = alpha;
+            b1 = 0.0;
+            b2 = -alpha;
+            a0_inv = 1.0 / (1.0 + alpha);
+            a1 = -2.0 * cos_w0;
+            a2 = 1.0 - alpha;
+            break;
     }
 
     // 归一化系数
@@ -77,16 +111,21 @@ void BiquadFilter::updateCoefficients(Type type, double sampleRate, double cente
 }
 
 float BiquadFilter::process(float in) {
-    double out = b0 * in + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+    // BUG-03: bypass mode — zero computation, zero noise
+    if (!mIsActive) return in;
+
+    double in_d = (double)in;
+    double out = b0 * in_d + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+    
+    // 防止 denormal 數字導致的效能崩潰 (在更新狀態前處理)
+    if (std::abs(out) < 1.17549435e-38) {
+        out = 0.0;
+    }
+
     x2 = x1;
-    x1 = in;
+    x1 = in_d;
     y2 = y1;
     y1 = out;
-    
-    // 防止 denormal 数字导致的性能崩溃
-    if (fabsf((float)out) < 1.175494e-38f) {  // 最小正规数
-        out = 0.0f;
-    }
     
     return (float)out;
 }

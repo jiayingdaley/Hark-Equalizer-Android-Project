@@ -3,83 +3,32 @@ package com.wcy.hark.ui.screen
 import android.Manifest
 import android.content.pm.PackageManager
 import android.media.AudioManager
-import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.wcy.hark.EqViewModel
+import com.wcy.hark.audio.SceneManager
 import com.wcy.hark.ui.components.EqualizerCurveDisplay
 import com.wcy.hark.ui.components.SystemVolumeSlider
 
-// ---------------------------------------------------------------------------
-// UI Layout Constants
-// ---------------------------------------------------------------------------
-
-/**
- * Shared UI dimension constants for the equalizer layout.
- * Centralised here so all EQ UI components share the same column width.
- */
 object EqUiConstants {
-    /** Width allocated to each EQ band column (label + curve handle + dB text). */
     val BAND_CONTAINER_WIDTH: Dp = 70.dp
 }
 
-// ---------------------------------------------------------------------------
-// Main Screen
-// ---------------------------------------------------------------------------
-
-/**
- * HarkAppScreen – Top-level composable for the main hearing-aid control screen.
- *
- * Responsibilities:
- *  - Permission request UI flow
- *  - Mode selection (8-band / 16-band)
- *  - Master on/off switch
- *  - Status text display
- *  - Equalizer curve display + drag-to-edit
- *  - System volume slider
- *
- * Design: Stateless composable receiving all state and callbacks from outside,
- * following the Compose Unidirectional Data Flow (UDF) pattern.
- * Ref: https://developer.android.com/jetpack/compose/architecture
- *
- * @param viewModel          Provides EQ state and business logic.
- * @param audioManager       For volume control; nullable for Preview compatibility.
- * @param isEngineOn         Current engine on/off state (user intent).
- * @param onEngineStateChange Callback when the user toggles the master switch.
- * @param onSetBandGain      JNI call-through to set per-band gain.
- * @param onSetBandQ         JNI call-through to set per-band Q factor.
- */
 @Composable
 fun HarkAppScreen(
     viewModel: EqViewModel,
@@ -94,9 +43,7 @@ fun HarkAppScreen(
     // --- Permission state ---
     var isPermissionGranted by remember {
         mutableStateOf(
-            ContextCompat.checkSelfPermission(
-                context, Manifest.permission.RECORD_AUDIO
-            ) == PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         )
     }
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -107,47 +54,16 @@ fun HarkAppScreen(
         if (!isPermissionGranted) permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
     }
 
-    // --- EQ state from ViewModel ---
+    // --- State ---
     val scrollState = rememberScrollState()
-    val currentMode by viewModel.currentMode
     val statusText by viewModel.statusText
-    val centerFrequencies = viewModel.currentCenterFrequencies
-    val currentBandGains = viewModel.currentBandGains
+    val centerFrequencies = viewModel.centerFrequencies16
+    val currentBandGains = viewModel.bandGains16
     val totalBandContainerWidth = EqUiConstants.BAND_CONTAINER_WIDTH * centerFrequencies.size
-
-    // Extract JNI syncing logic into a lambda so we can call it on reset as well
-    val syncJniState = {
-        Log.d("HarkAppScreen", "Syncing JNI state for mode: $currentMode")
-        // 8-band mode maps to specific positions in the 16-band filter array
-        val map8to16 = intArrayOf(0, 3, 6, 8, 9, 12, 14, 15)
-        for (i in 0 until 16) {
-            if (currentMode == EqViewModel.EngineMode.BIQUAD_16_MIC) {
-                val gain = viewModel.bandGains16.getOrNull(i)?.value ?: 0f
-                val q = viewModel.bandQs16.getOrNull(i)?.value ?: EqViewModel.DEFAULT_Q
-                onSetBandGain(i, gain)
-                onSetBandQ(i, q)
-            } else {
-                val indexOf8 = map8to16.indexOf(i)
-                if (indexOf8 != -1) {
-                    val gain = viewModel.bandGains8.getOrNull(indexOf8)?.value ?: 0f
-                    val q = viewModel.bandQs8.getOrNull(indexOf8)?.value ?: EqViewModel.DEFAULT_Q
-                    onSetBandGain(i, gain)
-                    onSetBandQ(i, q)
-                } else {
-                    // Unused 16-band slots in 8-band mode → flat
-                    onSetBandGain(i, 0f)
-                    onSetBandQ(i, EqViewModel.DEFAULT_Q)
-                }
-            }
-        }
-    }
-
-    // Sync ViewModel state → JNI layer whenever mode changes or data finishes loading.
-    // Maps 8-band UI indices to the correct 16-band C++ filter slots.
-    LaunchedEffect(currentMode, viewModel.isDataLoaded.value) {
-        if (!viewModel.isDataLoaded.value) return@LaunchedEffect
-        syncJniState()
-    }
+    
+    val situationalMode by viewModel.situationalMode
+    val isAutoLocked by viewModel.isAutoLocked
+    val pinnaEnabled by viewModel.pinnaEnabled
 
     // --- Layout ---
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
@@ -155,142 +71,139 @@ fun HarkAppScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(vertical = 8.dp)
+                .padding(16.dp)
         ) {
-            // --- Top control bar ---
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.fillMaxWidth()
+            // --- Situational Modes Row ---
+            Text("環境模式", style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Mode selector buttons
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    val activeColors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    )
-                    val inactiveColors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                    Button(
-                        onClick = { viewModel.currentMode.value = EqViewModel.EngineMode.BIQUAD_16_MIC },
-                        colors = if (currentMode == EqViewModel.EngineMode.BIQUAD_16_MIC) activeColors else inactiveColors
-                    ) { Text("16-Band") }
+                ModeButton(
+                    label = "全向",
+                    icon = Icons.Default.Hearing,
+                    isSelected = situationalMode == SceneManager.Mode.TRANSPARENCY,
+                    onClick = { viewModel.selectSituationalMode(SceneManager.Mode.TRANSPARENCY) }
+                )
+                ModeButton(
+                    label = "人聲",
+                    icon = Icons.Default.RecordVoiceOver,
+                    isSelected = situationalMode == SceneManager.Mode.CONVERSATION,
+                    onClick = { viewModel.selectSituationalMode(SceneManager.Mode.CONVERSATION) }
+                )
+                ModeButton(
+                    label = "戶外",
+                    icon = Icons.Default.Terrain,
+                    isSelected = situationalMode == SceneManager.Mode.OUTDOOR,
+                    onClick = { viewModel.selectSituationalMode(SceneManager.Mode.OUTDOOR) }
+                )
+                ModeButton(
+                    label = "影音",
+                    icon = Icons.Default.MusicNote,
+                    isSelected = situationalMode == SceneManager.Mode.CINEMA,
+                    onClick = { viewModel.selectSituationalMode(SceneManager.Mode.CINEMA) }
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // Auto Mode Toggle
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text("自動切換模式", style = MaterialTheme.typography.bodyLarge)
+                Spacer(modifier = Modifier.width(12.dp))
+                Switch(
+                    checked = !isAutoLocked,
+                    onCheckedChange = { if (it) viewModel.selectSituationalMode(SceneManager.Mode.AUTO) }
+                )
+            }
 
-                    Button(
-                        onClick = { viewModel.currentMode.value = EqViewModel.EngineMode.BIQUAD_8_MIC },
-                        colors = if (currentMode == EqViewModel.EngineMode.BIQUAD_8_MIC) activeColors else inactiveColors
-                    ) { Text("8-Band") }
+            Divider(modifier = Modifier.padding(vertical = 16.dp))
+
+            // --- Engine Control ---
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text("主開關", style = MaterialTheme.typography.titleSmall)
+                    Text(statusText, style = MaterialTheme.typography.bodySmall)
                 }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Master on/off switch
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("主開關")
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Switch(
-                        checked = isEngineOn,
-                        onCheckedChange = onEngineStateChange,
-                        enabled = isPermissionGranted
-                    )
-                }
-                if (!isPermissionGranted) {
-                    Text("請授予麥克風權限以啟用", color = MaterialTheme.colorScheme.error)
-                }
-
-                Text(text = statusText, style = MaterialTheme.typography.bodyLarge)
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Reset button
-                Button(onClick = { 
-                    viewModel.resetCurrentModeBands()
-                    syncJniState()
-                }) {
-                    Text("重設等化器")
-                }
+                Switch(
+                    checked = isEngineOn,
+                    onCheckedChange = onEngineStateChange,
+                    enabled = isPermissionGranted
+                )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // --- Equalizer section (horizontally scrollable) ---
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .horizontalScroll(scrollState),
-                verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.Start
-            ) {
-                Column(
+            // --- Equalizer Section ---
+            Box(modifier = Modifier.weight(1f)) {
+                Row(
                     modifier = Modifier
-                        .width(totalBandContainerWidth)
-                        .fillMaxHeight(),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .fillMaxSize()
+                        .horizontalScroll(scrollState)
                 ) {
-                    // Frequency labels row
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        centerFrequencies.forEach { freq ->
-                            Text(
-                                text = formatFrequencyLabel(freq),
-                                modifier = Modifier.width(EqUiConstants.BAND_CONTAINER_WIDTH),
-                                textAlign = TextAlign.Center,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
+                    Column(modifier = Modifier.width(totalBandContainerWidth)) {
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            centerFrequencies.forEach { freq ->
+                                Text(
+                                    text = formatFrequencyLabel(freq),
+                                    modifier = Modifier.width(EqUiConstants.BAND_CONTAINER_WIDTH),
+                                    textAlign = TextAlign.Center,
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
                         }
-                    }
-
-                    // Interactive EQ curve
-                    EqualizerCurveDisplay(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        bandGains = currentBandGains,
-                        centerFrequencies = centerFrequencies,
-                        onDragBand = { bandIndex, newGain ->
-                            viewModel.updateBandGain(bandIndex, newGain)
-                            // Map 8-band UI index to 16-band JNI index when in 8-band mode
-                            val jniIndex = if (currentMode == EqViewModel.EngineMode.BIQUAD_8_MIC) {
-                                val map = intArrayOf(0, 3, 6, 8, 9, 12, 14, 15)
-                                if (bandIndex in map.indices) map[bandIndex] else bandIndex
-                            } else bandIndex
-                            onSetBandGain(jniIndex, newGain)
-                        }
-                    )
-
-                    // dB value labels row
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        currentBandGains.forEach { gainState ->
-                            Text(
-                                text = String.format("%.1f dB", gainState.value),
-                                modifier = Modifier.width(EqUiConstants.BAND_CONTAINER_WIDTH),
-                                textAlign = TextAlign.Center,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = androidx.compose.ui.graphics.Color.Gray
-                            )
-                        }
+                        
+                        EqualizerCurveDisplay(
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                            bandGains = currentBandGains,
+                            centerFrequencies = centerFrequencies,
+                            onDragBand = { index, gain -> viewModel.updateBandGain(index, gain) }
+                        )
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
             audioManager?.let { SystemVolumeSlider(it) }
-            Spacer(modifier = Modifier.height(8.dp))
+            
+            Button(
+                onClick = { viewModel.resetCurrentModeBands() },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer)
+            ) {
+                Text("重設等化器 (0 dB)")
+            }
         }
     }
 }
 
-// ---------------------------------------------------------------------------
-// Utilities
-// ---------------------------------------------------------------------------
+@Composable
+fun ModeButton(label: String, icon: ImageVector, isSelected: Boolean, onClick: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        FilledTonalIconButton(
+            onClick = onClick,
+            modifier = Modifier.size(64.dp),
+            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                containerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        ) {
+            Icon(imageVector = icon, contentDescription = label, modifier = Modifier.size(32.dp))
+        }
+        Text(text = label, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 4.dp))
+    }
+}
 
-/**
- * Formats a frequency in Hz to a human-readable label.
- * e.g. 250 → "250", 1000 → "1k", 1250 → "1.3k", 6300 → "6.3k"
- */
 private fun formatFrequencyLabel(freq: Int): String {
     if (freq < 1000) return freq.toString()
     val kHz = freq / 1000.0

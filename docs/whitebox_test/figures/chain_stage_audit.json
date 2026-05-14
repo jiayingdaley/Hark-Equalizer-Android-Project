@@ -1,0 +1,34 @@
+{
+  "[0] Input": {
+    "rms_dBFS": -33.01,
+    "peak_linear": 0.03162
+  },
+  "[4] Pre-Gain": {
+    "rms_dBFS": -33.01,
+    "peak_linear": 0.03162
+  },
+  "[5] Pinna": {
+    "rms_dBFS": -32.67,
+    "peak_linear": 0.03287
+  },
+  "[6] EQ": {
+    "rms_dBFS": -32.67,
+    "peak_linear": 0.03287
+  },
+  "[7] WDRC": {
+    "rms_dBFS": -35.04,
+    "peak_linear": 0.02504
+  },
+  "[8] Makeup +16dB": {
+    "rms_dBFS": -19.04,
+    "peak_linear": 0.15799
+  },
+  "[9] Limiter": {
+    "rms_dBFS": -19.04,
+    "peak_linear": 0.15799
+  },
+  "[10] Soft-Clip": {
+    "rms_dBFS": -19.04,
+    "peak_linear": 0.15799
+  }
+}

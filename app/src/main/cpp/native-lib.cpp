@@ -2,16 +2,7 @@
 #include "HarkAudioEngine.h"
 
 // The single, static instance of our audio engine.
-// Lifetime: process lifetime (static storage duration).
-// Thread safety: individual methods are protected by mDSPMutex inside HarkAudioEngine.
 static HarkAudioEngine engine;
-
-// ---------------------------------------------------------------------------
-// JNI Bridge
-// Kotlin class: com.wcy.hark.audio.HarkAudioBridge (object)
-// Naming convention: Java_[package_underscored]_[ClassName]_[methodName]
-// Ref: JNI Tips – https://developer.android.com/training/articles/perf-jni
-// ---------------------------------------------------------------------------
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_wcy_hark_audio_HarkAudioBridge_startEngine(JNIEnv *env, jobject /* this */) {
@@ -45,4 +36,93 @@ extern "C" JNIEXPORT jboolean JNICALL
 Java_com_wcy_hark_audio_HarkAudioBridge_isEngineActuallyRunning(
         JNIEnv *env, jobject /* this */) {
     return (jboolean) engine.isEngineRunning();
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_wcy_hark_audio_HarkAudioBridge_setNoiseReductionEnabled(
+        JNIEnv *env, jobject /* this */, jboolean enabled) {
+    engine.setNoiseReductionEnabled(enabled);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_wcy_hark_audio_HarkAudioBridge_resetGesture(
+        JNIEnv *env, jobject /* this */) {
+    engine.resetGesture();
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_wcy_hark_audio_HarkAudioBridge_logLatencyStatistics(
+        JNIEnv *env, jobject /* this */) {
+    engine.logLatencyStatistics();
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_wcy_hark_audio_HarkAudioBridge_calibrateNoiseSuppressor(
+        JNIEnv *env, jobject /* this */) {
+    engine.calibrateNoiseSuppressor();
+}
+
+/**
+ * Situational mode:
+ *   0 = TRANSPARENCY
+ *   1 = CONVERSATION
+ *   2 = OUTDOOR
+ *   3 = CINEMA
+ *   4 = AUTO
+ */
+extern "C" JNIEXPORT void JNICALL
+Java_com_wcy_hark_audio_HarkAudioBridge_setSituationalMode(
+        JNIEnv *env, jobject /* this */, jint mode) {
+    HarkAudioEngine::SituationalMode m;
+    switch (mode) {
+        case 1:  m = HarkAudioEngine::SituationalMode::CONVERSATION; break;
+        case 2:  m = HarkAudioEngine::SituationalMode::OUTDOOR;      break;
+        case 3:  m = HarkAudioEngine::SituationalMode::CINEMA;       break;
+        case 4:  m = HarkAudioEngine::SituationalMode::AUTO;         break;
+        default: m = HarkAudioEngine::SituationalMode::TRANSPARENCY; break;
+    }
+    engine.setSituationalMode(m);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_wcy_hark_audio_HarkAudioBridge_setPinnaEnabled(
+        JNIEnv *env, jobject /* this */, jboolean enabled) {
+    engine.setPinnaEnabled(enabled);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_wcy_hark_audio_HarkAudioBridge_setBandWdrcParameters(
+        JNIEnv *env, jobject /* this */,
+        jint band, jfloat thresholdDb, jfloat ratio,
+        jfloat attackMs, jfloat releaseMs) {
+    engine.setBandWdrcParameters(band, thresholdDb, ratio, attackMs, releaseMs);
+}
+
+extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_wcy_hark_audio_HarkAudioBridge_getEnvironmentEnergy(JNIEnv *env, jobject /* this */) {
+    jfloatArray result = env->NewFloatArray(5);
+    float energy[5];
+    for (int i = 0; i < 5; ++i) {
+        energy[i] = engine.getBandEnergy(i);
+    }
+    env->SetFloatArrayRegion(result, 0, 5, energy);
+    return result;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_wcy_hark_audio_HarkAudioBridge_setBypassMode(
+        JNIEnv *env, jobject /* this */, jboolean bypass) {
+    engine.setBypassMode(bypass);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_wcy_hark_audio_HarkAudioBridge_setMasterGain(
+        JNIEnv *env, jobject /* this */, jfloat gain) {
+    engine.setMasterGain(gain);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_wcy_hark_audio_HarkAudioBridge_setMuted(
+        JNIEnv *env, jobject /* this */, jboolean muted) {
+    engine.setMuted(muted);
 }

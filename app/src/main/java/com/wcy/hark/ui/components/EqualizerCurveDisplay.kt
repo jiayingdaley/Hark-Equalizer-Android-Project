@@ -3,6 +3,7 @@ package com.wcy.hark.ui.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
@@ -43,10 +44,22 @@ fun EqualizerCurveDisplay(
 
     Canvas(
         modifier = modifier
-            .pointerInput(centerFrequencies) { // key: re-launch on band count change
-                awaitEachGesture {
-                    // --- Touch / Press start ---
-                    awaitFirstDown(requireUnconsumed = false).also { change ->
+            .pointerInput(centerFrequencies) {
+                // 改用 detectVerticalDragGestures，讓左右滑動事件可以順利傳遞給外層的 horizontalScroll
+                detectVerticalDragGestures(
+                    onDragStart = { offset ->
+                        val bandWidthPx = size.width / centerFrequencies.size.toFloat()
+                        val bandIndex = (offset.x / bandWidthPx)
+                            .toInt().coerceIn(0, centerFrequencies.size - 1)
+                        val gainRange = EqViewModel.MAX_GAIN_DB - EqViewModel.MIN_GAIN_DB
+                        val gain = EqViewModel.MAX_GAIN_DB -
+                                (offset.y / size.height) * gainRange
+                        onDragBand(
+                            bandIndex,
+                            gain.coerceIn(EqViewModel.MIN_GAIN_DB, EqViewModel.MAX_GAIN_DB)
+                        )
+                    },
+                    onVerticalDrag = { change, _ ->
                         change.consume()
                         val bandWidthPx = size.width / centerFrequencies.size.toFloat()
                         val bandIndex = (change.position.x / bandWidthPx)
@@ -59,26 +72,7 @@ fun EqualizerCurveDisplay(
                             gain.coerceIn(EqViewModel.MIN_GAIN_DB, EqViewModel.MAX_GAIN_DB)
                         )
                     }
-
-                    // --- Drag continuation ---
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        if (event.changes.all { !it.pressed }) break
-                        event.changes.firstOrNull()?.let { change ->
-                            change.consume()
-                            val bandWidthPx = size.width / centerFrequencies.size.toFloat()
-                            val bandIndex = (change.position.x / bandWidthPx)
-                                .toInt().coerceIn(0, centerFrequencies.size - 1)
-                            val gainRange = EqViewModel.MAX_GAIN_DB - EqViewModel.MIN_GAIN_DB
-                            val gain = EqViewModel.MAX_GAIN_DB -
-                                    (change.position.y / size.height) * gainRange
-                            onDragBand(
-                                bandIndex,
-                                gain.coerceIn(EqViewModel.MIN_GAIN_DB, EqViewModel.MAX_GAIN_DB)
-                            )
-                        }
-                    }
-                }
+                )
             }
     ) {
         val path = Path()

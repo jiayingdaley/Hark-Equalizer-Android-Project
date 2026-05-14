@@ -1,0 +1,47 @@
+{
+  "timestamp": "2026-05-11T16:22:18",
+  "total_pass": 26,
+  "total_fail": 4,
+  "modules": {
+    "BiquadFilter": {
+      "test_bq_16band_eq_flat": "PASS",
+      "test_bq_denormal_guard": "FAIL: Denormal guard failed: out=1.0090712606618494e-30",
+      "test_bq_highpass_150hz": "PASS",
+      "test_bq_identity": "PASS",
+      "test_bq_lowshelf_zero_gain": "PASS",
+      "test_bq_peaking_gain_accuracy": "PASS",
+      "test_bq_pinna_restore": "PASS"
+    },
+    "LR4 Crossover": {
+      "test_lr4_4band_tree_sum_flat": "FAIL: 4-Band Tree sum max error=4.831dB (must be <0.5dB)",
+      "test_lr4_band_energy_distribution": "PASS",
+      "test_lr4_minus6db_at_crossover": "PASS",
+      "test_lr4_reconstruction_500hz": "PASS"
+    },
+    "DynamicsProcessor": {
+      "test_expander_disabled": "PASS",
+      "test_gain_smoothing_no_clicks": "PASS",
+      "test_limiter_ceiling": "FAIL: Limiter output peak 1.0000 is too high (>0.95)",
+      "test_time_constant_coefficients": "PASS",
+      "test_wdrc_attack_time": "PASS",
+      "test_wdrc_compression_ratio": "PASS",
+      "test_wdrc_unity_below_threshold": "PASS"
+    },
+    "NoiseSuppressor": {
+      "test_ns_bypass": "PASS",
+      "test_ns_gain_floor": "PASS",
+      "test_ns_preserves_speech": "PASS",
+      "test_ns_snr_gain_curve": "PASS",
+      "test_ns_suppresses_noise": "FAIL: NS not suppressing noise enough: -0.84dB (need < -6dB)",
+      "test_ns_wind_filter": "PASS",
+      "test_wiener_gain_formula": "PASS"
+    },
+    "Full Signal Chain": {
+      "test_auto_headroom_formula": "PASS",
+      "test_chain_frequency_response": "PASS",
+      "test_chain_soft_clip_safety": "PASS",
+      "test_chain_stage_capture": "PASS",
+      "test_mono_to_stereo_expand": "PASS"
+    }
+  }
+}

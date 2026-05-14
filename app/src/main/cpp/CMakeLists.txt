@@ -9,6 +9,9 @@ add_library(hark SHARED
         BiquadFilter.cpp
         FilterChain.cpp
         DynamicsProcessor.cpp
+        NoiseSuppressor.cpp
+        GestureDetector.cpp
+        LinkwitzRileyCrossover.cpp
 )
 
 find_library(log-lib log)

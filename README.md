@@ -122,37 +122,42 @@ Hark/
 ## DSP 信號鏈架構
 
 ```
-Microphone Input (48 kHz, 16-bit → Float)
+Microphone Input (48 kHz, Mono → Stereo Expand)
     ↓
-[1] 預增益 (Pre-Gain)               [調整整體敏感度]
+[0] DC Blocker                     [消除直流偏移與開機爆音]
     ↓
-[2] VAD 降低 (Voice Activity Gating) [靜音檢測]
+[1] NoiseSuppressor (Wiener Filter) [自動環境降噪]
     ↓
-[3] WDRC 壓縮器 (Wide Dynamic Range Compression)
-    │   ├─ 壓縮比: 2:1
-    │   ├─ 閾值: -40 dB SPL
-    │   ├─ 軟膝: 2 dB
-    │   └─ 攻擊/釋放: 10/80 ms
+[2] Dual-Peak Pinna Restore        [2.7k + 4.5k 耳廓空間感補正]
     ↓
-[4] 噪音擴展器 (Expander/Gate)      [去除背景噪音]
-    │   ├─ 閾值: -70 dB
-    │   └─ 比例: 0.9:1
+[3] 8-Band LR4 Symmetric Tree      [對稱式分頻處理]
     ↓
-[5] 16 段等化器 (Band EQ)            [客製化聽力補償]
-    │   ├─ 頻率範圍: 250 Hz - 8 kHz
-    │   ├─ 濾波器類型: 峰值/低頻/高頻架
-    │   └─ Q 因子: 1.8 (聽覺域標準)
+[4] Multi-band WDRC                [8 頻段獨立動態壓縮]
+    │   ├─ 基礎增益: **+3.0 dB** (全域位移)
+    │   └─ 低頻噪音門: Band 0/1 特殊壓制
     ↓
-[6] 化妝增益 (Makeup Gain)           [補償多級壓縮損失]
+[5] MPO Limiter (Output Protection) [FDA 安全限幅 -1.5dBFS]
     ↓
-[7] 輸出限制器 (MPO Limiter)         [FDA 安全限制]
-    │   ├─ 閾值: -3 dBFS
-    │   ├─ 比例: 20:1 (Brick-Wall)
-    │   └─ 攻擊/釋放: 0.5/30 ms
+[6] Master Volume & Soft-Clip      [三次方音量曲線 & 飽和失真保護]
     ↓
-[8] 軟削波 (Soft-Clipping)           [防止數位削波失真]
-    ↓
-Speaker Output (Bluetooth Stereo 48 kHz)
+Speaker Output (Bluetooth/Wired Stereo 48 kHz)
+```
+
+---
+
+## 🧠 智慧型 DSP 功能
+
+### 1. 譜減法自動降噪 (Noise Suppression)
+*   **原理**：即時估算環境背景噪音並從頻譜中減除。
+*   **優點**：有效濾除冷氣聲、車流聲等穩定噪音，提升語音辨識度。
+
+### 2. 數位耳廓補償 (Pinna Restore)
+*   **原理**：根據 2023 最新聽力學研究，補償 2700Hz 附近的 17dB 缺失。
+*   **效果**：消除耳機的「悶塞感」，找回自然的方位感。
+
+### 3. 手勢記憶系統 (Gesture Memory)
+*   **操作**：用手遮住耳朵 3 秒鐘進行「聲學掃描」。
+*   **效果**：系統會自動鎖定並強化當前對話者的聲音，放手後依然維持該效果。
 ```
 
 ---

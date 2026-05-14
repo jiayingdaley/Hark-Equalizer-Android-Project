@@ -10,6 +10,11 @@ import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
+import android.database.ContentObserver
+import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -21,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.wcy.hark.audio.HarkAudioBridge
+import com.wcy.hark.audio.HarkAudioService
 import com.wcy.hark.ui.screen.HarkAppScreen
 import com.wcy.hark.ui.theme.HarkTheme
 import kotlinx.coroutines.launch
@@ -59,6 +65,7 @@ class MainActivity : ComponentActivity() {
     private var isEngineRunningByUserIntent by mutableStateOf(false)
 
     private var audioDeviceCallback: Any? = null
+    private var mCurrentInputDeviceId: Int = -1
 
     // -----------------------------------------------------------------------
     // Bluetooth SCO state (legacy Android < 12 fallback)
@@ -103,6 +110,29 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val volumeObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+        override fun onChange(selfChange: Boolean, uri: Uri?) {
+            super.onChange(selfChange, uri)
+            syncSystemVolume()
+        }
+    }
+
+    /**
+     * Reads current system voice call volume and pushes it to the native engine.
+     * Mutes if volume is 0.
+     */
+    private fun syncSystemVolume() {
+        val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_VOICE_CALL)
+        val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL)
+        val volRatio = if (maxVol > 0) currentVol.toFloat() / maxVol.toFloat() else 0f
+        
+        Log.d(TAG, "Syncing volume: $currentVol/$maxVol (Ratio: $volRatio)")
+        
+        HarkAudioBridge.setMuted(currentVol == 0)
+        // 使用三次方曲線讓低音量調節更細膩
+        HarkAudioBridge.setMasterGain(volRatio * volRatio * volRatio)
+    }
+
     // -----------------------------------------------------------------------
     // Lifecycle
     // -----------------------------------------------------------------------
@@ -131,11 +161,26 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+                permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
             != PackageManager.PERMISSION_GRANTED
         ) {
             permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
+
+        contentResolver.registerContentObserver(
+            Settings.System.CONTENT_URI,
+            true,
+            volumeObserver
+        )
+        syncSystemVolume()
 
         setContent {
             HarkTheme {
@@ -173,15 +218,15 @@ class MainActivity : ComponentActivity() {
 
         try { unregisterReceiver(scoStateReceiver) } catch (_: Exception) { /* ignore if not registered */ }
 
-        if (isScoAudioConnected) audioManager.stopBluetoothSco()
-
-        if (HarkAudioBridge.isEngineActuallyRunning()) {
-            Log.d(TAG, "onPause: stopping engine.")
-            HarkAudioBridge.stopEngine()
+        if (isScoAudioConnected && !isEngineRunningByUserIntent) {
+            audioManager.stopBluetoothSco()
         }
 
+        // Background Support: We NO LONGER stop the engine here if the service is running.
+        // The foreground service keeps the engine alive.
+        
         viewModel.statusText.value = if (isEngineRunningByUserIntent)
-            "狀態：已暫停 (背景)" else "狀態：已停用"
+            "狀態：已切換至背景" else "狀態：已停用"
     }
 
     // -----------------------------------------------------------------------
@@ -256,8 +301,12 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // 5. Stop engine for clean reconfiguration
-            HarkAudioBridge.stopEngine()
+            // 5. Stop engine for clean reconfiguration ONLY if config changed
+            if (HarkAudioBridge.isEngineActuallyRunning() && targetDeviceId != mCurrentInputDeviceId) {
+                Log.d(TAG, "Device changed from $mCurrentInputDeviceId to $targetDeviceId. Stopping for reconfiguration.")
+                HarkAudioBridge.stopEngine()
+            }
+            mCurrentInputDeviceId = targetDeviceId
 
             // 6. Apply selected input device to native engine
             HarkAudioBridge.setAudioInputDeviceId(targetDeviceId)
@@ -307,9 +356,24 @@ class MainActivity : ComponentActivity() {
 
             // 9. Start or confirm engine is stopped
             if (isEngineRunningByUserIntent && isHeadphoneConnected) {
-                HarkAudioBridge.startEngine()
-                updateEngineStatus(deviceLabel)
+                // Background Support: Trigger Foreground Service
+                val serviceIntent = Intent(this@MainActivity, HarkAudioService::class.java).apply {
+                    action = HarkAudioService.ACTION_START
+                }
+                ContextCompat.startForegroundService(this@MainActivity, serviceIntent)
+                
+                // 非同步檢查狀態，給予 Service 啟動時間
+                lifecycleScope.launch {
+                    viewModel.statusText.value = "狀態：正在啟動..."
+                    kotlinx.coroutines.delay(1000) // 等待 1 秒讓引擎熱身
+                    updateEngineStatus(deviceLabel)
+                }
             } else {
+                // Stop service if running
+                val serviceIntent = Intent(this@MainActivity, HarkAudioService::class.java).apply {
+                    action = HarkAudioService.ACTION_STOP
+                }
+                startService(serviceIntent)
                 viewModel.statusText.value = "狀態：已停用"
             }
         }
@@ -352,6 +416,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun unregisterAudioDeviceCallback() {
+        contentResolver.unregisterContentObserver(volumeObserver)
         (audioDeviceCallback as? android.media.AudioDeviceCallback)?.let {
             audioManager.unregisterAudioDeviceCallback(it)
             audioDeviceCallback = null

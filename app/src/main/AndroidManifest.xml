@@ -5,22 +5,19 @@
     <!-- 錄音權限 -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
-    <!-- 藍牙基礎權限 (對於舊版本和某些操作仍然有用) -->
+    <!-- 藍牙權限 -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
-
-    <!-- Android 12 (API 31) 及更高版本的藍牙連接權限 -->
-    <!-- 這是 startBluetoothSco() 和 stopBluetoothSco() 所必需的 -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-
-    <!-- Android 12 (API 31) 及更高版本的藍牙掃描權限 -->
-    <!-- 如果您的應用程式會主動掃描設備，則添加此項 -->
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
-    <!-- 根據需要決定是否需要 BLUETOOTH_SCAN。如果只是連接已配對的設備來使用 SCO，可能不是嚴格必需，但加上通常更安全 -->
 
-    <!-- 修改音訊設定的權限 -->
+    <!-- 修改音訊設定 -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
+    <!-- 前台服務權限 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:name=".HarkApplication"
@@ -32,6 +29,25 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Hark">
+
+        <!-- 背景音訊處理服務 -->
+        <service
+            android:name=".audio.HarkAudioService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+
+        <!-- 媒體監測服務 (用於自動模式切換) -->
+        <service
+            android:name=".audio.HarkNotificationListener"
+            android:label="Hark 媒體監測"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -41,7 +57,6 @@
             android:theme="@style/Theme.Hark">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
