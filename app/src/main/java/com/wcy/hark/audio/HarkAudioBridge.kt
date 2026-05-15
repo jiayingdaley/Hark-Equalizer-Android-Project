@@ -44,4 +44,5 @@ object HarkAudioBridge {
     external fun setBypassMode(bypass: Boolean)
     external fun setMasterGain(gain: Float)
     external fun setMuted(muted: Boolean)
+    external fun setInputGainOffset(gainDb: Float)
 }

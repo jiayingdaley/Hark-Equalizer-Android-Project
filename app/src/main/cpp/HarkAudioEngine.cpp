@@ -144,40 +144,65 @@ bool HarkAudioEngine::setupStreams() {
     outBuilder.setDirection(oboe::Direction::Output)
         ->setPerformanceMode(oboe::PerformanceMode::LowLatency)
         ->setSharingMode(oboe::SharingMode::Exclusive)
+        ->setAudioApi(oboe::AudioApi::AAudio)
         ->setFormat(oboe::AudioFormat::Float)
         ->setChannelCount(CHANNEL_COUNT)
-        ->setUsage(oboe::Usage::VoiceCommunication)
-        ->setContentType(oboe::ContentType::Speech)
+        // 使用 Game 模式以追求最低延遲路徑
+        ->setUsage(oboe::Usage::Game) 
         ->setDataCallback(this)
         ->setErrorCallback(this);
 
-    if (outBuilder.openStream(&mOutputStream) != oboe::Result::OK) return false;
+    if (outBuilder.openStream(&mOutputStream) != oboe::Result::OK) {
+        outBuilder.setAudioApi(oboe::AudioApi::Unspecified);
+        if (outBuilder.openStream(&mOutputStream) != oboe::Result::OK) return false;
+    }
+
     sampleRate = mOutputStream->getSampleRate();
+    int32_t outBurst = mOutputStream->getFramesPerBurst();
+    // 雙倍緩衝區維持穩定性
+    mOutputStream->setBufferSizeInFrames(outBurst * 2);
+    
+    LOGD("Output: SR=%.0f, Burst=%d, Buffer=%d, API=%d, Usage=Game", 
+         sampleRate, outBurst, mOutputStream->getBufferSizeInFrames(), 
+         (int)mOutputStream->getAudioApi());
+
     updateDSPParameters();
 
     oboe::AudioStreamBuilder inBuilder;
-    // 優先嘗試 Unprocessed 模式
     inBuilder.setDirection(oboe::Direction::Input)
         ->setDeviceId(mInputDeviceId)
-        ->setInputPreset(oboe::InputPreset::Unprocessed) 
+        // Camcorder 模式通常是 Android 低延遲收音的首選
+        ->setInputPreset(oboe::InputPreset::Camcorder) 
         ->setPerformanceMode(oboe::PerformanceMode::LowLatency)
+        ->setSharingMode(oboe::SharingMode::Exclusive)
+        ->setAudioApi(oboe::AudioApi::AAudio)
         ->setFormat(oboe::AudioFormat::Float)
         ->setChannelCount(oboe::ChannelCount::Mono)
         ->setSampleRate(static_cast<int32_t>(sampleRate));
 
     auto result = inBuilder.openStream(&mInputStream);
     if (result != oboe::Result::OK) {
-        LOGW("Unprocessed input failed (code: %s), falling back to Generic Mic", oboe::convertToText(result));
-        inBuilder.setInputPreset(oboe::InputPreset::Generic);
+        LOGW("Camcorder failed, trying Unprocessed");
+        inBuilder.setInputPreset(oboe::InputPreset::Unprocessed);
         result = inBuilder.openStream(&mInputStream);
-        if (result != oboe::Result::OK) {
-            LOGE("Failed to open ANY input stream: %s", oboe::convertToText(result));
-            return false;
-        }
+    }
+
+    if (result == oboe::Result::OK) {
+        int32_t inBurst = mInputStream->getFramesPerBurst();
+        mInputStream->setBufferSizeInFrames(inBurst * 2);
+        LOGD("Input: Burst=%d, Buffer=%d, API=%d", 
+             inBurst, mInputStream->getBufferSizeInFrames(), 
+             (int)mInputStream->getAudioApi());
+    } else {
+        return false;
     }
 
     mInputStream->requestStart();
     mOutputStream->requestStart();
+    
+    auto latency = mOutputStream->calculateLatencyMillis();
+    if (latency) LOGD("Oboe Latency: %.2f ms", latency.value());
+
     return true;
 }
 
@@ -233,6 +258,10 @@ void HarkAudioEngine::setPinnaEnabled(bool enabled) {
     mPinnaEnabled = enabled;
 }
 
+void HarkAudioEngine::setInputGainOffset(float gainDb) {
+    mInputGainFactor.store(powf(10.0f, gainDb / 20.0f));
+}
+
 oboe::DataCallbackResult
 HarkAudioEngine::onAudioReady(oboe::AudioStream* /*stream*/, void* audioData, int32_t numFrames) {
     if (!mInputStream) return oboe::DataCallbackResult::Continue;
@@ -249,6 +278,15 @@ HarkAudioEngine::onAudioReady(oboe::AudioStream* /*stream*/, void* audioData, in
 
     // 取得實際讀取的幀數
     int32_t framesRead = result.value();
+    
+    // [重要] 套用輸入源增益補償 (Input Gain Compensation)
+    float inputFactor = mInputGainFactor.load(std::memory_order_relaxed);
+    if (inputFactor != 1.0f) {
+        for (int i = 0; i < framesRead; ++i) {
+            buffer[i] *= inputFactor;
+        }
+    }
+
     if (framesRead < numFrames) {
         // 填補不足的幀數為靜音
         memset(buffer + framesRead, 0, sizeof(float) * (numFrames - framesRead));
@@ -260,7 +298,16 @@ HarkAudioEngine::onAudioReady(oboe::AudioStream* /*stream*/, void* audioData, in
         buffer[i * 2] = s; buffer[i * 2 + 1] = s;
     }
 
-    if (mBypassMode) return oboe::DataCallbackResult::Continue;
+    float finalGain = mIsMuted.load(std::memory_order_relaxed) ? 0.0f : mMasterGain.load(std::memory_order_relaxed);
+
+    if (mBypassMode) {
+        if (finalGain != 1.0f) {
+            for (int i = 0; i < numFrames * CHANNEL_COUNT; ++i) {
+                buffer[i] *= finalGain;
+            }
+        }
+        return oboe::DataCallbackResult::Continue;
+    }
 
     // Smooth prescription gains
     for (int b = 0; b < NUM_INTERNAL_BANDS; ++b) {
@@ -310,8 +357,7 @@ HarkAudioEngine::onAudioReady(oboe::AudioStream* /*stream*/, void* audioData, in
         // [4] Limiter & Soft Clip
         sL = mLimiterL.process(sL); sR = mLimiterR.process(sR);
 
-        // [5] Master Volume & Mute Sync (修復通話音量為 0 時仍有聲音的問題)
-        float finalGain = mIsMuted ? 0.0f : mMasterGain;
+        // [5] Master Volume & Soft Clip
         buffer[i] = tanhf(sL * finalGain); 
         buffer[i + 1] = tanhf(sR * finalGain);
     }
@@ -367,11 +413,11 @@ void HarkAudioEngine::setNoiseReductionEnabled(bool enabled) {
 }
 
 void HarkAudioEngine::setMasterGain(float gain) {
-    mMasterGain = gain;
+    mMasterGain.store(gain);
 }
 
 void HarkAudioEngine::setMuted(bool muted) {
-    mIsMuted = muted;
+    mIsMuted.store(muted);
 }
 
 float HarkAudioEngine::getBandEnergy(int band) const {

@@ -33,6 +33,7 @@ class EqViewModel(private val repository: EqSettingsRepository) : ViewModel() {
     val situationalMode = mutableStateOf(SceneManager.Mode.TRANSPARENCY)
     val isAutoLocked = mutableStateOf(false)
     val pinnaEnabled = mutableStateOf(true)
+    val useHeadsetMic = mutableStateOf(true) // 預設使用耳機麥克風
 
     // Frequencies
     val centerFrequencies16 = listOf(250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000)
@@ -70,6 +71,12 @@ class EqViewModel(private val repository: EqSettingsRepository) : ViewModel() {
     fun togglePinna(enabled: Boolean) {
         pinnaEnabled.value = enabled
         HarkAudioBridge.setPinnaEnabled(enabled)
+    }
+
+    fun toggleHeadsetMic(useHeadset: Boolean) {
+        useHeadsetMic.value = useHeadset
+        // 注意：這需要觸發 MainActivity 重新偵測設備，
+        // 在 MainActivity 中我們會透過觀察這個值或手動觸發來達成。
     }
 
     fun updateBandGain(bandIndex: Int, gain: Float) {

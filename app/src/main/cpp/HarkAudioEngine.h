@@ -66,6 +66,7 @@ public:
     void calibrateNoiseSuppressor();
     void resetGesture();
     void logLatencyStatistics();
+    void setInputGainOffset(float gainDb); // 調整輸入來源補償增益
 
     // --- WDRC / Limiter ---
     void setWdrcParameters(float thresholdDb, float ratio,
@@ -138,7 +139,8 @@ private:
     GestureState    mCurrentGestureState = GestureState::IDLE;
 
     bool mBypassMode = false;
-    float mMasterGain = 1.0f;
-    bool  mIsMuted = false;
+    std::atomic<float> mMasterGain{1.0f};
+    std::atomic<float> mInputGainFactor{1.0f};
+    std::atomic<bool>  mIsMuted{false};
     std::mutex mDSPMutex;
 };

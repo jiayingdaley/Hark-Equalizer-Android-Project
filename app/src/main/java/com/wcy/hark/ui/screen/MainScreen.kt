@@ -142,6 +142,54 @@ fun HarkAppScreen(
                 )
             }
 
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // --- Styled Input Source Toggle ---
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("收音來源", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Surface(
+                    shape = androidx.compose.foundation.shape.CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.height(48.dp).width(200.dp) // 加寬至 200dp
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Headset Mic Option (Left)
+                        InputSourceIcon(
+                            icon = Icons.Default.HeadsetMic,
+                            isSelected = viewModel.useHeadsetMic.value,
+                            onClick = { 
+                                if (!viewModel.useHeadsetMic.value) {
+                                    viewModel.toggleHeadsetMic(true)
+                                    onEngineStateChange(isEngineOn)
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        // Phone Mic Option (Right)
+                        InputSourceIcon(
+                            icon = Icons.Default.Smartphone,
+                            isSelected = !viewModel.useHeadsetMic.value,
+                            onClick = { 
+                                if (viewModel.useHeadsetMic.value) {
+                                    viewModel.toggleHeadsetMic(false)
+                                    onEngineStateChange(isEngineOn)
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
 
             // --- Equalizer Section ---
@@ -201,6 +249,21 @@ fun ModeButton(label: String, icon: ImageVector, isSelected: Boolean, onClick: (
             Icon(imageVector = icon, contentDescription = label, modifier = Modifier.size(32.dp))
         }
         Text(text = label, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 4.dp))
+    }
+}
+
+@Composable
+fun InputSourceIcon(icon: ImageVector, isSelected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier.fillMaxHeight(),
+        color = if (isSelected) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent,
+        contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+        shape = androidx.compose.foundation.shape.CircleShape
+    ) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+            Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(24.dp))
+        }
     }
 }
 

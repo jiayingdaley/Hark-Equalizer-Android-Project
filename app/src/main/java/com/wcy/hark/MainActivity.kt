@@ -122,15 +122,19 @@ class MainActivity : ComponentActivity() {
      * Mutes if volume is 0.
      */
     private fun syncSystemVolume() {
-        val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_VOICE_CALL)
-        val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL)
+        // 根據目前引擎模式決定同步對象：IN_COMMUNICATION 同步通話音量，否則同步媒體音量
+        val activeStream = if (audioManager.mode == AudioManager.MODE_IN_COMMUNICATION)
+            AudioManager.STREAM_VOICE_CALL else AudioManager.STREAM_MUSIC
+            
+        val currentVol = audioManager.getStreamVolume(activeStream)
+        val maxVol = audioManager.getStreamMaxVolume(activeStream)
         val volRatio = if (maxVol > 0) currentVol.toFloat() / maxVol.toFloat() else 0f
         
-        Log.d(TAG, "Syncing volume: $currentVol/$maxVol (Ratio: $volRatio)")
+        Log.d(TAG, "Syncing volume ($activeStream): $currentVol/$maxVol (Ratio: $volRatio)")
         
         HarkAudioBridge.setMuted(currentVol == 0)
-        // 使用三次方曲線讓低音量調節更細膩
-        HarkAudioBridge.setMasterGain(volRatio * volRatio * volRatio)
+        // 改用平方曲線 (vol^2)，比三次方曲線更符合人耳感知，且低音量時不會太小聲
+        HarkAudioBridge.setMasterGain(volRatio * volRatio)
     }
 
     // -----------------------------------------------------------------------
@@ -267,26 +271,33 @@ class MainActivity : ComponentActivity() {
                 return@withLock
             }
 
-            // 3. Select input device (priority: BLE > USB > Wired)
+            // 3. Select input device (priority: BLE > USB > Wired or Force Built-in)
             val inputDevices = audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS)
             var targetDeviceId = 0
             var deviceLabel = "內建麥克風"
 
-            inputDevices.find {
-                it.type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
-                it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO
-            }?.let { targetDeviceId = it.id; deviceLabel = "藍牙耳機" }
+            if (viewModel.useHeadsetMic.value) {
+                // 原有邏輯：優先耳機
+                inputDevices.find {
+                    it.type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
+                    it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO
+                }?.let { targetDeviceId = it.id; deviceLabel = "藍牙耳機" }
 
-            if (targetDeviceId == 0) {
-                inputDevices.find { it.type == AudioDeviceInfo.TYPE_USB_HEADSET }
-                    ?.let { targetDeviceId = it.id; deviceLabel = "USB 耳機" }
-                    ?: inputDevices.find { it.type == AudioDeviceInfo.TYPE_USB_DEVICE }
-                        ?.let { targetDeviceId = it.id; deviceLabel = "USB 麥克風" }
-            }
+                if (targetDeviceId == 0) {
+                    inputDevices.find { it.type == AudioDeviceInfo.TYPE_USB_HEADSET }
+                        ?.let { targetDeviceId = it.id; deviceLabel = "USB 耳機" }
+                        ?: inputDevices.find { it.type == AudioDeviceInfo.TYPE_USB_DEVICE }
+                            ?.let { targetDeviceId = it.id; deviceLabel = "USB 麥克風" }
+                }
 
-            if (targetDeviceId == 0) {
-                inputDevices.find { it.type == AudioDeviceInfo.TYPE_WIRED_HEADSET }
-                    ?.let { targetDeviceId = it.id; deviceLabel = "有線耳機 (3.5mm)" }
+                if (targetDeviceId == 0) {
+                    inputDevices.find { it.type == AudioDeviceInfo.TYPE_WIRED_HEADSET }
+                        ?.let { targetDeviceId = it.id; deviceLabel = "有線耳機 (3.5mm)" }
+                }
+            } else {
+                // 強制模式：使用手機內建麥克風
+                inputDevices.find { it.type == AudioDeviceInfo.TYPE_BUILTIN_MIC }
+                    ?.let { targetDeviceId = it.id; deviceLabel = "手機內建麥克風 (強制)" }
             }
             Log.d(TAG, "Selected input: $deviceLabel (ID=$targetDeviceId)")
 
@@ -310,6 +321,10 @@ class MainActivity : ComponentActivity() {
 
             // 6. Apply selected input device to native engine
             HarkAudioBridge.setAudioInputDeviceId(targetDeviceId)
+            
+            // 自動輸入增益補償：手機內建麥克風距離遠，預設補償 +15dB
+            val inputOffset = if (deviceLabel.contains("手機")) 15.0f else 0.0f
+            HarkAudioBridge.setInputGainOffset(inputOffset)
 
             // 7. Set communication device (Android 12+)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

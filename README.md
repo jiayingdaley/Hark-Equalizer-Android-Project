@@ -124,21 +124,23 @@ Hark/
 ```
 Microphone Input (48 kHz, Mono → Stereo Expand)
     ↓
-[0] DC Blocker                     [消除直流偏移與開機爆音]
+[0] Input Gain Compensation        [手機麥克風自動 +15dB 補償]
     ↓
-[1] NoiseSuppressor (Wiener Filter) [自動環境降噪]
+[1] DC Blocker                     [消除直流偏移與開機爆音]
     ↓
-[2] Dual-Peak Pinna Restore        [2.7k + 4.5k 耳廓空間感補正]
+[2] NoiseSuppressor (Wiener Filter) [自動環境降噪]
     ↓
-[3] 8-Band LR4 Symmetric Tree      [對稱式分頻處理]
+[3] Dual-Peak Pinna Restore        [2.7k + 4.5k 耳廓空間感補正]
     ↓
-[4] Multi-band WDRC                [8 頻段獨立動態壓縮]
-    │   ├─ 基礎增益: **+3.0 dB** (全域位移)
+[4] 8-Band LR4 Symmetric Tree      [對稱式分頻處理]
+    ↓
+[5] Multi-band WDRC                [8 頻段獨立動態壓縮]
+    │   ├─ 基礎增益: +3.0 dB (全域位移)
     │   └─ 低頻噪音門: Band 0/1 特殊壓制
     ↓
-[5] MPO Limiter (Output Protection) [FDA 安全限幅 -1.5dBFS]
+[6] MPO Limiter (Output Protection) [FDA 安全限幅 -1.5dBFS]
     ↓
-[6] Master Volume & Soft-Clip      [三次方音量曲線 & 飽和失真保護]
+[7] Master Volume & Soft-Clip      [三次方音量曲線 & 飽和失真保護]
     ↓
 Speaker Output (Bluetooth/Wired Stereo 48 kHz)
 ```

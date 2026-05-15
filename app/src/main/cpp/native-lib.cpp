@@ -126,3 +126,9 @@ Java_com_wcy_hark_audio_HarkAudioBridge_setMuted(
         JNIEnv *env, jobject /* this */, jboolean muted) {
     engine.setMuted(muted);
 }
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_wcy_hark_audio_HarkAudioBridge_setInputGainOffset(
+        JNIEnv *env, jobject /* this */, jfloat gainDb) {
+    engine.setInputGainOffset(gainDb);
+}

@@ -142,6 +142,21 @@
 | **戶外 (Outdoor)** | -20.0 dB | 1.5 : 1 | 10 ms | 600 ms | -45dB / 0.4 | 中等 (-9dB) |
 | **劇院 (Cinema)** | -22.0 dB | 1.2 : 1 | 15 ms | 800 ms | -65dB / 0.5 | 輕微 (-3dB) |
 
+| v3.0 | 2026-05-12 | 8-Band Tree, 250Hz Gate, +3dB Offset | Stable, 1x Burst (Glitches reported) |
+| v3.1 | 2026-05-15 | Game Mode, +15dB Phone Mic Boost, 2x Burst | Optimized for Latency & Input Balance |
+
+## 1. Global & Input Stage Parameters
+
+| Parameter | Value | Target / Rationale |
+| :--- | :--- | :--- |
+| **Output Usage** | `oboe::Usage::Game` | **[v3.1]** Shortest possible path in Android for minimal latency. |
+| **Input Preset** | `oboe::InputPreset::Camcorder` | **[v3.1]** High performance, bypasses excessive system AEC. |
+| **Buffer Size** | `2x Burst` | Balanced stability; prevents intermittent crackling. |
+| **Global Gain Offset** | `+3.0 dB` | Base makeup gain for perceived loudness. |
+| **Phone Mic Compensation**| `+15.0 dB` | **[v3.1]** Auto-boost when using built-in mic to match headset levels. |
+| **Headset Mic Offset** | `0.0 dB` | Standard sensitivity baseline. |
+| **Pinna Restore** | **Always ON** | Dual-peak spatial restoration (2.7kHz & 4.5kHz). |
+
 > **v3.0 變更記錄**:
 > - 所有模式均加入了 **Expander (噪音門)** 以解決底噪呼吸效應。
 > - **人聲模式** 提升了壓縮比至 2.0，並縮短了 Attack 時間以捕捉瞬態語音。
