@@ -14,18 +14,12 @@ import kotlinx.coroutines.launch
 
 class EqViewModel(private val repository: EqSettingsRepository) : ViewModel() {
 
-    enum class EngineMode {
-        BIQUAD_16_MIC,
-        BIQUAD_8_MIC
-    }
-
     companion object {
         const val MAX_GAIN_DB = 24f
         const val MIN_GAIN_DB = -24f
         const val DEFAULT_Q: Float = 1.4f
     }
 
-    val currentMode = mutableStateOf(EngineMode.BIQUAD_16_MIC)
     val statusText = mutableStateOf("狀態：已停用")
     val isDataLoaded = mutableStateOf(false)
 
@@ -34,6 +28,7 @@ class EqViewModel(private val repository: EqSettingsRepository) : ViewModel() {
     val isAutoLocked = mutableStateOf(false)
     val pinnaEnabled = mutableStateOf(true)
     val useHeadsetMic = mutableStateOf(true) // 預設使用耳機麥克風
+    val isMicrophonePermissionGranted = mutableStateOf(false)
 
     // Frequencies
     val centerFrequencies16 = listOf(250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000)

@@ -40,19 +40,8 @@ fun HarkAppScreen(
 ) {
     val context = LocalContext.current
 
-    // --- Permission state ---
-    var isPermissionGranted by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-        )
-    }
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-        onResult = { isGranted -> isPermissionGranted = isGranted }
-    )
-    LaunchedEffect(context) {
-        if (!isPermissionGranted) permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-    }
+    // Read dynamic permission state from ViewModel to prevent UI locks
+    val isPermissionGranted = viewModel.isMicrophonePermissionGranted.value
 
     // --- State ---
     val scrollState = rememberScrollState()

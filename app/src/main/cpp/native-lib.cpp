@@ -132,3 +132,9 @@ Java_com_wcy_hark_audio_HarkAudioBridge_setInputGainOffset(
         JNIEnv *env, jobject /* this */, jfloat gainDb) {
     engine.setInputGainOffset(gainDb);
 }
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_wcy_hark_audio_HarkAudioBridge_setUseHeadsetMic(
+        JNIEnv *env, jobject /* this */, jboolean useHeadset) {
+    engine.setUseHeadsetMic(useHeadset);
+}

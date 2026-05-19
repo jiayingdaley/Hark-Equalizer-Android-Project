@@ -37,10 +37,8 @@ import androidx.compose.ui.unit.dp
 fun SystemVolumeSlider(audioManager: AudioManager) {
     val context = LocalContext.current
 
-    // Dynamically select stream based on current audio mode:
-    // IN_COMMUNICATION → STREAM_VOICE_CALL; otherwise → STREAM_MUSIC
-    val activeStream = if (audioManager.mode == AudioManager.MODE_IN_COMMUNICATION)
-        AudioManager.STREAM_VOICE_CALL else AudioManager.STREAM_MUSIC
+    // Force STREAM_MUSIC (Media Volume) control as requested by the user
+    val activeStream = AudioManager.STREAM_MUSIC
     val maxVolume = audioManager.getStreamMaxVolume(activeStream)
     var currentVolume by remember(activeStream) {
         mutableStateOf(audioManager.getStreamVolume(activeStream))
@@ -69,7 +67,7 @@ fun SystemVolumeSlider(audioManager: AudioManager) {
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
     ) {
-        Text(if (activeStream == AudioManager.STREAM_VOICE_CALL) "通話音量" else "系統音量")
+        Text("媒體音量")
         Slider(
             value = sliderPosition,
             onValueChange = { newPosition ->

@@ -34,7 +34,7 @@ public:
 
     // --- Lifecycle ---
     void start();
-    void stop();
+    void stop(bool disableRecovery = true);
     bool isEngineRunning() const;
 
     // --- Situational Modes ---
@@ -67,6 +67,7 @@ public:
     void resetGesture();
     void logLatencyStatistics();
     void setInputGainOffset(float gainDb); // 調整輸入來源補償增益
+    void setUseHeadsetMic(bool useHeadset); // 設定是否使用耳機麥克風
 
     // --- WDRC / Limiter ---
     void setWdrcParameters(float thresholdDb, float ratio,
@@ -94,7 +95,9 @@ private:
     oboe::AudioStream* mOutputStream = nullptr;
     double sampleRate = 48000.0;
     bool   mIsRunning = false;
+    std::atomic<bool>  mAutoRecoveryEnabled{true};
     int32_t mInputDeviceId  = oboe::kUnspecified;
+    std::atomic<bool>  mUseHeadsetMic{true};
 
     // --- State ---
     SituationalMode mCurrentMode = SituationalMode::TRANSPARENCY;

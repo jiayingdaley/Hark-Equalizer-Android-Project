@@ -11,6 +11,8 @@
 #include <android/log.h>
 #include <cmath>
 #include <cstring>
+#include <thread>
+#include <chrono>
 
 #define LOG_TAG "HarkAudioEngine"
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
@@ -104,13 +106,13 @@ void HarkAudioEngine::recomputePrescriptionGains() {
     for (int b = 0; b < NUM_INTERNAL_BANDS; ++b) {
         float avgDb = (count[b] > 0) ? gainSum[b] / (float)count[b] : 0.0f;
         
-        // 再次拉高音量：位移設為 +3.0dB (超越無損，進行主動增強)
-        float globalGainOffsetDb = 3.0f;
+        // 再次拉高音量：位移設為 +8.0dB (超越無損，進行主動增強，適合輕中度聽損)
+        float globalGainOffsetDb = 8.0f;
         mPrescriptionTargets[b] = powf(10.0f, (avgDb + globalGainOffsetDb) / 20.0f);
     }
-    // 讓 Band 0 保持與主位準同步的 +3.0dB 偏移，但維持其噪音壓制係數
+    // 讓 Band 0 保持與主位準同步的 +4.0dB 偏移，但維持其噪音壓制係數
     float firstBandDb = mBandGains[0].load(std::memory_order_relaxed);
-    mPrescriptionTargets[0] = powf(10.0f, (firstBandDb * 0.8f + 1.0f) / 20.0f);
+    mPrescriptionTargets[0] = powf(10.0f, (firstBandDb * 0.8f + 4.0f) / 20.0f);
 
     // 針對低頻頻段 (Band 0, 1) 使用更強大的噪音門
     // 這樣就算 EQ 拉高，沒聲音時也會被切斷
@@ -122,13 +124,17 @@ void HarkAudioEngine::recomputePrescriptionGains() {
 
 void HarkAudioEngine::start() {
     if (mIsRunning) return;
+    mAutoRecoveryEnabled.store(true);
     if (setupStreams()) {
         mIsRunning = true;
         logLatencyStatistics();
     }
 }
 
-void HarkAudioEngine::stop() {
+void HarkAudioEngine::stop(bool disableRecovery) {
+    if (disableRecovery) {
+        mAutoRecoveryEnabled.store(false);
+    }
     if (!mIsRunning && !mInputStream && !mOutputStream) return;
     if (mInputStream)  { mInputStream->stop();  mInputStream->close();  mInputStream  = nullptr; }
     if (mOutputStream) { mOutputStream->stop(); mOutputStream->close(); mOutputStream = nullptr; }
@@ -140,20 +146,34 @@ bool HarkAudioEngine::isEngineRunning() const {
 }
 
 bool HarkAudioEngine::setupStreams() {
+    bool useHeadset = mUseHeadsetMic.load();
+    // 為了極致低延遲與跨時脈物理穩定性：
+    // 1. 當使用耳機收音時，輸入與輸出在同一個實體設備/時鐘源上，開啟 AAudio Exclusive 獨占低延遲模式以追求極限。
+    // 2. 當強制使用手機麥克風收音時，因為輸入（手機內建 Codec）與輸出（藍牙耳機晶片）在不同的物理時鐘源上，
+    //    獨占模式會因為時脈不同步或 HAL 驅動拒絕而崩潰無聲。我們必須使用 Shared 共享模式，讓系統 AudioFlinger 自動協調跨時區重採樣與時脈同步！
+    oboe::SharingMode targetSharingMode = useHeadset ? oboe::SharingMode::Exclusive : oboe::SharingMode::Shared;
+
+    // 關鍵路由物理常識：
+    // 當使用耳機收音時，我們使用 Usage::Game 以追求極速路徑。
+    // 當使用手機收音且藍牙耳機連線時，使用 Usage::Media (標準音樂) 能 100% 強制 Android 路由策略將其視為標準音樂播放，
+    // 從而毫無阻礙地路由至藍牙 A2DP 耳機，絕對避免被系統錯誤路由至手機喇叭或聽筒！
+    oboe::Usage targetUsage = useHeadset ? oboe::Usage::Game : oboe::Usage::Media;
+
     oboe::AudioStreamBuilder outBuilder;
     outBuilder.setDirection(oboe::Direction::Output)
         ->setPerformanceMode(oboe::PerformanceMode::LowLatency)
-        ->setSharingMode(oboe::SharingMode::Exclusive)
+        ->setSharingMode(targetSharingMode)
         ->setAudioApi(oboe::AudioApi::AAudio)
         ->setFormat(oboe::AudioFormat::Float)
         ->setChannelCount(CHANNEL_COUNT)
-        // 使用 Game 模式以追求最低延遲路徑
-        ->setUsage(oboe::Usage::Game) 
+        ->setUsage(targetUsage) 
+        ->setSampleRate(48000) // 強制通用 48000Hz 輸出以對齊麥克風，消除一切取樣率轉換延遲與衝突
         ->setDataCallback(this)
         ->setErrorCallback(this);
 
     if (outBuilder.openStream(&mOutputStream) != oboe::Result::OK) {
         outBuilder.setAudioApi(oboe::AudioApi::Unspecified);
+        outBuilder.setSharingMode(oboe::SharingMode::Shared);
         if (outBuilder.openStream(&mOutputStream) != oboe::Result::OK) return false;
     }
 
@@ -162,38 +182,72 @@ bool HarkAudioEngine::setupStreams() {
     // 雙倍緩衝區維持穩定性
     mOutputStream->setBufferSizeInFrames(outBurst * 2);
     
-    LOGD("Output: SR=%.0f, Burst=%d, Buffer=%d, API=%d, Usage=Game", 
+    LOGD("Output: SR=%.0f, Burst=%d, Buffer=%d, API=%d, Usage=Game, Sharing=%d", 
          sampleRate, outBurst, mOutputStream->getBufferSizeInFrames(), 
-         (int)mOutputStream->getAudioApi());
+         (int)mOutputStream->getAudioApi(), (int)mOutputStream->getSharingMode());
 
     updateDSPParameters();
 
+    // 為了極致低延遲與物理強行路由：
+    // 1. 如果是使用耳機收音，我們保持 Device ID 為 oboe::kUnspecified，這能讓系統自動選用預設最優路由，並開啟 AAudio Exclusive 獨占低延遲模式！
+    // 2. 如果是強制使用手機收音，我們必須傳入精確的手機麥克風實體 ID (mInputDeviceId)，強制 Android 繞過耳機，直接打開手機內建麥克風收音！
+    int32_t targetInputDeviceId = useHeadset ? (int32_t)oboe::kUnspecified : mInputDeviceId;
+    oboe::InputPreset targetPreset = oboe::InputPreset::Generic;
+
     oboe::AudioStreamBuilder inBuilder;
     inBuilder.setDirection(oboe::Direction::Input)
-        ->setDeviceId(mInputDeviceId)
-        // Camcorder 模式通常是 Android 低延遲收音的首選
-        ->setInputPreset(oboe::InputPreset::Camcorder) 
+        ->setDeviceId(targetInputDeviceId)
+        ->setInputPreset(targetPreset) 
         ->setPerformanceMode(oboe::PerformanceMode::LowLatency)
-        ->setSharingMode(oboe::SharingMode::Exclusive)
+        ->setSharingMode(targetSharingMode)
         ->setAudioApi(oboe::AudioApi::AAudio)
         ->setFormat(oboe::AudioFormat::Float)
         ->setChannelCount(oboe::ChannelCount::Mono)
-        ->setSampleRate(static_cast<int32_t>(sampleRate));
+        ->setSampleRate(48000) // 麥克風同樣強制 48000Hz，與輸出流物理完美同步！
+        ->setErrorCallback(this); // 綁定錯誤回呼以偵測麥克風斷線
 
     auto result = inBuilder.openStream(&mInputStream);
     if (result != oboe::Result::OK) {
-        LOGW("Camcorder failed, trying Unprocessed");
-        inBuilder.setInputPreset(oboe::InputPreset::Unprocessed);
+        LOGW("AAudio Explicit Exclusive 48000Hz failed: %s. Trying Shared mode with explicit ID...", oboe::convertToText(result));
+        inBuilder.setSharingMode(oboe::SharingMode::Shared);
+        result = inBuilder.openStream(&mInputStream);
+    }
+    if (result != oboe::Result::OK) {
+        LOGW("AAudio Explicit Shared failed. Trying Unspecified device ID (kUnspecified) as safety fallback...");
+        inBuilder.setDeviceId(oboe::kUnspecified);
+        inBuilder.setSharingMode(oboe::SharingMode::Shared);
+        result = inBuilder.openStream(&mInputStream);
+    }
+    if (result != oboe::Result::OK) {
+        LOGW("AAudio Unspecified failed. Trying OpenSL ES with unspecified device...");
+        inBuilder.setAudioApi(oboe::AudioApi::OpenSLES);
+        inBuilder.setDeviceId(oboe::kUnspecified);
+        inBuilder.setSharingMode(oboe::SharingMode::Shared);
+        result = inBuilder.openStream(&mInputStream);
+    }
+    if (result != oboe::Result::OK) {
+        LOGW("All inputs failed. Trying ultimate generic unspecified fallback...");
+        inBuilder.setAudioApi(oboe::AudioApi::AAudio);
+        inBuilder.setDeviceId(oboe::kUnspecified);
+        inBuilder.setSharingMode(oboe::SharingMode::Shared);
+        inBuilder.setInputPreset(oboe::InputPreset::Generic);
+        inBuilder.setSampleRate(oboe::kUnspecified);
         result = inBuilder.openStream(&mInputStream);
     }
 
     if (result == oboe::Result::OK) {
         int32_t inBurst = mInputStream->getFramesPerBurst();
         mInputStream->setBufferSizeInFrames(inBurst * 2);
-        LOGD("Input: Burst=%d, Buffer=%d, API=%d", 
-             inBurst, mInputStream->getBufferSizeInFrames(), 
-             (int)mInputStream->getAudioApi());
+        LOGD("Input opened successfully: SR=%d, Burst=%d, Buffer=%d, API=%d, Sharing=%d", 
+             mInputStream->getSampleRate(), inBurst, mInputStream->getBufferSizeInFrames(), 
+             (int)mInputStream->getAudioApi(), (int)mInputStream->getSharingMode());
     } else {
+        LOGE("Failed to open input stream completely. Cleaning up output stream to prevent zombie state!");
+        if (mOutputStream) {
+            mOutputStream->stop();
+            mOutputStream->close();
+            mOutputStream = nullptr;
+        }
         return false;
     }
 
@@ -260,6 +314,10 @@ void HarkAudioEngine::setPinnaEnabled(bool enabled) {
 
 void HarkAudioEngine::setInputGainOffset(float gainDb) {
     mInputGainFactor.store(powf(10.0f, gainDb / 20.0f));
+}
+
+void HarkAudioEngine::setUseHeadsetMic(bool useHeadset) {
+    mUseHeadsetMic.store(useHeadset);
 }
 
 oboe::DataCallbackResult
@@ -366,7 +424,23 @@ HarkAudioEngine::onAudioReady(oboe::AudioStream* /*stream*/, void* audioData, in
 }
 
 void HarkAudioEngine::onErrorAfterClose(oboe::AudioStream* stream, oboe::Result error) {
+    LOGW("Oboe stream disconnected! Error: %s. Spawning auto-recovery thread...", oboe::convertToText(error));
     mIsRunning = false;
+
+    // 建立分離的後台線程進行自動自我修復重啟
+    std::thread([this]() {
+        LOGD("Auto-recovery thread started. Resetting streams...");
+        stop(false); // 僅重置流，不要關閉自癒標記！
+        // 給予物理系統 500ms 的緩衝穩定時間，確保硬體變更完全就緒
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        
+        if (mAutoRecoveryEnabled.load()) {
+            LOGD("Re-starting audio engine on new routing...");
+            start();
+        } else {
+            LOGD("Auto-recovery bypassed: engine was stopped by user or system.");
+        }
+    }).detach();
 }
 
 void HarkAudioEngine::logLatencyStatistics() {

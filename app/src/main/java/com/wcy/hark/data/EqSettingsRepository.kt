@@ -14,23 +14,10 @@ val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "eq
 
 class EqSettingsRepository(private val context: Context) {
 
-    // Define keys for DataStore
-    private val ENGINE_MODE_KEY = intPreferencesKey("engine_mode")
-    
     // We store gains as preferences. For 16 bands, we store 16 floats.
     // For 8 bands, we store 8 floats.
     private fun getBandGainKey(mode: Int, index: Int) = floatPreferencesKey("band_gain_${mode}_${index}")
     private fun getBandQKey(mode: Int, index: Int) = floatPreferencesKey("band_q_${mode}_${index}")
-
-    val engineModeFlow: Flow<Int> = context.dataStore.data.map { preferences ->
-        preferences[ENGINE_MODE_KEY] ?: 0 // 0 for 16-band, 1 for 8-band
-    }
-
-    suspend fun saveEngineMode(mode: Int) {
-        context.dataStore.edit { preferences ->
-            preferences[ENGINE_MODE_KEY] = mode
-        }
-    }
 
     fun getBandGainsFlow(mode: Int, numBands: Int): Flow<List<Float>> = context.dataStore.data.map { preferences ->
         val gains = mutableListOf<Float>()
