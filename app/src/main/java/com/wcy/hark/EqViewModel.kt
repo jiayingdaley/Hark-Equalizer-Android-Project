@@ -12,6 +12,11 @@ import com.wcy.hark.data.EqSettingsRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
+enum class AudioSourceMode {
+    MICROPHONE,
+    INTERNAL_MEDIA
+}
+
 class EqViewModel(private val repository: EqSettingsRepository) : ViewModel() {
 
     companion object {
@@ -29,6 +34,14 @@ class EqViewModel(private val repository: EqSettingsRepository) : ViewModel() {
     val pinnaEnabled = mutableStateOf(true)
     val useHeadsetMic = mutableStateOf(true) // 預設使用耳機麥克風
     val isMicrophonePermissionGranted = mutableStateOf(false)
+    val isMediaCaptureEnabled = mutableStateOf(false)
+    val currentSourceMode = mutableStateOf(AudioSourceMode.MICROPHONE)
+    val isSystemDspOn = mutableStateOf(com.wcy.hark.audio.SystemDspManager.isEnabled)
+
+    fun setSystemDspEnabled(enabled: Boolean) {
+        // We just call the manager; the flow collector below will update isSystemDspOn
+        com.wcy.hark.audio.SystemDspManager.setEnabled(enabled)
+    }
 
     // Frequencies
     val centerFrequencies16 = listOf(250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000)
@@ -36,14 +49,29 @@ class EqViewModel(private val repository: EqSettingsRepository) : ViewModel() {
     private val _bandGains16 = List(centerFrequencies16.size) { mutableStateOf(0f) }
     val bandGains16: List<MutableState<Float>> = _bandGains16
 
+    private val saveJobs = arrayOfNulls<kotlinx.coroutines.Job>(16)
+
     init {
         viewModelScope.launch {
-            val savedGains16 = repository.getBandGainsFlow(0, 16).first()
-            savedGains16.forEachIndexed { index, gain -> 
-                _bandGains16[index].value = gain 
-                HarkAudioBridge.setBandGain(index, gain)
+            repository.getBandGainsFlow(0, 16).collect { savedGains16 ->
+                savedGains16.forEachIndexed { index, gain -> 
+                    // Only apply value from database if we are NOT currently dragging/debouncing it!
+                    if (saveJobs[index]?.isActive != true) {
+                        if (_bandGains16[index].value != gain) {
+                            _bandGains16[index].value = gain 
+                            HarkAudioBridge.setBandGain(index, gain)
+                            com.wcy.hark.audio.SystemDspManager.updateBandGain(index, gain)
+                        }
+                    }
+                }
+                isDataLoaded.value = true
             }
-            isDataLoaded.value = true
+        }
+
+        viewModelScope.launch {
+            com.wcy.hark.audio.SystemDspManager.isEnabledFlow.collect { enabled ->
+                isSystemDspOn.value = enabled
+            }
         }
 
         // Observe SceneManager if service is running
@@ -77,10 +105,18 @@ class EqViewModel(private val repository: EqSettingsRepository) : ViewModel() {
     fun updateBandGain(bandIndex: Int, gain: Float) {
         if (bandIndex in 0 until 16) {
             val coercedGain = gain.coerceIn(MIN_GAIN_DB, MAX_GAIN_DB)
-            _bandGains16[bandIndex].value = coercedGain
-            HarkAudioBridge.setBandGain(bandIndex, coercedGain)
-            viewModelScope.launch {
-                repository.saveBandGain(0, bandIndex, coercedGain)
+            // Only update memory state if it actually changed, to prevent redundant recompositions
+            if (_bandGains16[bandIndex].value != coercedGain) {
+                _bandGains16[bandIndex].value = coercedGain
+                HarkAudioBridge.setBandGain(bandIndex, coercedGain)
+                com.wcy.hark.audio.SystemDspManager.updateBandGain(bandIndex, coercedGain)
+                
+                // Debounce DataStore saving to prevent UI rebounding during drag
+                saveJobs[bandIndex]?.cancel()
+                saveJobs[bandIndex] = viewModelScope.launch {
+                    kotlinx.coroutines.delay(200)
+                    repository.saveBandGain(0, bandIndex, coercedGain)
+                }
             }
         }
     }

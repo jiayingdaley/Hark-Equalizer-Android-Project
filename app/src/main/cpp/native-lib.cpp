@@ -138,3 +138,19 @@ Java_com_wcy_hark_audio_HarkAudioBridge_setUseHeadsetMic(
         JNIEnv *env, jobject /* this */, jboolean useHeadset) {
     engine.setUseHeadsetMic(useHeadset);
 }
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_wcy_hark_audio_HarkAudioBridge_setMediaCaptureMode(
+        JNIEnv *env, jobject /* this */, jboolean enabled) {
+    engine.setMediaCaptureMode(enabled);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_wcy_hark_audio_HarkAudioBridge_pushMediaAudioData(
+        JNIEnv *env, jobject /* this */, jfloatArray data, jint numFrames) {
+    jfloat *c_data = env->GetFloatArrayElements(data, nullptr);
+    if (c_data != nullptr) {
+        engine.pushMediaAudioData(c_data, numFrames);
+        env->ReleaseFloatArrayElements(data, c_data, JNI_ABORT);
+    }
+}

@@ -10,6 +10,8 @@
 #include "BiquadFilter.h"
 #include "FilterChain.h"
 #include "LinkwitzRileyCrossover.h"
+#include "LockFreeQueue.h"
+#include <memory>
 
 /**
  * HarkAudioEngine — Hark 助聽器 DSP 音訊引擎 (Refactored v3, 2026-05-12)
@@ -69,6 +71,10 @@ public:
     void setInputGainOffset(float gainDb); // 調整輸入來源補償增益
     void setUseHeadsetMic(bool useHeadset); // 設定是否使用耳機麥克風
 
+    // --- Media Capture Mode ---
+    void setMediaCaptureMode(bool enabled);
+    void pushMediaAudioData(const float* data, int numFrames);
+
     // --- WDRC / Limiter ---
     void setWdrcParameters(float thresholdDb, float ratio,
                            float attackMs,    float releaseMs);
@@ -98,6 +104,10 @@ private:
     std::atomic<bool>  mAutoRecoveryEnabled{true};
     int32_t mInputDeviceId  = oboe::kUnspecified;
     std::atomic<bool>  mUseHeadsetMic{true};
+
+    // --- Media Capture ---
+    std::atomic<bool> mMediaCaptureMode{false};
+    std::unique_ptr<LockFreeQueue<float>> mMediaAudioQueue;
 
     // --- State ---
     SituationalMode mCurrentMode = SituationalMode::TRANSPARENCY;

@@ -43,6 +43,8 @@ HarkAudioEngine::HarkAudioEngine()
       mNoiseSuppressorL(48000.0), mNoiseSuppressorR(48000.0),
       mGestureDetector(48000.0),
       mEqLeft(NUM_UI_BANDS), mEqRight(NUM_UI_BANDS) {
+          
+    mMediaAudioQueue = std::make_unique<LockFreeQueue<float>>(48000 * 2 * 2); // 2 seconds of stereo float buffer
 
     for (int i = 0; i < NUM_UI_BANDS; ++i) {
         mBandGains[i].store(0.0f, std::memory_order_relaxed);
@@ -138,6 +140,7 @@ void HarkAudioEngine::stop(bool disableRecovery) {
     if (!mIsRunning && !mInputStream && !mOutputStream) return;
     if (mInputStream)  { mInputStream->stop();  mInputStream->close();  mInputStream  = nullptr; }
     if (mOutputStream) { mOutputStream->stop(); mOutputStream->close(); mOutputStream = nullptr; }
+    if (mMediaAudioQueue) { mMediaAudioQueue->clear(); }
     mIsRunning = false;
 }
 
@@ -188,70 +191,76 @@ bool HarkAudioEngine::setupStreams() {
 
     updateDSPParameters();
 
-    // 為了極致低延遲與物理強行路由：
-    // 1. 如果是使用耳機收音，我們保持 Device ID 為 oboe::kUnspecified，這能讓系統自動選用預設最優路由，並開啟 AAudio Exclusive 獨占低延遲模式！
-    // 2. 如果是強制使用手機收音，我們必須傳入精確的手機麥克風實體 ID (mInputDeviceId)，強制 Android 繞過耳機，直接打開手機內建麥克風收音！
-    int32_t targetInputDeviceId = useHeadset ? (int32_t)oboe::kUnspecified : mInputDeviceId;
-    oboe::InputPreset targetPreset = oboe::InputPreset::Generic;
+    bool isMediaMode = mMediaCaptureMode.load();
 
-    oboe::AudioStreamBuilder inBuilder;
-    inBuilder.setDirection(oboe::Direction::Input)
-        ->setDeviceId(targetInputDeviceId)
-        ->setInputPreset(targetPreset) 
-        ->setPerformanceMode(oboe::PerformanceMode::LowLatency)
-        ->setSharingMode(targetSharingMode)
-        ->setAudioApi(oboe::AudioApi::AAudio)
-        ->setFormat(oboe::AudioFormat::Float)
-        ->setChannelCount(oboe::ChannelCount::Mono)
-        ->setSampleRate(48000) // 麥克風同樣強制 48000Hz，與輸出流物理完美同步！
-        ->setErrorCallback(this); // 綁定錯誤回呼以偵測麥克風斷線
+    if (!isMediaMode) {
+        // 為了極致低延遲與物理強行路由：
+        // 1. 如果是使用耳機收音，我們保持 Device ID 為 oboe::kUnspecified，這能讓系統自動選用預設最優路由，並開啟 AAudio Exclusive 獨占低延遲模式！
+        // 2. 如果是強制使用手機收音，我們必須傳入精確的手機麥克風實體 ID (mInputDeviceId)，強制 Android 繞過耳機，直接打開手機內建麥克風收音！
+        int32_t targetInputDeviceId = useHeadset ? (int32_t)oboe::kUnspecified : mInputDeviceId;
+        oboe::InputPreset targetPreset = useHeadset ? oboe::InputPreset::VoiceCommunication : oboe::InputPreset::Camcorder;
 
-    auto result = inBuilder.openStream(&mInputStream);
-    if (result != oboe::Result::OK) {
-        LOGW("AAudio Explicit Exclusive 48000Hz failed: %s. Trying Shared mode with explicit ID...", oboe::convertToText(result));
-        inBuilder.setSharingMode(oboe::SharingMode::Shared);
-        result = inBuilder.openStream(&mInputStream);
-    }
-    if (result != oboe::Result::OK) {
-        LOGW("AAudio Explicit Shared failed. Trying Unspecified device ID (kUnspecified) as safety fallback...");
-        inBuilder.setDeviceId(oboe::kUnspecified);
-        inBuilder.setSharingMode(oboe::SharingMode::Shared);
-        result = inBuilder.openStream(&mInputStream);
-    }
-    if (result != oboe::Result::OK) {
-        LOGW("AAudio Unspecified failed. Trying OpenSL ES with unspecified device...");
-        inBuilder.setAudioApi(oboe::AudioApi::OpenSLES);
-        inBuilder.setDeviceId(oboe::kUnspecified);
-        inBuilder.setSharingMode(oboe::SharingMode::Shared);
-        result = inBuilder.openStream(&mInputStream);
-    }
-    if (result != oboe::Result::OK) {
-        LOGW("All inputs failed. Trying ultimate generic unspecified fallback...");
-        inBuilder.setAudioApi(oboe::AudioApi::AAudio);
-        inBuilder.setDeviceId(oboe::kUnspecified);
-        inBuilder.setSharingMode(oboe::SharingMode::Shared);
-        inBuilder.setInputPreset(oboe::InputPreset::Generic);
-        inBuilder.setSampleRate(oboe::kUnspecified);
-        result = inBuilder.openStream(&mInputStream);
-    }
+        oboe::AudioStreamBuilder inBuilder;
+        inBuilder.setDirection(oboe::Direction::Input)
+            ->setDeviceId(targetInputDeviceId)
+            ->setInputPreset(targetPreset) 
+            ->setPerformanceMode(oboe::PerformanceMode::LowLatency)
+            ->setSharingMode(targetSharingMode)
+            ->setAudioApi(oboe::AudioApi::AAudio)
+            ->setFormat(oboe::AudioFormat::Float)
+            ->setChannelCount(oboe::ChannelCount::Mono)
+            ->setSampleRate(48000) // 麥克風同樣強制 48000Hz，與輸出流物理完美同步！
+            ->setErrorCallback(this); // 綁定錯誤回呼以偵測麥克風斷線
 
-    if (result == oboe::Result::OK) {
-        int32_t inBurst = mInputStream->getFramesPerBurst();
-        mInputStream->setBufferSizeInFrames(inBurst * 2);
-        LOGD("Input opened successfully: SR=%d, Burst=%d, Buffer=%d, API=%d, Sharing=%d", 
-             mInputStream->getSampleRate(), inBurst, mInputStream->getBufferSizeInFrames(), 
-             (int)mInputStream->getAudioApi(), (int)mInputStream->getSharingMode());
-    } else {
-        LOGE("Failed to open input stream completely. Cleaning up output stream to prevent zombie state!");
-        if (mOutputStream) {
-            mOutputStream->stop();
-            mOutputStream->close();
-            mOutputStream = nullptr;
+        auto result = inBuilder.openStream(&mInputStream);
+        if (result != oboe::Result::OK) {
+            LOGW("AAudio Explicit Exclusive 48000Hz failed: %s. Trying Shared mode with explicit ID...", oboe::convertToText(result));
+            inBuilder.setSharingMode(oboe::SharingMode::Shared);
+            result = inBuilder.openStream(&mInputStream);
         }
-        return false;
+        if (result != oboe::Result::OK) {
+            LOGW("AAudio Explicit Shared failed. Trying Unspecified device ID (kUnspecified) as safety fallback...");
+            inBuilder.setDeviceId(oboe::kUnspecified);
+            inBuilder.setSharingMode(oboe::SharingMode::Shared);
+            result = inBuilder.openStream(&mInputStream);
+        }
+        if (result != oboe::Result::OK) {
+            LOGW("AAudio Unspecified failed. Trying OpenSL ES with unspecified device...");
+            inBuilder.setAudioApi(oboe::AudioApi::OpenSLES);
+            inBuilder.setDeviceId(oboe::kUnspecified);
+            inBuilder.setSharingMode(oboe::SharingMode::Shared);
+            result = inBuilder.openStream(&mInputStream);
+        }
+        if (result != oboe::Result::OK) {
+            LOGW("All inputs failed. Trying ultimate generic unspecified fallback...");
+            inBuilder.setAudioApi(oboe::AudioApi::AAudio);
+            inBuilder.setDeviceId(oboe::kUnspecified);
+            inBuilder.setSharingMode(oboe::SharingMode::Shared);
+            inBuilder.setInputPreset(oboe::InputPreset::Generic);
+            inBuilder.setSampleRate(oboe::kUnspecified);
+            result = inBuilder.openStream(&mInputStream);
+        }
+
+        if (result == oboe::Result::OK) {
+            int32_t inBurst = mInputStream->getFramesPerBurst();
+            mInputStream->setBufferSizeInFrames(inBurst * 2);
+            LOGD("Input opened successfully: SR=%d, Burst=%d, Buffer=%d, API=%d, Sharing=%d", 
+                 mInputStream->getSampleRate(), inBurst, mInputStream->getBufferSizeInFrames(), 
+                 (int)mInputStream->getAudioApi(), (int)mInputStream->getSharingMode());
+        } else {
+            LOGE("Failed to open input stream completely. Cleaning up output stream to prevent zombie state!");
+            if (mOutputStream) {
+                mOutputStream->stop();
+                mOutputStream->close();
+                mOutputStream = nullptr;
+            }
+            return false;
+        }
+        mInputStream->requestStart();
+    } else {
+        LOGD("Media Capture Mode enabled. Bypassing Oboe Microphone Input.");
     }
 
-    mInputStream->requestStart();
     mOutputStream->requestStart();
     
     auto latency = mOutputStream->calculateLatencyMillis();
@@ -322,38 +331,51 @@ void HarkAudioEngine::setUseHeadsetMic(bool useHeadset) {
 
 oboe::DataCallbackResult
 HarkAudioEngine::onAudioReady(oboe::AudioStream* /*stream*/, void* audioData, int32_t numFrames) {
-    if (!mInputStream) return oboe::DataCallbackResult::Continue;
-
     auto* buffer = static_cast<float*>(audioData);
-    
-    // 將讀取超時設為 1ms (1,000,000 ns)，避免在啟動初期產生 WouldBlock 導致的靜音
-    auto result = mInputStream->read(buffer, numFrames, 1000000);
-    if (!result) {
-        // 若讀取失敗，則清空該段 buffer 避免產生隨機噪音
-        memset(audioData, 0, sizeof(float) * numFrames * CHANNEL_COUNT);
-        return oboe::DataCallbackResult::Continue;
-    }
+    bool isMediaMode = mMediaCaptureMode.load(std::memory_order_relaxed);
 
-    // 取得實際讀取的幀數
-    int32_t framesRead = result.value();
-    
-    // [重要] 套用輸入源增益補償 (Input Gain Compensation)
-    float inputFactor = mInputGainFactor.load(std::memory_order_relaxed);
-    if (inputFactor != 1.0f) {
-        for (int i = 0; i < framesRead; ++i) {
-            buffer[i] *= inputFactor;
+    if (isMediaMode) {
+        if (mMediaAudioQueue) {
+            size_t floatsNeeded = numFrames * CHANNEL_COUNT;
+            size_t floatsRead = mMediaAudioQueue->pop(buffer, floatsNeeded);
+            if (floatsRead < floatsNeeded) {
+                memset(buffer + floatsRead, 0, (floatsNeeded - floatsRead) * sizeof(float));
+            }
+        } else {
+            memset(buffer, 0, numFrames * CHANNEL_COUNT * sizeof(float));
         }
-    }
+    } else {
+        if (!mInputStream) return oboe::DataCallbackResult::Continue;
+        
+        // 將讀取超時設為 1ms (1,000,000 ns)，避免在啟動初期產生 WouldBlock 導致的靜音
+        auto result = mInputStream->read(buffer, numFrames, 1000000);
+        if (!result) {
+            // 若讀取失敗，則清空該段 buffer 避免產生隨機噪音
+            memset(audioData, 0, sizeof(float) * numFrames * CHANNEL_COUNT);
+            return oboe::DataCallbackResult::Continue;
+        }
 
-    if (framesRead < numFrames) {
-        // 填補不足的幀數為靜音
-        memset(buffer + framesRead, 0, sizeof(float) * (numFrames - framesRead));
-    }
+        // 取得實際讀取的幀數
+        int32_t framesRead = result.value();
+        
+        // [重要] 套用輸入源增益補償 (Input Gain Compensation)
+        float inputFactor = mInputGainFactor.load(std::memory_order_relaxed);
+        if (inputFactor != 1.0f) {
+            for (int i = 0; i < framesRead; ++i) {
+                buffer[i] *= inputFactor;
+            }
+        }
 
-    // Mono to Stereo
-    for (int i = numFrames - 1; i >= 0; --i) {
-        float s = buffer[i];
-        buffer[i * 2] = s; buffer[i * 2 + 1] = s;
+        if (framesRead < numFrames) {
+            // 填補不足的幀數為靜音
+            memset(buffer + framesRead, 0, sizeof(float) * (numFrames - framesRead));
+        }
+
+        // Mono to Stereo (Microphone input is Mono, duplicate to LR)
+        for (int i = numFrames - 1; i >= 0; --i) {
+            float s = buffer[i];
+            buffer[i * 2] = s; buffer[i * 2 + 1] = s;
+        }
     }
 
     float finalGain = mIsMuted.load(std::memory_order_relaxed) ? 0.0f : mMasterGain.load(std::memory_order_relaxed);
@@ -476,6 +498,25 @@ void HarkAudioEngine::setLimiterParameters(float thresholdDb, float ratio, float
 
 void HarkAudioEngine::setInputDeviceId(int32_t deviceId) { mInputDeviceId = deviceId; }
 void HarkAudioEngine::resetGesture() { mGestureDetector.reset(); }
+
+void HarkAudioEngine::setMediaCaptureMode(bool enabled) {
+    if (mMediaCaptureMode.load() != enabled) {
+        mMediaCaptureMode.store(enabled);
+        if (mMediaAudioQueue) {
+            mMediaAudioQueue->clear();
+        }
+        // Restart engine to apply routing change
+        LOGD("setMediaCaptureMode to %d, restarting engine...", enabled);
+        stop(false);
+        start();
+    }
+}
+
+void HarkAudioEngine::pushMediaAudioData(const float* data, int numFrames) {
+    if (mMediaCaptureMode.load() && mMediaAudioQueue) {
+        mMediaAudioQueue->push(data, numFrames * CHANNEL_COUNT); // Assuming stereo float input
+    }
+}
 
 void HarkAudioEngine::setBypassMode(bool bypass) {
     mBypassMode = bypass;

@@ -46,4 +46,8 @@ object HarkAudioBridge {
     external fun setMuted(muted: Boolean)
     external fun setInputGainOffset(gainDb: Float)
     external fun setUseHeadsetMic(useHeadset: Boolean)
+
+    // --- Media Capture Mode ---
+    external fun setMediaCaptureMode(enabled: Boolean)
+    external fun pushMediaAudioData(data: FloatArray, numFrames: Int)
 }

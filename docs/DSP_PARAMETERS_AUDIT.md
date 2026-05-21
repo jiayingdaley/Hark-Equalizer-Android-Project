@@ -150,7 +150,7 @@
 | Parameter | Value | Target / Rationale |
 | :--- | :--- | :--- |
 | **Output Usage** | `oboe::Usage::Game` | **[v3.1]** Shortest possible path in Android for minimal latency. |
-| **Input Preset** | `oboe::InputPreset::Camcorder` | **[v3.1]** High performance, bypasses excessive system AEC. |
+| **Input Preset** | `VoiceCommunication` / `Camcorder` | **[v3.1]** `VoiceCommunication` for Bluetooth SCO headset routing; `Camcorder` for Phone Mic to bypass excessive AEC. |
 | **Buffer Size** | `2x Burst` | Balanced stability; prevents intermittent crackling. |
 | **Global Gain Offset** | `+3.0 dB` | Base makeup gain for perceived loudness. |
 | **Phone Mic Compensation**| `+15.0 dB` | **[v3.1]** Auto-boost when using built-in mic to match headset levels. |

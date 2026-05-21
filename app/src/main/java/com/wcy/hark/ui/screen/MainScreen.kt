@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.wcy.hark.EqViewModel
+import com.wcy.hark.AudioSourceMode
 import com.wcy.hark.audio.SceneManager
 import com.wcy.hark.ui.components.EqualizerCurveDisplay
 import com.wcy.hark.ui.components.SystemVolumeSlider
@@ -35,6 +36,7 @@ fun HarkAppScreen(
     audioManager: AudioManager?,
     isEngineOn: Boolean,
     onEngineStateChange: (Boolean) -> Unit,
+    onSourceModeChanged: (AudioSourceMode) -> Unit,
     onSetBandGain: (bandIndex: Int, gain: Float) -> Unit,
     onSetBandQ: (bandIndex: Int, q: Float) -> Unit
 ) {
@@ -62,7 +64,28 @@ fun HarkAppScreen(
                 .padding(innerPadding)
                 .padding(16.dp)
         ) {
-            // --- Situational Modes Row ---
+            // --- Top Level Mode Selection ---
+            val tabs = listOf("環境助聽 (麥克風)", "手機影音 (內部音訊)")
+            val selectedTabIndex = if (viewModel.currentSourceMode.value == AudioSourceMode.MICROPHONE) 0 else 1
+            
+            TabRow(selectedTabIndex = selectedTabIndex, modifier = Modifier.padding(bottom = 16.dp)) {
+                tabs.forEachIndexed { index, title ->
+                    Tab(
+                        selected = selectedTabIndex == index,
+                        onClick = {
+                            val newMode = if (index == 0) AudioSourceMode.MICROPHONE else AudioSourceMode.INTERNAL_MEDIA
+                            if (viewModel.currentSourceMode.value != newMode) {
+                                viewModel.currentSourceMode.value = newMode
+                                onSourceModeChanged(newMode)
+                            }
+                        },
+                        text = { Text(title, style = MaterialTheme.typography.titleSmall) }
+                    )
+                }
+            }
+
+            if (viewModel.currentSourceMode.value == AudioSourceMode.MICROPHONE) {
+                // --- Situational Modes Row ---
             Text("環境模式", style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.height(8.dp))
             
@@ -111,37 +134,20 @@ fun HarkAppScreen(
                     onCheckedChange = { if (it) viewModel.selectSituationalMode(SceneManager.Mode.AUTO) }
                 )
             }
-
-            Divider(modifier = Modifier.padding(vertical = 16.dp))
-
-            // --- Engine Control ---
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    Text("主開關", style = MaterialTheme.typography.titleSmall)
-                    Text(statusText, style = MaterialTheme.typography.bodySmall)
-                }
-                Switch(
-                    checked = isEngineOn,
-                    onCheckedChange = onEngineStateChange,
-                    enabled = isPermissionGranted
-                )
-            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // --- Styled Input Source Toggle ---
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text("收音來源", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Surface(
+            // --- Styled Input Source Toggle (Only show in Microphone mode) ---
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("收音來源", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Surface(
                     shape = androidx.compose.foundation.shape.CircleShape,
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                     modifier = Modifier.height(48.dp).width(200.dp) // 加寬至 200dp
@@ -178,10 +184,44 @@ fun HarkAppScreen(
                     }
                 }
             }
-
             Spacer(modifier = Modifier.height(16.dp))
+        } else {
+                // Placeholder for internal media explanation
+                Text(
+                    text = "正在處理手機內部影音，麥克風已暫停收音。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                    textAlign = TextAlign.Center
+                )
+            }
 
-            // --- Equalizer Section ---
+            // --- Engine Control (Main Power) ---
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                val displayText = if (viewModel.currentSourceMode.value == AudioSourceMode.INTERNAL_MEDIA) {
+                    if (viewModel.isSystemDspOn.value) "狀態：手機影音 DSP 已啟用" else "狀態：手機影音 DSP 已暫停"
+                } else statusText
+                
+                Text(displayText, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                
+                if (viewModel.currentSourceMode.value == AudioSourceMode.MICROPHONE) {
+                    Switch(
+                        checked = isEngineOn,
+                        onCheckedChange = onEngineStateChange
+                    )
+                } else {
+                    Switch(
+                        checked = viewModel.isSystemDspOn.value,
+                        onCheckedChange = { viewModel.setSystemDspEnabled(it) }
+                    )
+                }
+            }
+
+            // --- EQ Slider Section ---
             Box(modifier = Modifier.weight(1f)) {
                 Row(
                     modifier = Modifier

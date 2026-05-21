@@ -32,6 +32,7 @@ import com.wcy.hark.ui.theme.HarkTheme
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import com.wcy.hark.AudioSourceMode
 
 /**
  * MainActivity – Entry point and lifecycle owner of the Hark hearing-aid app.
@@ -59,7 +60,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private lateinit var audioManager: AudioManager
-
+    
     // User's *intent*: does the user want the engine running?
     // Persists across onPause/onResume so we can restart on resume if needed.
     private var isEngineRunningByUserIntent by mutableStateOf(false)
@@ -208,6 +209,27 @@ class MainActivity : ComponentActivity() {
                         viewModel.statusText.value = if (userWantsOn)
                             "狀態：正在偵測音訊裝置..." else "狀態：已停用"
                         lifecycleScope.launch { checkAndSetAudioDevice() }
+                    },
+                    onSourceModeChanged = { newMode ->
+                        if (newMode == AudioSourceMode.INTERNAL_MEDIA) {
+                            if (!android.provider.Settings.canDrawOverlays(this@MainActivity)) {
+                                val intent = Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse("package:$packageName"))
+                                startActivity(intent)
+                                viewModel.currentSourceMode.value = AudioSourceMode.MICROPHONE
+                            } else {
+                                isEngineRunningByUserIntent = false
+                                viewModel.statusText.value = "狀態：手機影音 DSP 啟動中"
+                                lifecycleScope.launch { checkAndSetAudioDevice() }
+                                com.wcy.hark.audio.SystemDspManager.setEnabled(viewModel.isSystemDspOn.value)
+                                // Try attaching to Session 0 (Global Mix) as a fallback
+                                com.wcy.hark.audio.SystemDspManager.attachToSession(0)
+                                startService(Intent(this@MainActivity, com.wcy.hark.audio.FloatingEqService::class.java))
+                            }
+                        } else {
+                            com.wcy.hark.audio.SystemDspManager.setEnabled(false)
+                            com.wcy.hark.audio.SystemDspManager.clearAllEffects()
+                            stopService(Intent(this@MainActivity, com.wcy.hark.audio.FloatingEqService::class.java))
+                        }
                     },
                     onSetBandGain = HarkAudioBridge::setBandGain,
                     onSetBandQ = HarkAudioBridge::setBandQ
