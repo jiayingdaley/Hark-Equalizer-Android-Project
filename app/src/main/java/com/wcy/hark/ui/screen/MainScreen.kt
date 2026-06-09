@@ -54,10 +54,17 @@ fun HarkAppScreen(
     
     val situationalMode by viewModel.situationalMode
     val isAutoLocked by viewModel.isAutoLocked
-    val pinnaEnabled by viewModel.pinnaEnabled
 
-    // --- Layout ---
-    Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+    var currentScreen by remember { mutableStateOf("main") }
+
+    if (currentScreen == "dsp_test") {
+        DspTestScreen(
+            viewModel = viewModel,
+            onBack = { currentScreen = "main" }
+        )
+    } else {
+        // --- Layout ---
+        Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -260,7 +267,17 @@ fun HarkAppScreen(
             ) {
                 Text("重設等化器 (0 dB)")
             }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = { currentScreen = "dsp_test" },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer)
+            ) {
+                Text("進入 DSP 測試與診斷面板")
+            }
         }
+    }
     }
 }
 

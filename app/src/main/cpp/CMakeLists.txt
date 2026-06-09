@@ -12,6 +12,8 @@ add_library(hark SHARED
         NoiseSuppressor.cpp
         GestureDetector.cpp
         LinkwitzRileyCrossover.cpp
+        TransientSuppressor.cpp
+        OwnVoiceDetector.cpp
 )
 
 find_library(log-lib log)

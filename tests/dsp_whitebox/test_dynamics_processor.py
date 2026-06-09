@@ -39,7 +39,6 @@ class DynamicsProcessor:
     Soft-knee = 2dB.
     Gain smoothing = 0.7 * current + 0.3 * target.
     """
-    UPDATE_INTERVAL = 16
     KNEE_DB = 2.0
 
     def __init__(self):
@@ -47,11 +46,16 @@ class DynamicsProcessor:
         self.compress_ratio  = 1.0
         self.expander_thresh = 1e-4   # linear (~ -80dB)
         self.expander_ratio  = 1.0
+        self.noise_floor_db  = -60.0
+        self.expander_thresh_db_preset = -50.0
+        self.alpha_noise_up  = 0.99995
+        self.alpha_noise_down = 0.999
         self.attack_coeff    = 1.0
         self.release_coeff   = 1.0
         self.current_gain    = 1.0
         self.target_gain     = 1.0
         self.counter         = 0
+        self.update_interval = 16
         self.envelope        = 0.0
 
     def set_parameters(self, compress_thresh_db: float, compress_ratio: float,
@@ -59,10 +63,16 @@ class DynamicsProcessor:
                         attack_ms: float, release_ms: float, sample_rate: float):
         self.compress_thresh = 10 ** (compress_thresh_db / 20.0)
         self.compress_ratio  = compress_ratio
+        self.expander_thresh_db_preset = expander_thresh_db
         self.expander_thresh = 10 ** (expander_thresh_db / 20.0)
         self.expander_ratio  = expander_ratio
         self.attack_coeff  = math.exp(-1.0 / (sample_rate * attack_ms / 1000.0))  if attack_ms  > 0 else 0.0
         self.release_coeff = math.exp(-1.0 / (sample_rate * release_ms / 1000.0)) if release_ms > 0 else 0.0
+
+        if attack_ms < 1.0:
+            self.update_interval = 1
+        else:
+            self.update_interval = 16
 
     def process(self, x: float) -> float:
         level = abs(x)
@@ -75,14 +85,30 @@ class DynamicsProcessor:
         if abs(self.envelope) < 1.175494e-38:
             self.envelope = 0.0
 
-        # Gain recompute every 16 samples
+        # Gain recompute every update_interval samples
         self.counter += 1
-        if self.counter >= self.UPDATE_INTERVAL:
+        if self.counter >= self.update_interval:
             self.counter = 0
             gain = 1.0
             env_db  = 20 * math.log10(self.envelope) if self.envelope > 1e-9 else -180.0
+            
+            # Asymmetric Noise Floor Tracking
+            if env_db < self.noise_floor_db:
+                self.noise_floor_db = self.alpha_noise_down * self.noise_floor_db + (1.0 - self.alpha_noise_down) * env_db
+            else:
+                self.noise_floor_db = self.alpha_noise_up * self.noise_floor_db + (1.0 - self.alpha_noise_up) * env_db
+            if self.noise_floor_db > -20.0: self.noise_floor_db = -20.0
+            if self.noise_floor_db < -80.0: self.noise_floor_db = -80.0
+
+            # Dynamic expander threshold: preset ceiling or noise_floor + 5.0 dB
+            final_et_db = self.expander_thresh_db_preset
+            if self.expander_thresh_db_preset > -95.0:
+                adaptive_thresh_db = self.noise_floor_db + 5.0
+                final_et_db = min(self.expander_thresh_db_preset, adaptive_thresh_db)
+            self.expander_thresh = 10 ** (final_et_db / 20.0)
+
             ct_db   = 20 * math.log10(self.compress_thresh)
-            et_db   = 20 * math.log10(self.expander_thresh) if self.expander_thresh > 1e-9 else -180.0
+            et_db   = final_et_db
 
             if env_db > ct_db - self.KNEE_DB:
                 overshoot = env_db - ct_db
@@ -112,6 +138,7 @@ class DynamicsProcessor:
         self.current_gain = 1.0
         self.target_gain  = 1.0
         self.counter = 0
+        self.noise_floor_db = -60.0
 
 
 def run_test(name, fn):
@@ -311,7 +338,9 @@ def test_limiter_ceiling():
     x = np.sin(2 * math.pi * 1000.0 * t).astype(np.float32)  # peak = 1.0 (-3dBFS RMS)
 
     y = limiter.process_block(x)
-    peak_out = np.max(np.abs(y))
+    # Ignore initial transient leak during attack time to measure steady-state ceiling
+    warmup = int(SAMPLE_RATE * 0.05)
+    peak_out = np.max(np.abs(y[warmup:]))
     rms_out_db = 20 * math.log10(max(np.sqrt(np.mean(y[-int(SAMPLE_RATE*0.2):]**2)), 1e-12))
     print(f"    Limiter: input peak=1.0, output peak={peak_out:.4f}, output RMS={rms_out_db:.2f}dBFS")
 

@@ -13,12 +13,21 @@ public:
     // 處理單一樣本
     float process(float inputSample);
 
+    // Get current target gain for testing/inspection
+    float getTargetGain() const { return mTargetGain; }
+
 private:
     // Parameters
     float mCompressThreshold; // Linear amplitude for compression
     float mCompressRatio;
     float mExpanderThreshold; // Linear amplitude for expansion (Noise Gate)
     float mExpanderRatio;
+    
+    // Adaptive Gate Parameters
+    float mNoiseFloorDb;
+    float mExpanderThresholdDbPreset;
+    float mAlphaNoiseUp;
+    float mAlphaNoiseDown;
     
     float mAttackCoeff;
     float mReleaseCoeff;
@@ -30,7 +39,7 @@ private:
     float mCurrentGain = 1.0f;
     float mTargetGain = 1.0f;
     int mCounter = 0;
-    static const int UPDATE_INTERVAL = 16; // Update gain every 16 samples
+    int mUpdateInterval;
 
     // State
     float mEnvelope; // Envelope detector current value

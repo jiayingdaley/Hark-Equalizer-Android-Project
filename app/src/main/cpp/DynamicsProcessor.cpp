@@ -17,11 +17,16 @@ DynamicsProcessor::DynamicsProcessor() :
         mCompressRatio(1.0f),
         mExpanderThreshold(1e-4f),  // Bug fix: MUST NOT be 0.0f (log10(0)=-inf). Default ~-80dB
         mExpanderRatio(1.0f),
+        mNoiseFloorDb(-60.0f),
+        mExpanderThresholdDbPreset(-50.0f),
+        mAlphaNoiseUp(0.99995f),
+        mAlphaNoiseDown(0.999f),
         mAttackCoeff(1.0f),
         mReleaseCoeff(1.0f),
         mCurrentGain(1.0f),
         mTargetGain(1.0f),
         mCounter(0),
+        mUpdateInterval(16),
         mEnvelope(0.0f) {}
 
 void DynamicsProcessor::setSampleRate(double sampleRate) {
@@ -49,9 +54,17 @@ void DynamicsProcessor::setParameters(float compressThresholdDb, float compressR
     mCompressThreshold = powf(10.0f, compressThresholdDb / 20.0f);
     mCompressRatio = compressRatio;
     
-    // Default threshold is -50dB if using expander
+    // Save preset expander threshold for adaptive tracking
+    mExpanderThresholdDbPreset = expanderThresholdDb;
     mExpanderThreshold = powf(10.0f, expanderThresholdDb / 20.0f);
     mExpanderRatio = expanderRatio;
+
+    // Limiters with very fast attack time need sample-by-sample update to prevent transient leakage
+    if (attackMs < 1.0f) {
+        mUpdateInterval = 1;
+    } else {
+        mUpdateInterval = 16;
+    }
 
     // 计算起音和释放时间的系数 (一阶低通滤波器)
     if (attackMs > 0.0f) {
@@ -86,17 +99,34 @@ float DynamicsProcessor::process(float inputSample) {
     }
 
     // 2. Performance Optimization: Only recompute gain every N samples
-    if (mCounter++ >= UPDATE_INTERVAL) {
+    if (mCounter++ >= mUpdateInterval) {
         mCounter = 0;
         float gain = 1.0f;
 
         // Calculate current envelope in dB for precise processing
         float envelopeDb = (mEnvelope > 1e-9f) ? 20.0f * log10f(mEnvelope) : -180.0f;
+        
+        // Asymmetric Noise Floor Tracking
+        if (envelopeDb < mNoiseFloorDb) {
+            mNoiseFloorDb = mAlphaNoiseDown * mNoiseFloorDb + (1.0f - mAlphaNoiseDown) * envelopeDb;
+        } else {
+            mNoiseFloorDb = mAlphaNoiseUp * mNoiseFloorDb + (1.0f - mAlphaNoiseUp) * envelopeDb;
+        }
+        if (mNoiseFloorDb > -20.0f) mNoiseFloorDb = -20.0f;
+        if (mNoiseFloorDb < -80.0f) mNoiseFloorDb = -80.0f;
+
+        // Dynamic expander threshold: preset ceiling or noise_floor + 5.0 dB
+        float finalExpanderThresholdDb = mExpanderThresholdDbPreset;
+        if (mExpanderThresholdDbPreset > -95.0f) {
+            float adaptiveThresholdDb = mNoiseFloorDb + 5.0f;
+            finalExpanderThresholdDb = (mExpanderThresholdDbPreset < adaptiveThresholdDb) 
+                                       ? mExpanderThresholdDbPreset 
+                                       : adaptiveThresholdDb;
+        }
+        mExpanderThreshold = powf(10.0f, finalExpanderThresholdDb / 20.0f);
+
         float compressThresholdDb = 20.0f * log10f(mCompressThreshold);
-        // Guard: mExpanderThreshold must be > 0 to avoid log10(0)
-        float expanderThresholdDb = (mExpanderThreshold > 1e-9f)
-                                    ? 20.0f * log10f(mExpanderThreshold)
-                                    : -180.0f;
+        float expanderThresholdDb = finalExpanderThresholdDb;
 
         if (envelopeDb > compressThresholdDb - mKneeDb) {
             // Soft-Knee Downward Compression

@@ -85,12 +85,6 @@ Java_com_wcy_hark_audio_HarkAudioBridge_setSituationalMode(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_wcy_hark_audio_HarkAudioBridge_setPinnaEnabled(
-        JNIEnv *env, jobject /* this */, jboolean enabled) {
-    engine.setPinnaEnabled(enabled);
-}
-
-extern "C" JNIEXPORT void JNICALL
 Java_com_wcy_hark_audio_HarkAudioBridge_setBandWdrcParameters(
         JNIEnv *env, jobject /* this */,
         jint band, jfloat thresholdDb, jfloat ratio,
@@ -140,6 +134,18 @@ Java_com_wcy_hark_audio_HarkAudioBridge_setUseHeadsetMic(
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_com_wcy_hark_audio_HarkAudioBridge_setIsBluetoothInput(
+        JNIEnv *env, jobject /* this */, jboolean isBluetooth) {
+    engine.setIsBluetoothInput(isBluetooth);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_wcy_hark_audio_HarkAudioBridge_setHeadphonesConnected(
+        JNIEnv *env, jobject /* this */, jboolean connected) {
+    engine.setHeadphonesConnected(connected);
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_com_wcy_hark_audio_HarkAudioBridge_setMediaCaptureMode(
         JNIEnv *env, jobject /* this */, jboolean enabled) {
     engine.setMediaCaptureMode(enabled);
@@ -153,4 +159,63 @@ Java_com_wcy_hark_audio_HarkAudioBridge_pushMediaAudioData(
         engine.pushMediaAudioData(c_data, numFrames);
         env->ReleaseFloatArrayElements(data, c_data, JNI_ABORT);
     }
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_wcy_hark_audio_HarkAudioBridge_setDcBlockerEnabled(
+        JNIEnv *env, jobject /* this */, jboolean enabled) {
+    engine.setDcBlockerEnabled(enabled);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_wcy_hark_audio_HarkAudioBridge_setCrossoverWdrcEnabled(
+        JNIEnv *env, jobject /* this */, jboolean enabled) {
+    engine.setCrossoverWdrcEnabled(enabled);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_wcy_hark_audio_HarkAudioBridge_setLimiterEnabled(
+        JNIEnv *env, jobject /* this */, jboolean enabled) {
+    engine.setLimiterEnabled(enabled);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_wcy_hark_audio_HarkAudioBridge_setTransientSuppressorEnabled(
+        JNIEnv *env, jobject /* this */, jboolean enabled) {
+    engine.setTransientSuppressorEnabled(enabled);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_wcy_hark_audio_HarkAudioBridge_setOwnVoiceDetectorEnabled(
+        JNIEnv *env, jobject /* this */, jboolean enabled) {
+    engine.setOwnVoiceDetectorEnabled(enabled);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_wcy_hark_audio_HarkAudioBridge_setWdrcExpanderThreshold(
+        JNIEnv *env, jobject /* this */, jfloat thresholdDb) {
+    engine.setWdrcExpanderThreshold(thresholdDb);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_wcy_hark_audio_HarkAudioBridge_setLimiterParameters(
+        JNIEnv *env, jobject /* this */, jfloat thresholdDb, jfloat releaseMs) {
+    engine.setLimiterParameters(thresholdDb, 20.0f, 0.5f, releaseMs);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_wcy_hark_audio_HarkAudioBridge_setStreamOverrides(
+        JNIEnv *env, jobject /* this */, jint sharingMode, jint inputPreset) {
+    engine.setStreamOverrides(sharingMode, inputPreset);
+}
+
+extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_wcy_hark_audio_HarkAudioBridge_getDiagnosticMetrics(
+        JNIEnv *env, jobject /* this */) {
+    jfloatArray result = env->NewFloatArray(5);
+    if (result == nullptr) return nullptr;
+    float metrics[5];
+    engine.getDiagnosticMetrics(metrics);
+    env->SetFloatArrayRegion(result, 0, 5, metrics);
+    return result;
 }

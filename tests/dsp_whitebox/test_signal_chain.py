@@ -88,6 +88,22 @@ class FullChain:
     def set_ui_gains(self, gains: list):
         self.band_gains_ui = gains
 
+    def set_wdrc_parameters(self, comp_thresh, comp_ratio, exp_thresh, exp_ratio, attack_ms, release_ms, sample_rate):
+        for b in range(8):
+            band_exp_thresh = exp_thresh
+            band_exp_ratio = exp_ratio
+            if exp_thresh > -55.0:
+                if b == 0:
+                    band_exp_thresh = max(exp_thresh, -32.0)
+                    band_exp_ratio = 0.40
+                elif b == 1:
+                    band_exp_thresh = max(exp_thresh, -35.0)
+                    band_exp_ratio = 0.45
+                elif b == 7:
+                    band_exp_thresh = max(exp_thresh, -36.0)
+                    band_exp_ratio = 0.40
+            self.wdrc[b].set_parameters(comp_thresh, comp_ratio, band_exp_thresh, band_exp_ratio, attack_ms, release_ms, sample_rate)
+
     def get_prescription_gains(self):
         gain_sum = [0.0] * 8
         count = [0] * 8
@@ -96,10 +112,27 @@ class FullChain:
             gain_sum[b] += self.band_gains_ui[i]
             count[b] += 1
         
+        max_boost = 0.0
+        sum_boost = 0.0
+        for i in range(16):
+            db = self.band_gains_ui[i]
+            if db > max_boost:
+                max_boost = db
+            if db > 0.0:
+                sum_boost += db
+        headroom_db = -max(0.0, max_boost * 0.40 + sum_boost * 0.05)
+        headroom_linear = 10 ** (headroom_db / 20.0)
+
         targets = []
         for b in range(8):
-            avg = gain_sum[b] / count[b] if count[b] > 0 else 0.0
-            targets.append(10 ** ((avg + self.global_offset_db) / 20.0))
+            if b == 0:
+                # Align with C++ Band 0 logic: offset of +4dB and scaled first band UI gain
+                first_band_db = self.band_gains_ui[0]
+                val = 10 ** ((first_band_db * 0.8 + 4.0) / 20.0) * headroom_linear
+            else:
+                avg = gain_sum[b] / count[b] if count[b] > 0 else 0.0
+                val = 10 ** ((avg + self.global_offset_db) / 20.0) * headroom_linear
+            targets.append(val)
         return targets
 
     def process(self, sample: float, capture: bool = False):
@@ -122,7 +155,7 @@ class FullChain:
         targets = self.get_prescription_gains()
         out_sum = 0.0
         for b in range(8):
-            out_sum += self.wdrc[b].process(bands[b] * targets[b])
+            out_sum += self.wdrc[b].process(bands[b]) * targets[b]
         s = out_sum
         snap["stage4_wdrc"] = s
 
@@ -405,19 +438,19 @@ def test_chain_situational_modes():
     """
     chain = FullChain(SAMPLE_RATE)
     
-    # 1. Test Outdoor Low-Cut (100Hz suppression)
-    # We simulate the 100Hz high-pass by adding it to the chain for this test
-    hp100 = BiquadFilter()
-    hp100.update_coefficients("highpass", SAMPLE_RATE, 100.0, 0.0, 0.707)
+    # 1. Test Outdoor Low-Cut (150Hz suppression, matching Wind Filter)
+    # We simulate the 150Hz high-pass by adding it to the chain for this test
+    hp150 = BiquadFilter()
+    hp150.update_coefficients("highpass", SAMPLE_RATE, 150.0, 0.0, 0.707)
     
     n = int(SAMPLE_RATE * 0.1)
     t = np.arange(n) / SAMPLE_RATE
     x_50hz = (10**(-30/20) * np.sin(2 * math.pi * 50.0 * t)).astype(np.float32)
     
-    # Process through HP100
-    y_50hz = np.array([hp100.process(s) for s in x_50hz])
+    # Process through HP150
+    y_50hz = np.array([hp150.process(s) for s in x_50hz])
     suppression = 20 * math.log10(np.sqrt(np.mean(y_50hz**2)) / np.sqrt(np.mean(x_50hz**2)))
-    print(f"    Outdoor Mode (100Hz HP): 50Hz suppression = {suppression:.2f}dB (expect < -15dB)")
+    print(f"    Outdoor Mode (150Hz HP): 50Hz suppression = {suppression:.2f}dB (expect < -15dB)")
     assert suppression < -15.0, f"Outdoor mode HP too weak: {suppression:.2f}dB"
 
     # 2. Test Conversation Mode WDRC (Stronger ratio 2.0:1 vs 1.2:1)
@@ -433,9 +466,9 @@ def test_chain_situational_modes():
     rms_out = 20 * math.log10(np.sqrt(np.mean(y_high[int(n/2):]**2)))
     
     print(f"    Conversation Mode WDRC: Output at -10dBFS input = {rms_out:.2f}dBFS")
-    # With -30dB threshold, 2.0 ratio, -9dB offset:
-    # Target = ((-10 - (-30)) * (1/2.0 - 1)) + (-10 + -9) = (20 * -0.5) - 19 = -10 - 19 = -29dBFS
-    assert abs(rms_out - (-29.0)) < 3.0, f"Conversation WDRC error: {rms_out:.2f}dBFS (expected -29)"
+    # With -30dB threshold, 2.0 ratio: WDRC output is -20dBFS. Then we add global_offset_db.
+    target_expected = -20.0 + chain.global_offset_db
+    assert abs(rms_out - target_expected) < 3.0, f"Conversation WDRC error: {rms_out:.2f}dBFS (expected {target_expected:.2f})"
 
 
 if __name__ == "__main__":

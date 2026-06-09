@@ -67,6 +67,7 @@ class MainActivity : ComponentActivity() {
 
     private var audioDeviceCallback: Any? = null
     private var mCurrentInputDeviceId: Int = -1
+    private var mCurrentOutputDeviceType: Int = -1
 
     // -----------------------------------------------------------------------
     // Bluetooth SCO state (legacy Android < 12 fallback)
@@ -151,8 +152,6 @@ class MainActivity : ComponentActivity() {
         // loaded here at a well-known lifecycle point rather than lazily.
         System.loadLibrary("hark")
 
-        registerReceiver(scoStateReceiver, IntentFilter(AudioManager.ACTION_SCO_AUDIO_STATE_UPDATED))
-
         // Centralized RequestMultiplePermissions to prevent launcher race conditions
         val permissionLauncher = registerForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions()
@@ -191,11 +190,6 @@ class MainActivity : ComponentActivity() {
             viewModel.isMicrophonePermissionGranted.value = true
         }
 
-        contentResolver.registerContentObserver(
-            Settings.System.CONTENT_URI,
-            true,
-            volumeObserver
-        )
         syncSystemVolume()
 
         setContent {
@@ -246,6 +240,19 @@ class MainActivity : ComponentActivity() {
         viewModel.isMicrophonePermissionGranted.value = hasPermission
         
         registerAudioDeviceCallback()
+        
+        // Re-register volume observer and Bluetooth SCO receiver on resume to avoid lifecycle dead state
+        contentResolver.registerContentObserver(
+            Settings.System.CONTENT_URI,
+            true,
+            volumeObserver
+        )
+        try {
+            registerReceiver(scoStateReceiver, IntentFilter(AudioManager.ACTION_SCO_AUDIO_STATE_UPDATED))
+        } catch (e: Exception) {
+            Log.w(TAG, "Error registering SCO receiver: ${e.message}")
+        }
+
         if (isEngineRunningByUserIntent) {
             Log.d(TAG, "onResume: user intent ON, re-checking audio device.")
             lifecycleScope.launch { checkAndSetAudioDevice() }
@@ -291,6 +298,7 @@ class MainActivity : ComponentActivity() {
 
             val isHeadphoneConnected = checkHeadphoneConnection()
             Log.d(TAG, "Headphone output detected: $isHeadphoneConnected")
+            HarkAudioBridge.setHeadphonesConnected(isHeadphoneConnected)
 
             if (isEngineRunningByUserIntent && !isHeadphoneConnected) {
                 Log.w(TAG, "No headphone output → forcing engine stop")
@@ -309,31 +317,55 @@ class MainActivity : ComponentActivity() {
             val (targetDeviceId, deviceLabel) = selectBestInputDevice()
             Log.d(TAG, "Selected input: $deviceLabel (ID=$targetDeviceId)")
 
+            // 藍牙耳機收音防禦：若選擇藍牙麥克風收音但 SCO 尚未建立連結，先啟動 SCO 連結並退出。
+            // 等待 `scoStateReceiver` 收到 `SCO_AUDIO_STATE_CONNECTED` 廣播後，會重新調用此方法進入第二階段啟動引擎。
+            if (deviceLabel == "藍牙耳機" && !isScoAudioConnected) {
+                Log.d(TAG, "Bluetooth headset selected but SCO not connected. Initiating connection...")
+                updateAudioManagerMode(deviceLabel)
+                configureCommunicationDevice(targetDeviceId, deviceLabel)
+                handleBluetoothScoLegacy(deviceLabel)
+                if (isEngineRunningByUserIntent) {
+                    viewModel.statusText.value = "狀態：正在連接藍牙麥克風..."
+                }
+                return@withLock
+            }
+
             // 1. 如果引擎正在運行，且設定/裝置改變，先停止引擎
+            val targetOutputDeviceType = getHeadphoneOutputDeviceType()
             var transitionDelayNeeded = false
             if (HarkAudioBridge.isEngineActuallyRunning()) {
-                if (targetDeviceId != mCurrentInputDeviceId || !viewModel.useHeadsetMic.value) {
-                    Log.d(TAG, "Stopping engine for clean reconfiguration.")
+                if (targetDeviceId != mCurrentInputDeviceId || 
+                    targetOutputDeviceType != mCurrentOutputDeviceType || 
+                    !viewModel.useHeadsetMic.value) {
+                    Log.d(TAG, "Stopping engine for clean reconfiguration (device changed).")
                     HarkAudioBridge.stopEngine()
                     transitionDelayNeeded = true
                 }
             }
             mCurrentInputDeviceId = targetDeviceId
+            mCurrentOutputDeviceType = targetOutputDeviceType
 
             // 2. 更新 AudioManager 路由與模式（先清理舊路由與釋放藍牙 SCO，最後再更改模式，防止 Android 進入聽筒通話衝突狀態！）
             HarkAudioBridge.setAudioInputDeviceId(targetDeviceId)
             HarkAudioBridge.setUseHeadsetMic(viewModel.useHeadsetMic.value)
+            HarkAudioBridge.setIsBluetoothInput(deviceLabel == "藍牙耳機")
             HarkAudioBridge.setInputGainOffset(if (deviceLabel.contains("手機")) 15.0f else 0.0f)
 
             val previousMode = audioManager.mode
             val previousScoConnected = isScoAudioConnected
 
-            // A. 先清理/配置通訊路由與藍牙 SCO，將連線釋放乾淨
-            configureCommunicationDevice(targetDeviceId, deviceLabel)
-            handleBluetoothScoLegacy(deviceLabel)
-
-            // B. 後更新主模式（在 SCO 被強行關閉後，更改主模式方能順暢重定向至高清 A2DP 通道）
-            updateAudioManagerMode()
+            // 根據是否為藍牙耳機收音，調整模式與配置順序：
+            // 1. 如果是藍牙耳機收音：必須先將 mode 設為 MODE_IN_COMMUNICATION，之後 setCommunicationDevice 才能成功綁定藍牙 SCO，否則會退回手機聽筒！
+            // 2. 如果是其他收音（手機/有線/USB）：先清理通訊路由與 SCO 連線，再退回 MODE_NORMAL，以順利重定向至高品質 A2DP。
+            if (deviceLabel == "藍牙耳機") {
+                updateAudioManagerMode(deviceLabel)
+                configureCommunicationDevice(targetDeviceId, deviceLabel)
+                handleBluetoothScoLegacy(deviceLabel)
+            } else {
+                configureCommunicationDevice(targetDeviceId, deviceLabel)
+                handleBluetoothScoLegacy(deviceLabel)
+                updateAudioManagerMode(deviceLabel)
+            }
 
             // 3. 安定時間偵測：
             // 如果我們從 MODE_IN_COMMUNICATION (3) 切換到 MODE_NORMAL (0)
@@ -364,21 +396,51 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun getHeadphoneOutputDeviceType(): Int {
+        val outputDevices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+        val headset = outputDevices.find {
+            it.type in listOf(
+                AudioDeviceInfo.TYPE_WIRED_HEADSET,
+                AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
+                AudioDeviceInfo.TYPE_USB_HEADSET,
+                AudioDeviceInfo.TYPE_BLE_HEADSET,
+                AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+                AudioDeviceInfo.TYPE_BLUETOOTH_SCO
+            )
+        }
+        return headset?.type ?: -1
+    }
+
     private fun selectBestInputDevice(): Pair<Int, String> {
         val inputDevices = audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS)
+        val outputDevices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
         var targetDeviceId = 0
         var deviceLabel = "內建麥克風"
 
+        // 檢查輸出端是否有藍牙設備已連線
+        val hasBluetoothOutput = outputDevices.any {
+            it.type in listOf(
+                AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+                AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+                AudioDeviceInfo.TYPE_BLE_HEADSET
+            )
+        }
+
         if (viewModel.useHeadsetMic.value) {
-            inputDevices.find {
+            val btInput = inputDevices.find {
                 it.type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
                 it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO
-            }?.let {
-                targetDeviceId = it.id
+            }
+            if (btInput != null) {
+                targetDeviceId = btInput.id
+                deviceLabel = "藍牙耳機"
+            } else if (hasBluetoothOutput) {
+                // 輸出端已連線藍牙，但輸入端尚未建立 SCO Link，此時仍標記為藍牙耳機以啟動通訊路由
+                targetDeviceId = 0
                 deviceLabel = "藍牙耳機"
             }
 
-            if (targetDeviceId == 0) {
+            if (targetDeviceId == 0 && deviceLabel != "藍牙耳機") {
                 inputDevices.find { it.type == AudioDeviceInfo.TYPE_USB_HEADSET }?.let {
                     targetDeviceId = it.id
                     deviceLabel = "USB 耳機"
@@ -388,7 +450,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            if (targetDeviceId == 0) {
+            if (targetDeviceId == 0 && deviceLabel != "藍牙耳機") {
                 inputDevices.find { it.type == AudioDeviceInfo.TYPE_WIRED_HEADSET }?.let {
                     targetDeviceId = it.id
                     deviceLabel = "有線耳機 (3.5mm)"
@@ -403,72 +465,68 @@ class MainActivity : ComponentActivity() {
         return Pair(targetDeviceId, deviceLabel)
     }
 
-    private suspend fun updateAudioManagerMode() {
-        val (_, deviceLabel) = selectBestInputDevice()
+    private suspend fun updateAudioManagerMode(deviceLabel: String) {
         val targetMode = if (isEngineRunningByUserIntent && deviceLabel == "藍牙耳機")
             AudioManager.MODE_IN_COMMUNICATION else AudioManager.MODE_NORMAL
         if (audioManager.mode != targetMode) {
             audioManager.mode = targetMode
             Log.d(TAG, "AudioManager mode → $targetMode")
-            if (targetMode == AudioManager.MODE_IN_COMMUNICATION) {
-                kotlinx.coroutines.delay(200)
-            }
+            kotlinx.coroutines.delay(300)
         }
     }
 
     private suspend fun configureCommunicationDevice(targetDeviceId: Int, deviceLabel: String) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val commDevices = audioManager.availableCommunicationDevices
-            Log.d(TAG, "Available communication devices: ${commDevices.map { "${it.id}:${it.type}" }}")
+            Log.d(TAG, "Available comm devices: ${commDevices.map { "${it.id}:type=${it.type}" }}")
 
-            // 尋找連接的耳機優先級：藍牙耳機 > USB耳機 > 有線耳機
-            val headsetDevice = commDevices.find {
-                it.type in listOf(
-                    AudioDeviceInfo.TYPE_BLE_HEADSET,
-                    AudioDeviceInfo.TYPE_BLUETOOTH_SCO
-                )
-            } ?: commDevices.find {
-                it.type in listOf(
-                    AudioDeviceInfo.TYPE_USB_HEADSET,
-                    AudioDeviceInfo.TYPE_USB_DEVICE
-                )
-            } ?: commDevices.find {
-                it.type in listOf(
-                    AudioDeviceInfo.TYPE_WIRED_HEADSET,
-                    AudioDeviceInfo.TYPE_WIRED_HEADPHONES
-                )
+            val headsetDevice = if (deviceLabel == "藍牙耳機") {
+                commDevices.find {
+                    it.type in listOf(
+                        AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+                        AudioDeviceInfo.TYPE_BLE_HEADSET
+                    )
+                }
+            } else {
+                commDevices.find {
+                    it.type in listOf(
+                        AudioDeviceInfo.TYPE_USB_HEADSET,
+                        AudioDeviceInfo.TYPE_USB_DEVICE
+                    )
+                } ?: commDevices.find {
+                    it.type in listOf(
+                        AudioDeviceInfo.TYPE_WIRED_HEADSET,
+                        AudioDeviceInfo.TYPE_WIRED_HEADPHONES
+                    )
+                }
             }
 
             if (headsetDevice != null) {
-                // 強行鎖定耳機作為通訊與媒體輸出設備！這能 100% 保證即使我們用手機麥克風收音，聲音也絕對只能從耳機播放！
                 val ok = audioManager.setCommunicationDevice(headsetDevice)
-                Log.d(TAG, "Forced setCommunicationDevice to headset → type=${headsetDevice.type}, success=$ok")
-                
+                Log.d(TAG, "setCommunicationDevice → type=${headsetDevice.type}, ok=$ok")
                 if (deviceLabel == "藍牙耳機" && headsetDevice.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO) {
-                    Log.d(TAG, "BT SCO recording selected — waiting 600ms for SCO link")
                     kotlinx.coroutines.delay(600)
                 }
             } else {
                 audioManager.clearCommunicationDevice()
-                Log.d(TAG, "No headset found: cleared communication device routing")
+                Log.d(TAG, "Cleared communication device routing")
             }
         }
     }
 
     private fun handleBluetoothScoLegacy(deviceLabel: String) {
-        val isBluetoothDevice = deviceLabel == "藍牙耳機"
-        if (isBluetoothDevice) {
+        val isBluetooth = deviceLabel == "藍牙耳機"
+        if (isBluetooth) {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && !isScoAudioConnected) {
                 Log.d(TAG, "Legacy Android: calling startBluetoothSco()")
                 audioManager.startBluetoothSco()
             }
         } else {
-            // 只要不是藍牙耳機收音，就強行調用 stopBluetoothSco() 進行安全拆除，無視當前變數狀態，確保絕無聽筒衝突！
-            Log.d(TAG, "Force stopping Bluetooth SCO for safe media routing fallback")
             try {
                 audioManager.stopBluetoothSco()
+                Log.d(TAG, "stopBluetoothSco() — ensuring SCO link is cleared")
             } catch (e: Exception) {
-                Log.w(TAG, "Error stopping SCO: ${e.message}")
+                Log.w(TAG, "stopBluetoothSco ignored: ${e.message}")
             }
             isScoAudioConnected = false
         }
@@ -520,13 +578,15 @@ class MainActivity : ComponentActivity() {
         val callback = object : android.media.AudioDeviceCallback() {
             override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>?) {
                 Log.d(TAG, "Audio device added — waiting 1000ms for OS routing tables to stabilize")
+                HarkAudioBridge.setHeadphonesConnected(checkHeadphoneConnection())
                 lifecycleScope.launch {
                     kotlinx.coroutines.delay(1000)
                     checkAndSetAudioDevice()
                 }
             }
             override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>?) {
-                Log.d(TAG, "Audio device removed — waiting 1000ms for OS routing tables to stabilize")
+                Log.d(TAG, "Audio device removed — checking state immediately")
+                HarkAudioBridge.setHeadphonesConnected(checkHeadphoneConnection())
                 lifecycleScope.launch {
                     kotlinx.coroutines.delay(1000)
                     checkAndSetAudioDevice()

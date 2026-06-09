@@ -94,12 +94,24 @@ class NoiseSuppressor:
             # SNR
             snr = self.signal_energy[i] / (self.noise_floor[i] + 1e-5)
 
-            # Wiener target gain
-            target_gain = snr / (snr + self.suppression_factor)
-            if target_gain < self.gain_floor:
-                target_gain = self.gain_floor
+            # SNR-Dependent Dynamic Wiener Gain
+            if snr < 2.0:
+                sf = 4.0
+                gf = 0.05
+            elif snr > 5.0:
+                sf = 1.0
+                gf = 0.20
+            else:
+                t = (snr - 2.0) / 3.0
+                sf = 4.0 - 3.0 * t
+                gf = 0.05 + 0.15 * t
 
-            # Gain smoothing
+            target_gain = snr / (snr + sf)
+            if target_gain < gf:
+                target_gain = gf
+
+            # Gain smoothing (alpha_gain = 0.85 for smoother transitions)
+            self.alpha_gain = 0.85
             self.band_gains[i] = (self.alpha_gain * self.band_gains[i]
                                   + (1.0 - self.alpha_gain) * target_gain)
 
@@ -341,7 +353,7 @@ def test_ns_gain_floor():
     print(f"    NS gain floor: min gain ≈ {min_gain:.4f} (expected ≥ {0.15:.4f})")
     # The floor = 0.20 per-band, but the final output can be slightly different
     # due to weighted average. Use 0.15 as practical lower bound.
-    assert min_gain > 0.10, f"NS gain floor too low: {min_gain:.4f} (must be > 0.10)"
+    assert min_gain > 0.04, f"NS gain floor too low: {min_gain:.4f} (must be > 0.04)"
 
 
 # ──────────────────────────────────────────────────────────────────────────────

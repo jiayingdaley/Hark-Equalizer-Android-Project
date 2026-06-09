@@ -31,12 +31,33 @@ class EqViewModel(private val repository: EqSettingsRepository) : ViewModel() {
     // Situational Mode State
     val situationalMode = mutableStateOf(SceneManager.Mode.TRANSPARENCY)
     val isAutoLocked = mutableStateOf(false)
-    val pinnaEnabled = mutableStateOf(true)
     val useHeadsetMic = mutableStateOf(true) // 預設使用耳機麥克風
     val isMicrophonePermissionGranted = mutableStateOf(false)
     val isMediaCaptureEnabled = mutableStateOf(false)
     val currentSourceMode = mutableStateOf(AudioSourceMode.MICROPHONE)
     val isSystemDspOn = mutableStateOf(com.wcy.hark.audio.SystemDspManager.isEnabled)
+
+    // DSP Testing & Diagnostics State
+    val testDcBlockerEnabled = mutableStateOf(true)
+    val testNoiseReductionEnabled = mutableStateOf(true)
+    val testCrossoverWdrcEnabled = mutableStateOf(true)
+    val testLimiterEnabled = mutableStateOf(true)
+    val testTransientSuppressorEnabled = mutableStateOf(true)
+    val testOwnVoiceDetectorEnabled = mutableStateOf(true)
+
+    val testMasterGain = mutableStateOf(1.0f)
+    val testInputGainOffset = mutableStateOf(0.0f)
+    val testWdrcExpanderThreshold = mutableStateOf(-72.0f)
+    val testLimiterThreshold = mutableStateOf(-1.5f)
+    val testLimiterRelease = mutableStateOf(30.0f)
+    val testSharingModeOverride = mutableStateOf(0)
+    val testInputPresetOverride = mutableStateOf(4)
+
+    val diagInputLevel = mutableStateOf(-120.0f)
+    val diagOutputLevel = mutableStateOf(-120.0f)
+    val diagWouldBlockRate = mutableStateOf(0.0f)
+    val diagInputXRun = mutableStateOf(0)
+    val diagOutputXRun = mutableStateOf(0)
 
     fun setSystemDspEnabled(enabled: Boolean) {
         // We just call the manager; the flow collector below will update isSystemDspOn
@@ -84,6 +105,33 @@ class EqViewModel(private val repository: EqSettingsRepository) : ViewModel() {
                 kotlinx.coroutines.delay(500)
             }
         }
+
+        // Diagnostics Polling loop
+        viewModelScope.launch {
+            while(true) {
+                if (HarkAudioBridge.isEngineActuallyRunning()) {
+                    try {
+                        val metrics = HarkAudioBridge.getDiagnosticMetrics()
+                        if (metrics.size >= 5) {
+                            diagInputLevel.value = metrics[0]
+                            diagOutputLevel.value = metrics[1]
+                            diagWouldBlockRate.value = metrics[2]
+                            diagInputXRun.value = metrics[3].toInt()
+                            diagOutputXRun.value = metrics[4].toInt()
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                } else {
+                    diagInputLevel.value = -120.0f
+                    diagOutputLevel.value = -120.0f
+                    diagWouldBlockRate.value = 0.0f
+                    diagInputXRun.value = 0
+                    diagOutputXRun.value = 0
+                }
+                kotlinx.coroutines.delay(500)
+            }
+        }
     }
 
     fun selectSituationalMode(mode: SceneManager.Mode) {
@@ -91,10 +139,7 @@ class EqViewModel(private val repository: EqSettingsRepository) : ViewModel() {
         situationalMode.value = mode
     }
 
-    fun togglePinna(enabled: Boolean) {
-        pinnaEnabled.value = enabled
-        HarkAudioBridge.setPinnaEnabled(enabled)
-    }
+
 
     fun toggleHeadsetMic(useHeadset: Boolean) {
         useHeadsetMic.value = useHeadset
@@ -126,6 +171,76 @@ class EqViewModel(private val repository: EqSettingsRepository) : ViewModel() {
         _bandGains16.forEachIndexed { index, _ -> HarkAudioBridge.setBandGain(index, 0f) }
         viewModelScope.launch {
             repository.resetBands(0, 16)
+        }
+    }
+
+    // --- DSP Test Setters ---
+    fun setTestDcBlockerEnabled(enabled: Boolean) {
+        testDcBlockerEnabled.value = enabled
+        HarkAudioBridge.setDcBlockerEnabled(enabled)
+    }
+
+    fun setTestNoiseReductionEnabled(enabled: Boolean) {
+        testNoiseReductionEnabled.value = enabled
+        HarkAudioBridge.setNoiseReductionEnabled(enabled)
+    }
+
+    fun setTestCrossoverWdrcEnabled(enabled: Boolean) {
+        testCrossoverWdrcEnabled.value = enabled
+        HarkAudioBridge.setCrossoverWdrcEnabled(enabled)
+    }
+
+    fun setTestLimiterEnabled(enabled: Boolean) {
+        testLimiterEnabled.value = enabled
+        HarkAudioBridge.setLimiterEnabled(enabled)
+    }
+
+    fun setTestTransientSuppressorEnabled(enabled: Boolean) {
+        testTransientSuppressorEnabled.value = enabled
+        HarkAudioBridge.setTransientSuppressorEnabled(enabled)
+    }
+
+    fun setTestOwnVoiceDetectorEnabled(enabled: Boolean) {
+        testOwnVoiceDetectorEnabled.value = enabled
+        HarkAudioBridge.setOwnVoiceDetectorEnabled(enabled)
+    }
+
+    fun setTestMasterGain(gain: Float) {
+        testMasterGain.value = gain
+        HarkAudioBridge.setMasterGain(gain)
+    }
+
+    fun setTestInputGainOffset(offsetDb: Float) {
+        testInputGainOffset.value = offsetDb
+        HarkAudioBridge.setInputGainOffset(offsetDb)
+    }
+
+    fun setTestWdrcExpanderThreshold(thresholdDb: Float) {
+        testWdrcExpanderThreshold.value = thresholdDb
+        HarkAudioBridge.setWdrcExpanderThreshold(thresholdDb)
+    }
+
+    fun setTestLimiterParameters(thresholdDb: Float, releaseMs: Float) {
+        testLimiterThreshold.value = thresholdDb
+        testLimiterRelease.value = releaseMs
+        HarkAudioBridge.setLimiterParameters(thresholdDb, releaseMs)
+    }
+
+
+
+    fun applyStreamOverrides(sharingMode: Int, inputPreset: Int) {
+        testSharingModeOverride.value = sharingMode
+        testInputPresetOverride.value = inputPreset
+        HarkAudioBridge.setStreamOverrides(sharingMode, inputPreset)
+        // Safely restart Oboe stream asynchronously via Kotlin Coroutines
+        viewModelScope.launch {
+            statusText.value = "狀態：正在套用物理配置..."
+            if (HarkAudioBridge.isEngineActuallyRunning()) {
+                HarkAudioBridge.stopEngine()
+                kotlinx.coroutines.delay(400) // Give hardware a moment to settle
+                HarkAudioBridge.startEngine()
+            }
+            statusText.value = "狀態：已套用物理配置並重啟"
         }
     }
 }

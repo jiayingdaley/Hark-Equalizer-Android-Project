@@ -30,7 +30,7 @@ NoiseSuppressor::NoiseSuppressor(double sampleRate)
     // 解決「吹風機聲」與「底噪過大」：參數微調
     mAlphaNoise = 0.9998f;  // 增加底噪追蹤穩定度，避免誤判語音為噪音
     mAlphaSignal = 0.95f;   // 稍微放慢能量追蹤，減少毛刺感
-    mAlphaGain = 0.70f;     // 加快增益平滑（從0.90→0.70），使音量變化更快速反應
+    mAlphaGain = 0.85f;     // 設為 0.85f 以平滑增益過渡，避免產生氣泡聲或音樂噪音
 }
 
 float NoiseSuppressor::process(float sample) {
@@ -53,17 +53,30 @@ float NoiseSuppressor::process(float sample) {
         // SNR 計算 (加入 Offset 防止除以零)
         float snr = mSignalEnergy[i] / (mNoiseFloor[i] + 0.00001f);
         
-        // 頻帶目標增益 (Wiener Filter)
-        // suppressionFactor 調整為 2.0f：平衡噪音抑制與音量靈活性
-        float suppressionFactor = 2.0f; 
-        float targetGain = snr / (snr + suppressionFactor); 
+        // 頻帶目標增益 (動態信噪比 Wiener Filter)
+        // 依據信噪比動態調整抑制因子與增益底限，保護語音的同時在安靜時強力降噪
+        float suppressionFactor = 2.0f;
+        float gainFloor = 0.10f;
         
-        // 提高底限到 0.20 (約 -14dB)：保留更多訊號，避免音量過度衰減
-        // 改善音量穩定性，讓話音保持可聞度
-        float gainFloor = 0.20f; 
+        if (snr < 2.0f) {
+            // 低信噪比 (純噪音區)：增強抑制並降低底限至 -26dB
+            suppressionFactor = 4.0f;
+            gainFloor = 0.05f;
+        } else if (snr > 5.0f) {
+            // 高信噪比 (清晰語音區)：減小抑制並保留語音振幅
+            suppressionFactor = 1.0f;
+            gainFloor = 0.20f;
+        } else {
+            // SNR 介於 2.0 與 5.0 之間：連續線性插值以消除增益階梯突變
+            float t = (snr - 2.0f) / 3.0f;
+            suppressionFactor = 4.0f - 3.0f * t;
+            gainFloor = 0.05f + 0.15f * t;
+        }
+        
+        float targetGain = snr / (snr + suppressionFactor);
         if (targetGain < gainFloor) targetGain = gainFloor; 
-
-        // 增益平滑：使用 header 定義的變數 mAlphaGain (0.9f)
+ 
+        // 增益平滑
         mBandGains[i] = mAlphaGain * mBandGains[i] + (1.0f - mAlphaGain) * targetGain;
 
         // 背景噪音地板追蹤：使用極慢速度 (0.9999) 防止追蹤到語音或產生調變雜訊

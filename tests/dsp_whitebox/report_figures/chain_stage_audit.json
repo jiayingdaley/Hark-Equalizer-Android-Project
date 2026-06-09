@@ -12,15 +12,15 @@
     "peak_linear": 0.03305
   },
   "[4] WDRC (8-band)": {
-    "rms_dBFS": -30.44,
-    "peak_linear": 0.04247
+    "rms_dBFS": -30.43,
+    "peak_linear": 0.04253
   },
   "[5] Limiter": {
-    "rms_dBFS": -30.44,
-    "peak_linear": 0.04247
+    "rms_dBFS": -30.43,
+    "peak_linear": 0.04253
   },
   "[6] Master (tanh)": {
-    "rms_dBFS": -30.45,
-    "peak_linear": 0.04244
+    "rms_dBFS": -30.43,
+    "peak_linear": 0.0425
   }
 }

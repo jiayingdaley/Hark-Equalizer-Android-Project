@@ -22,16 +22,7 @@ object HarkAudioBridge {
     external fun logLatencyStatistics()
     external fun calibrateNoiseSuppressor()
 
-    /**
-     * 情境模式切換 (Situational Mode).
-     * @param mode 0=TRANSPARENCY, 1=CONVERSATION, 2=OUTDOOR, 3=CINEMA, 4=AUTO
-     */
     external fun setSituationalMode(mode: Int)
-
-    /**
-     * 耳廓補償開關 (Pinna Restore).
-     */
-    external fun setPinnaEnabled(enabled: Boolean)
 
     external fun setBandWdrcParameters(band: Int, thresholdDb: Float, ratio: Float,
                                        attackMs: Float, releaseMs: Float)
@@ -46,8 +37,21 @@ object HarkAudioBridge {
     external fun setMuted(muted: Boolean)
     external fun setInputGainOffset(gainDb: Float)
     external fun setUseHeadsetMic(useHeadset: Boolean)
+    external fun setIsBluetoothInput(isBluetooth: Boolean)
+    external fun setHeadphonesConnected(connected: Boolean)
 
     // --- Media Capture Mode ---
     external fun setMediaCaptureMode(enabled: Boolean)
     external fun pushMediaAudioData(data: FloatArray, numFrames: Int)
+
+    // --- Testing & Diagnostics API ---
+    external fun setDcBlockerEnabled(enabled: Boolean)
+    external fun setCrossoverWdrcEnabled(enabled: Boolean)
+    external fun setLimiterEnabled(enabled: Boolean)
+    external fun setTransientSuppressorEnabled(enabled: Boolean)
+    external fun setOwnVoiceDetectorEnabled(enabled: Boolean)
+    external fun setWdrcExpanderThreshold(thresholdDb: Float)
+    external fun setLimiterParameters(thresholdDb: Float, releaseMs: Float)
+    external fun setStreamOverrides(sharingMode: Int, inputPreset: Int)
+    external fun getDiagnosticMetrics(): FloatArray
 }

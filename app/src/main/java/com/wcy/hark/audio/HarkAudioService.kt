@@ -86,6 +86,14 @@ class HarkAudioService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        // 當使用者在最近工作列表中滑掉 App 時，徹底關閉引擎與停止服務
+        HarkAudioBridge.stopEngine()
+        sceneManager?.stop()
+        stopSelf()
+    }
+
     override fun onDestroy() {
         sceneManager?.stop()
         sceneManager = null
