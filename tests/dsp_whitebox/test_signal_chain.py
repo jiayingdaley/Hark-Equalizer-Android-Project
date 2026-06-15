@@ -73,9 +73,8 @@ class FullChain:
         self.wdrc = []
         for _ in range(8):
             d = DynamicsProcessor()
-            # Default transparency parameters
-            d.set_parameters(-25.0, 1.2, -60.0, 0.5, 10.0, 600.0, sample_rate)
             self.wdrc.append(d)
+        self.set_wdrc_parameters(-25.0, 1.2, -60.0, 0.5, 10.0, 600.0, sample_rate)
 
         self.limiter = DynamicsProcessor()
         self.limiter.set_parameters(-1.5, 20.0, -100.0, 1.0, 0.5, 30.0, sample_rate)
@@ -85,6 +84,10 @@ class FullChain:
         self.global_offset_db = 3.0 # 同步 C++ 再次提升後的位準 (+3dB)
         self.band_gains_ui = [0.0] * 16
 
+        # Level-dependent dynamic headroom tracking
+        self.input_ms = 1e-10
+        self.input_rms = 1e-5
+
     def set_ui_gains(self, gains: list):
         self.band_gains_ui = gains
 
@@ -92,19 +95,27 @@ class FullChain:
         for b in range(8):
             band_exp_thresh = exp_thresh
             band_exp_ratio = exp_ratio
-            if exp_thresh > -55.0:
-                if b == 0:
-                    band_exp_thresh = max(exp_thresh, -32.0)
-                    band_exp_ratio = 0.40
-                elif b == 1:
-                    band_exp_thresh = max(exp_thresh, -35.0)
-                    band_exp_ratio = 0.45
-                elif b == 7:
-                    band_exp_thresh = max(exp_thresh, -36.0)
-                    band_exp_ratio = 0.40
+            if b >= 2 and b <= 5:
+                # Relaxed speech bands
+                band_exp_thresh = -55.0
+                band_exp_ratio = 0.66  # 1.5:1 expansion
+            else:
+                if exp_thresh > -55.0:
+                    if b == 0:
+                        band_exp_thresh = max(exp_thresh, -32.0)
+                        band_exp_ratio = 0.40
+                    elif b == 1:
+                        band_exp_thresh = max(exp_thresh, -35.0)
+                        band_exp_ratio = 0.45
+                    elif b == 7:
+                        band_exp_thresh = max(exp_thresh, -36.0)
+                        band_exp_ratio = 0.40
             self.wdrc[b].set_parameters(comp_thresh, comp_ratio, band_exp_thresh, band_exp_ratio, attack_ms, release_ms, sample_rate)
 
-    def get_prescription_gains(self):
+    def get_prescription_gains(self, input_rms=None):
+        if input_rms is None:
+            input_rms = self.input_rms
+            
         gain_sum = [0.0] * 8
         count = [0] * 8
         for i in range(16):
@@ -121,7 +132,18 @@ class FullChain:
             if db > 0.0:
                 sum_boost += db
         headroom_db = -max(0.0, max_boost * 0.40 + sum_boost * 0.05)
-        headroom_linear = 10 ** (headroom_db / 20.0)
+        
+        # Level-dependent scaling:
+        # Quiet threshold = -45dBFS, Loud threshold = -20dBFS
+        input_rms_db = 20.0 * math.log10(max(input_rms, 1e-5))
+        scaling = 1.0
+        if input_rms_db < -45.0:
+            scaling = 0.0
+        elif input_rms_db < -20.0:
+            scaling = (input_rms_db - (-45.0)) / 25.0
+            
+        applied_headroom_db = headroom_db * scaling
+        headroom_linear = 10 ** (applied_headroom_db / 20.0)
 
         targets = []
         for b in range(8):
@@ -139,6 +161,11 @@ class FullChain:
         s = float(sample)
         snap = {}
         snap["stage0_in"] = s
+
+        # Track input RMS continuously using EMA
+        alpha_rms = 1.0 / self.sr
+        self.input_ms = alpha_rms * (s * s) + (1.0 - alpha_rms) * self.input_ms
+        self.input_rms = math.sqrt(max(self.input_ms, 1e-10))
 
         # [1] NS
         s = self.ns.process(s)
@@ -180,6 +207,8 @@ class FullChain:
         # Manual reset for BiquadFilters
         for f in [self.pinna1, self.pinna2]:
             f.x1 = f.x2 = f.y1 = f.y2 = 0.0
+        self.input_ms = 1e-10
+        self.input_rms = 1e-5
 
 
 def run_test(name, fn):

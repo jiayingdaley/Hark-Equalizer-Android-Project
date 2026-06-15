@@ -85,11 +85,30 @@ void HarkAudioEngine::updateDSPParameters() {
   const DspParameterSnapshot &params =
       mParamsBuffers[mActiveParamsIndex.load(std::memory_order_relaxed)];
   for (int b = 0; b < NUM_INTERNAL_BANDS; ++b) {
+    float bandExpThresh = params.expanderThresholdDb;
+    float bandExpRatio = params.expanderRatio;
+    if (b >= 2 && b <= 5) {
+      bandExpThresh = -55.0f;
+      bandExpRatio = 0.66f;
+    } else {
+      if (params.expanderThresholdDb > -55.0f) {
+        if (b == 0) {
+          bandExpThresh = fmaxf(params.expanderThresholdDb, -32.0f);
+          bandExpRatio = 0.40f;
+        } else if (b == 1) {
+          bandExpThresh = fmaxf(params.expanderThresholdDb, -35.0f);
+          bandExpRatio = 0.45f;
+        } else if (b == 7) {
+          bandExpThresh = fmaxf(params.expanderThresholdDb, -36.0f);
+          bandExpRatio = 0.40f;
+        }
+      }
+    }
     mWdrcL[b].setParameters(params.compressThresholdDb, params.compressRatio,
-                            params.expanderThresholdDb, params.expanderRatio,
+                            bandExpThresh, bandExpRatio,
                             params.attackMs, params.releaseMs, sampleRate);
     mWdrcR[b].setParameters(params.compressThresholdDb, params.compressRatio,
-                            params.expanderThresholdDb, params.expanderRatio,
+                            bandExpThresh, bandExpRatio,
                             params.attackMs, params.releaseMs, sampleRate);
   }
 
@@ -129,30 +148,49 @@ void HarkAudioEngine::recomputePrescriptionGains() {
     if (db > maxBoostDb) maxBoostDb = db;
     if (db > 0.0f) sumBoostDb += db;
   }
-  float headroomDb = -fmaxf(0.0f, maxBoostDb * 0.40f + sumBoostDb * 0.05f);
-  float headroomLinear = powf(10.0f, headroomDb / 20.0f);
+  mMaxBoostDb = maxBoostDb;
+  mSumBoostDb = sumBoostDb;
 
   for (int b = 0; b < NUM_INTERNAL_BANDS; ++b) {
     float avgDb = (count[b] > 0) ? gainSum[b] / (float)count[b] : 0.0f;
 
     // 再次拉高音量：位移設為 +8.0dB (超越無損，進行主動增強，適合輕中度聽損)
     float globalGainOffsetDb = 8.0f;
-    mPrescriptionTargets[b] = powf(10.0f, (avgDb + globalGainOffsetDb) / 20.0f) * headroomLinear;
+    mPrescriptionBaseTargets[b] = powf(10.0f, (avgDb + globalGainOffsetDb) / 20.0f);
   }
-  // 讓 Band 0 保持與主位準同步的 +4.0dB 偏移，但維持其噪音壓制係數，並套用 headroom
+  // 讓 Band 0 保持與主位準同步的 +4.0dB 偏移，但維持其噪音壓制係數
   float firstBandDb = mBandGains[0].load(std::memory_order_relaxed);
-  mPrescriptionTargets[0] = powf(10.0f, (firstBandDb * 0.8f + 4.0f) / 20.0f) * headroomLinear;
+  mPrescriptionBaseTargets[0] = powf(10.0f, (firstBandDb * 0.8f + 4.0f) / 20.0f);
 
   // Load the active snapshot parameters and apply them consistently to all 8
   // bands
   const DspParameterSnapshot &params =
       mParamsBuffers[mActiveParamsIndex.load(std::memory_order_relaxed)];
   for (int b = 0; b < NUM_INTERNAL_BANDS; ++b) {
+    float bandExpThresh = params.expanderThresholdDb;
+    float bandExpRatio = params.expanderRatio;
+    if (b >= 2 && b <= 5) {
+      bandExpThresh = -55.0f;
+      bandExpRatio = 0.66f;
+    } else {
+      if (params.expanderThresholdDb > -55.0f) {
+        if (b == 0) {
+          bandExpThresh = fmaxf(params.expanderThresholdDb, -32.0f);
+          bandExpRatio = 0.40f;
+        } else if (b == 1) {
+          bandExpThresh = fmaxf(params.expanderThresholdDb, -35.0f);
+          bandExpRatio = 0.45f;
+        } else if (b == 7) {
+          bandExpThresh = fmaxf(params.expanderThresholdDb, -36.0f);
+          bandExpRatio = 0.40f;
+        }
+      }
+    }
     mWdrcL[b].setParameters(params.compressThresholdDb, params.compressRatio,
-                            params.expanderThresholdDb, params.expanderRatio,
+                            bandExpThresh, bandExpRatio,
                             params.attackMs, params.releaseMs, sampleRate);
     mWdrcR[b].setParameters(params.compressThresholdDb, params.compressRatio,
-                            params.expanderThresholdDb, params.expanderRatio,
+                            bandExpThresh, bandExpRatio,
                             params.attackMs, params.releaseMs, sampleRate);
   }
 }
@@ -399,7 +437,7 @@ bool HarkAudioEngine::setupStreams() {
 
   auto latency = mOutputStream->calculateLatencyMillis();
   if (latency)
-    LOGD("Oboe Latency: %.2f ms", latency.value());
+    LOGD("Oboe Latency－－: %.2f ms", latency.value());
 
   return true;
 }
@@ -440,22 +478,27 @@ void HarkAudioEngine::updateWdrcParameters(float compThresh, float compRatio,
     float bandExpThresh = expThresh;
     float bandExpRatio = expRatio;
 
-    // 針對降噪模式 (例如 CONVERSATION)，進行通道特異性調整
-    if (expThresh > -55.0f) {
-      if (b == 0) {
-        // Band 0 (<250Hz)：將門檻拉高至 -32dBFS 且比例設為 2.5:1
-        // (0.40f)，平滑閘控教室空調與環境低頻轟鳴噪聲
-        bandExpThresh = std::max(expThresh, -32.0f);
-        bandExpRatio = 0.40f;
-      } else if (b == 1) {
-        // Band 1 (250-500Hz)：將門檻拉高至 -35dBFS，比例設為 2.2:1 (0.45f)
-        bandExpThresh = std::max(expThresh, -35.0f);
-        bandExpRatio = 0.45f;
-      } else if (b == 7) {
-        // Band 7 (>6000Hz)：將門檻設為 -36dBFS，比例設為 2.5:1 (0.40f)
-        // 平滑隔離麥克風高頻熱雜訊 (Hiss)，防止其被 Slope 處方增益強行放大
-        bandExpThresh = std::max(expThresh, -36.0f);
-        bandExpRatio = 0.40f;
+    if (b >= 2 && b <= 5) {
+      bandExpThresh = -55.0f;
+      bandExpRatio = 0.66f;
+    } else {
+      // 針對降噪模式 (例如 CONVERSATION)，進行通道特異性調整
+      if (expThresh > -55.0f) {
+        if (b == 0) {
+          // Band 0 (<250Hz)：將門檻拉高至 -32dBFS 且比例設為 2.5:1
+          // (0.40f)，平滑閘控教室空調與環境低頻轟鳴噪聲
+          bandExpThresh = std::max(expThresh, -32.0f);
+          bandExpRatio = 0.40f;
+        } else if (b == 1) {
+          // Band 1 (250-500Hz)：將門檻拉高至 -35dBFS，比例設為 2.2:1 (0.45f)
+          bandExpThresh = std::max(expThresh, -35.0f);
+          bandExpRatio = 0.45f;
+        } else if (b == 7) {
+          // Band 7 (>6000Hz)：將門檻設為 -36dBFS，比例設為 2.5:1 (0.40f)
+          // 平滑隔離麥克風高頻熱雜訊 (Hiss)，防止其被 Slope 處方增益強行放大
+          bandExpThresh = std::max(expThresh, -36.0f);
+          bandExpRatio = 0.40f;
+        }
       }
     }
 
@@ -667,11 +710,37 @@ HarkAudioEngine::onAudioReady(oboe::AudioStream * /*stream*/, void *audioData,
     return oboe::DataCallbackResult::Continue;
   }
 
-  // Smooth prescription gains
+  // Track input RMS slowly
+  float blockSumSq = 0.0f;
+  int totalSamples = numFrames * CHANNEL_COUNT;
+  for (int i = 0; i < totalSamples; ++i) {
+    float val = buffer[i];
+    blockSumSq += val * val;
+  }
+  float blockRms = std::sqrt(blockSumSq / (float)totalSamples);
+  float alphaRms = 0.01f; // Slow EMA with block-level tracking
+  float currentRms = mInputRmsSlow.load(std::memory_order_relaxed);
+  float nextRms = alphaRms * blockRms + (1.0f - alphaRms) * currentRms;
+  mInputRmsSlow.store(nextRms, std::memory_order_relaxed);
+
+  // Compute level-dependent headroom db
+  float inputRmsDb = 20.0f * std::log10(std::max(nextRms, 1e-5f));
+  float headroomDb = -fmaxf(0.0f, mMaxBoostDb * 0.40f + mSumBoostDb * 0.05f);
+  float scaling = 1.0f;
+  if (inputRmsDb < -45.0f) {
+    scaling = 0.0f;
+  } else if (inputRmsDb < -20.0f) {
+    scaling = (inputRmsDb - (-45.0f)) / 25.0f;
+  }
+  float appliedHeadroomDb = headroomDb * scaling;
+  float headroomLinear = powf(10.0f, appliedHeadroomDb / 20.0f);
+
+  // Smooth prescription gains using base targets scaled by dynamic headroom
   for (int b = 0; b < NUM_INTERNAL_BANDS; ++b) {
+    float target = mPrescriptionBaseTargets[b] * headroomLinear;
     mPrescriptionGains[b] =
         GAIN_SMOOTH_ALPHA * mPrescriptionGains[b] +
-        (1.0f - GAIN_SMOOTH_ALPHA) * mPrescriptionTargets[b];
+        (1.0f - GAIN_SMOOTH_ALPHA) * target;
   }
 
   for (int i = 0; i < numFrames * CHANNEL_COUNT; i += CHANNEL_COUNT) {

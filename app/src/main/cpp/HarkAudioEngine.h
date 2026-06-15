@@ -137,6 +137,10 @@ private:
   static constexpr int NUM_INTERNAL_BANDS = 8;
   float mPrescriptionGains[NUM_INTERNAL_BANDS];
   float mPrescriptionTargets[NUM_INTERNAL_BANDS];
+  float mPrescriptionBaseTargets[NUM_INTERNAL_BANDS] = {};
+  float mMaxBoostDb = 0.0f;
+  float mSumBoostDb = 0.0f;
+  std::atomic<float> mInputRmsSlow{0.001f};
   static constexpr float GAIN_SMOOTH_ALPHA =
       0.8f; // 加快響應速度 (原為 0.9995f，導致更新過慢)
 

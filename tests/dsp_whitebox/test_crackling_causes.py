@@ -56,7 +56,7 @@ def run_custom_simulation(samples, config_name):
                 if abs(d.envelope) < 1.175494e-38: d.envelope = 0.0
                 
                 d.counter += 1
-                if d.counter >= d.UPDATE_INTERVAL:
+                if d.counter >= d.update_interval:
                     d.counter = 0
                     gain = 1.0
                     env_db = 20 * math.log10(d.envelope) if d.envelope > 1e-9 else -180.0
