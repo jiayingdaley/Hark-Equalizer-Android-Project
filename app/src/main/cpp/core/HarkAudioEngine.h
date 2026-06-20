@@ -61,7 +61,7 @@ public:
   bool isMuted() const { return mIsMuted; }
 
   // --- EQ Control (Lock-free) ---
-  void setBandGain(int bandIndex, float gainDb);
+  void setBandGain(int ear, int bandIndex, float gainDb);
   void setBandQ(int bandIndex, float q_factor);
 
   // --- Per-band WDRC individualisation ---
@@ -122,7 +122,8 @@ private:
 
   // --- Gains & EQ ---
   static constexpr int NUM_UI_BANDS = 16;
-  std::atomic<float> mBandGains[NUM_UI_BANDS];
+  std::atomic<float> mBandGainsL[NUM_UI_BANDS];
+  std::atomic<float> mBandGainsR[NUM_UI_BANDS];
   std::atomic<bool> mGainDirty[NUM_UI_BANDS];
   float mBandQs[NUM_UI_BANDS];
 
@@ -131,11 +132,16 @@ private:
   FilterChain mEqRight;
 
   static constexpr int NUM_INTERNAL_BANDS = 8;
-  float mPrescriptionGains[NUM_INTERNAL_BANDS];
-  float mPrescriptionTargets[NUM_INTERNAL_BANDS];
-  float mPrescriptionBaseTargets[NUM_INTERNAL_BANDS] = {};
-  float mMaxBoostDb = 0.0f;
-  float mSumBoostDb = 0.0f;
+  float mPrescriptionGainsL[NUM_INTERNAL_BANDS];
+  float mPrescriptionGainsR[NUM_INTERNAL_BANDS];
+  float mPrescriptionTargetsL[NUM_INTERNAL_BANDS];
+  float mPrescriptionTargetsR[NUM_INTERNAL_BANDS];
+  float mPrescriptionBaseTargetsL[NUM_INTERNAL_BANDS] = {};
+  float mPrescriptionBaseTargetsR[NUM_INTERNAL_BANDS] = {};
+  float mMaxBoostDbL = 0.0f;
+  float mSumBoostDbL = 0.0f;
+  float mMaxBoostDbR = 0.0f;
+  float mSumBoostDbR = 0.0f;
   std::atomic<float> mInputRmsSlow{0.001f};
   static constexpr float GAIN_SMOOTH_ALPHA =
       HarkDspConfig::GAIN_SMOOTH_ALPHA; // 加快響應速度 (原為 0.9995f，導致更新過慢)

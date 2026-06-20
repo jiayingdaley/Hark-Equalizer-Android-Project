@@ -18,7 +18,8 @@ object SystemDspManager {
     val isEnabledFlow: kotlinx.coroutines.flow.StateFlow<Boolean> = _isEnabledFlow
     val isEnabled: Boolean get() = _isEnabledFlow.value
 
-    private var bandGains16 = FloatArray(16) { 0f }
+    private var bandGains16Left = FloatArray(16) { 0f }
+    private var bandGains16Right = FloatArray(16) { 0f }
     
     // UI 16 Band center frequencies
     private val UI_CENTER_FREQS = floatArrayOf(
@@ -59,9 +60,10 @@ object SystemDspManager {
             val dp = DynamicsProcessing(0, sessionId, config)
             dp.enabled = _isEnabledFlow.value
 
-            // Setup 16-Band Pre-EQ
+            // Setup 16-Band Pre-EQ (Left: channel 0, Right: channel 1)
             for (i in 0 until 16) {
-                dp.setPreEqBandAllChannelsTo(i, DynamicsProcessing.EqBand(true, UI_CENTER_FREQS[i], bandGains16[i]))
+                dp.setPreEqBandByChannelIndex(0, i, DynamicsProcessing.EqBand(true, UI_CENTER_FREQS[i], bandGains16Left[i]))
+                dp.setPreEqBandByChannelIndex(1, i, DynamicsProcessing.EqBand(true, UI_CENTER_FREQS[i], bandGains16Right[i]))
             }
 
             // Setup WDRC as MBC (8 Bands)
@@ -101,17 +103,19 @@ object SystemDspManager {
     /**
      * Update EQ band gain (index 0-15).
      */
-    fun updateBandGain(bandIndex: Int, gainDb: Float) {
+    fun updateBandGain(ear: Int, bandIndex: Int, gainDb: Float) {
         if (bandIndex !in 0..15) return
-        bandGains16[bandIndex] = gainDb
+        if (ear == 0) {
+            bandGains16Left[bandIndex] = gainDb
+        } else {
+            bandGains16Right[bandIndex] = gainDb
+        }
 
         activeEffects.values.forEach { dp ->
             try {
-                val eq = dp.getPreEqByChannelIndex(0)
-                eq.getBand(bandIndex).gain = gainDb
-                dp.setPreEqBandAllChannelsTo(bandIndex, DynamicsProcessing.EqBand(true, UI_CENTER_FREQS[bandIndex], gainDb))
+                dp.setPreEqBandByChannelIndex(ear, bandIndex, DynamicsProcessing.EqBand(true, UI_CENTER_FREQS[bandIndex], gainDb))
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to update DP band gain", e)
+                Log.e(TAG, "Failed to update DP band gain (ear=$ear)", e)
             }
         }
     }

@@ -16,8 +16,8 @@ Java_com_wcy_hark_audio_bridge_HarkAudioBridge_stopEngine(JNIEnv *env, jobject /
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_wcy_hark_audio_bridge_HarkAudioBridge_setBandGain(
-        JNIEnv *env, jobject /* this */, jint bandIndex, jfloat gainDb) {
-    engine.setBandGain(bandIndex, gainDb);
+        JNIEnv *env, jobject /* this */, jint ear, jint bandIndex, jfloat gainDb) {
+    engine.setBandGain(ear, bandIndex, gainDb);
 }
 
 extern "C" JNIEXPORT void JNICALL

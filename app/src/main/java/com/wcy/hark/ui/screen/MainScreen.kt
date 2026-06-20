@@ -38,7 +38,8 @@ fun HarkAppScreen(
     onEngineStateChange: (Boolean) -> Unit,
     onSourceModeChanged: (AudioSourceMode) -> Unit,
     onSetBandGain: (bandIndex: Int, gain: Float) -> Unit,
-    onSetBandQ: (bandIndex: Int, q: Float) -> Unit
+    onSetBandQ: (bandIndex: Int, q: Float) -> Unit,
+    onBack: () -> Unit
 ) {
     val context = LocalContext.current
 
@@ -71,6 +72,25 @@ fun HarkAppScreen(
                 .padding(innerPadding)
                 .padding(16.dp)
         ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "返回主畫面"
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "實驗調試面板 (原 Hark 測試介面)",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                )
+            }
             // --- Top Level Mode Selection ---
             val tabs = listOf("環境助聽 (麥克風)", "手機影音 (內部音訊)")
             val selectedTabIndex = if (viewModel.currentSourceMode.value == AudioSourceMode.MICROPHONE) 0 else 1

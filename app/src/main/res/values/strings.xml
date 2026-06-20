@@ -1,3 +1,58 @@
 <resources>
     <string name="app_name">Hark</string>
+
+    <!-- ── 主控畫面 (HarkMainScreen / PSAP) ── -->
+    <string name="main_power_on">助聽已啟用</string>
+    <string name="main_power_off">助聽已暫停</string>
+    <string name="main_hint_power_off">環境助聽已暫停，請開啟上方開關開始使用</string>
+    <string name="main_tab_microphone">環境助聽（麥克風）</string>
+    <string name="main_tab_internal_media">手機影音（內部音訊）</string>
+    <string name="main_banner_internal_media">正在處理手機影音音訊，麥克風已靜音</string>
+    <string name="main_mode_omnidirectional">全向</string>
+    <string name="main_mode_conversation">人聲</string>
+    <string name="main_mode_outdoor">戶外</string>
+    <string name="main_mode_cinema">影音</string>
+    <string name="main_auto_mode">自動切換模式</string>
+    <string name="main_mic_source">收音來源</string>
+    <string name="main_mic_headset">耳機麥克風</string>
+    <string name="main_mic_phone">手機麥克風</string>
+    <string name="main_volume_master">整體放大音量</string>
+    <string name="main_balance">左右耳平衡</string>
+    <string name="main_btn_equalizer">等化器微調（EQUALIZER）</string>
+    <string name="main_btn_hearing_test">聽力檢測</string>
+    <string name="main_btn_debug_panel">進入實驗調試面板</string>
+
+    <!-- ── 等化器畫面 (HarkEqualizerScreen) ── -->
+    <string name="eq_title">等化器微調</string>
+    <string name="eq_btn_reset">重設等化器（0 dB）</string>
+    <string name="eq_btn_back">返回主畫面</string>
+
+    <!-- ── 聽力測試 — 測試選擇 (TestSelectActivity) ── -->
+    <string name="testSelect_title">選擇測試項目</string>
+    <string name="testSelect_button_PureToneTest">純音聽力測試</string>
+    <string name="testSelect_button_SpeechAudiometry">語音辨識閾值測試</string>
+
+    <!-- ── 聽力測試 — 耳別選擇 (SelectEarActivity) ── -->
+    <string name="selectEar_title">選擇測試耳別</string>
+    <string name="selectEar_button_Left">左耳</string>
+    <string name="selectEar_button_Right">右耳</string>
+    <string name="selectEar_title_NoiseDetect">背景噪音偵測</string>
+    <string name="selectEar_unit_dbSPL">--- dB SPL</string>
+
+    <!-- ── 聽力測試 — 純音測試 (PureToneTestActivity) ── -->
+    <string name="pureTest_title">純音聽力測試</string>
+    <string name="pureTest_instruction">當您聽到聲音時，請按下按鈕</string>
+    <string name="pureTest_btn_heard">我聽到了</string>
+
+    <!-- ── 聽力測試 — 語音辨識說明 (SpeechAudiometryExplanationActivity) ── -->
+    <string name="speechExplain_title">語音辨識閾值測試說明</string>
+
+    <!-- ── 聽力測試 — 語音辨識測試 (SRTTestActivity) ── -->
+    <string name="srtTest_title">語音辨識閾值測試</string>
+
+    <!-- ── 聽力測試 — 語音辨識結果 (SRTTestResultActivity) ── -->
+    <string name="srtResult_title">測試結果</string>
+    <string name="srtResult_accuracy">正確率</string>
+    <string name="srtResult_btn_back">返回主選單</string>
+
 </resources>

@@ -46,13 +46,16 @@ HarkAudioEngine::HarkAudioEngine()
       static_cast<int>(HarkDspConfig::SAMPLE_RATE) * 2 * 2); // 2 seconds of stereo float buffer
 
   for (int i = 0; i < NUM_UI_BANDS; ++i) {
-    mBandGains[i].store(0.0f, std::memory_order_relaxed);
+    mBandGainsL[i].store(0.0f, std::memory_order_relaxed);
+    mBandGainsR[i].store(0.0f, std::memory_order_relaxed);
     mGainDirty[i].store(false, std::memory_order_relaxed);
     mBandQs[i] = HarkDspConfig::DEFAULT_BAND_Q;
   }
   for (int b = 0; b < NUM_INTERNAL_BANDS; ++b) {
-    mPrescriptionGains[b] = 1.0f;
-    mPrescriptionTargets[b] = 1.0f;
+    mPrescriptionGainsL[b] = 1.0f;
+    mPrescriptionGainsR[b] = 1.0f;
+    mPrescriptionTargetsL[b] = 1.0f;
+    mPrescriptionTargetsR[b] = 1.0f;
   }
   // Initialize default double-buffered snapshot parameters
   updateWdrcParameters(HarkDspConfig::DEFAULT_WDRC_COMP_THRESH_DB,
@@ -153,7 +156,8 @@ void HarkAudioEngine::updateDSPParameters() {
 }
 
 void HarkAudioEngine::recomputePrescriptionGains() {
-  calculatePrescriptionGains(mBandGains, mPrescriptionBaseTargets, mMaxBoostDb, mSumBoostDb);
+  calculatePrescriptionGains(mBandGainsL, mPrescriptionBaseTargetsL, mMaxBoostDbL, mSumBoostDbL);
+  calculatePrescriptionGains(mBandGainsR, mPrescriptionBaseTargetsR, mMaxBoostDbR, mSumBoostDbR);
 
   // Load the active snapshot parameters and apply them consistently to all 8
   // bands
@@ -435,10 +439,14 @@ bool HarkAudioEngine::setupStreams() {
   return true;
 }
 
-void HarkAudioEngine::setBandGain(int bandIndex, float gainDb) {
+void HarkAudioEngine::setBandGain(int ear, int bandIndex, float gainDb) {
   if (bandIndex < 0 || bandIndex >= NUM_UI_BANDS)
     return;
-  mBandGains[bandIndex].store(gainDb, std::memory_order_relaxed);
+  if (ear == 0) {
+    mBandGainsL[bandIndex].store(gainDb, std::memory_order_relaxed);
+  } else {
+    mBandGainsR[bandIndex].store(gainDb, std::memory_order_relaxed);
+  }
   mGainDirty[bandIndex].store(true, std::memory_order_release);
   recomputePrescriptionGains();
 }
@@ -708,9 +716,8 @@ HarkAudioEngine::onAudioReady(oboe::AudioStream * /*stream*/, void *audioData,
   float nextRms = alphaRms * blockRms + (1.0f - alphaRms) * currentRms;
   mInputRmsSlow.store(nextRms, std::memory_order_relaxed);
 
-  // Compute level-dependent headroom db
+  // Compute level-dependent headroom db (separate for Left and Right)
   float inputRmsDb = 20.0f * std::log10(std::max(nextRms, HarkDspConfig::INPUT_RMS_MIN));
-  float headroomDb = -fmaxf(0.0f, mMaxBoostDb * HarkDspConfig::HEADROOM_MAX_BOOST_WEIGHT + mSumBoostDb * HarkDspConfig::HEADROOM_SUM_BOOST_WEIGHT);
   float scaling = 1.0f;
   if (inputRmsDb < HarkDspConfig::HEADROOM_QUIET_THRESH_DB) {
     scaling = 0.0f;
@@ -718,15 +725,28 @@ HarkAudioEngine::onAudioReady(oboe::AudioStream * /*stream*/, void *audioData,
     scaling = (inputRmsDb - HarkDspConfig::HEADROOM_QUIET_THRESH_DB) /
               (HarkDspConfig::HEADROOM_LOUD_THRESH_DB - HarkDspConfig::HEADROOM_QUIET_THRESH_DB);
   }
-  float appliedHeadroomDb = headroomDb * scaling;
-  float headroomLinear = powf(10.0f, appliedHeadroomDb / 20.0f);
+
+  // Left Channel Headroom
+  float headroomDbL = -fmaxf(0.0f, mMaxBoostDbL * HarkDspConfig::HEADROOM_MAX_BOOST_WEIGHT + mSumBoostDbL * HarkDspConfig::HEADROOM_SUM_BOOST_WEIGHT);
+  float appliedHeadroomDbL = headroomDbL * scaling;
+  float headroomLinearL = powf(10.0f, appliedHeadroomDbL / 20.0f);
+
+  // Right Channel Headroom
+  float headroomDbR = -fmaxf(0.0f, mMaxBoostDbR * HarkDspConfig::HEADROOM_MAX_BOOST_WEIGHT + mSumBoostDbR * HarkDspConfig::HEADROOM_SUM_BOOST_WEIGHT);
+  float appliedHeadroomDbR = headroomDbR * scaling;
+  float headroomLinearR = powf(10.0f, appliedHeadroomDbR / 20.0f);
 
   // Smooth prescription gains using base targets scaled by dynamic headroom
   for (int b = 0; b < NUM_INTERNAL_BANDS; ++b) {
-    float target = mPrescriptionBaseTargets[b] * headroomLinear;
-    mPrescriptionGains[b] =
-        GAIN_SMOOTH_ALPHA * mPrescriptionGains[b] +
-        (1.0f - GAIN_SMOOTH_ALPHA) * target;
+    float targetL = mPrescriptionBaseTargetsL[b] * headroomLinearL;
+    mPrescriptionGainsL[b] =
+        GAIN_SMOOTH_ALPHA * mPrescriptionGainsL[b] +
+        (1.0f - GAIN_SMOOTH_ALPHA) * targetL;
+
+    float targetR = mPrescriptionBaseTargetsR[b] * headroomLinearR;
+    mPrescriptionGainsR[b] =
+        GAIN_SMOOTH_ALPHA * mPrescriptionGainsR[b] +
+        (1.0f - GAIN_SMOOTH_ALPHA) * targetR;
   }
 
   for (int i = 0; i < numFrames * CHANNEL_COUNT; i += CHANNEL_COUNT) {
@@ -776,7 +796,7 @@ HarkAudioEngine::onAudioReady(oboe::AudioStream * /*stream*/, void *audioData,
       for (int b = 0; b < 8; ++b) {
         // 將處方增益移至 WDRC 處理之後，避免底噪在 WDRC
         // 前被放大，從而正確觸發下擴展降噪
-        float processed = mWdrcL[b].process(bandsL[b]) * mPrescriptionGains[b];
+        float processed = mWdrcL[b].process(bandsL[b]) * mPrescriptionGainsL[b];
         if (mOwnVoiceDetectorEnabled.load(std::memory_order_relaxed)) {
           processed *= mOwnVoiceDetectorL.getOcclusionGain(b);
         }
@@ -801,7 +821,7 @@ HarkAudioEngine::onAudioReady(oboe::AudioStream * /*stream*/, void *audioData,
       sR = 0.0f;
       for (int b = 0; b < 8; ++b) {
         // 同步右聲道：將處方增益移至 WDRC 處理之後，確保雙耳處理一致性
-        float processed = mWdrcR[b].process(bandsR[b]) * mPrescriptionGains[b];
+        float processed = mWdrcR[b].process(bandsR[b]) * mPrescriptionGainsR[b];
         if (mOwnVoiceDetectorEnabled.load(std::memory_order_relaxed)) {
           processed *= mOwnVoiceDetectorR.getOcclusionGain(b);
         }

@@ -74,6 +74,12 @@ dependencies {
 
     // Timber
     implementation(libs.timber)
+
+    // AppCompat & ConstraintLayout (for migrated PureToneEqualizer XML-based Activities)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.constraintlayout)
+    implementation(libs.androidx.cardview)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

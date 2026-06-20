@@ -38,9 +38,10 @@ fun EqualizerCurveDisplay(
     modifier: Modifier = Modifier,
     bandGains: List<State<Float>>,
     centerFrequencies: List<Int>,
+    lineColor: Color = MaterialTheme.colorScheme.primary,
     onDragBand: (bandIndex: Int, gain: Float) -> Unit
 ) {
-    val primaryColor = MaterialTheme.colorScheme.primary
+    val primaryColor = lineColor
 
     Canvas(
         modifier = modifier

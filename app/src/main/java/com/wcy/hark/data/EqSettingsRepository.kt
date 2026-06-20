@@ -16,13 +16,13 @@ class EqSettingsRepository(private val context: Context) {
 
     // We store gains as preferences. For 16 bands, we store 16 floats.
     // For 8 bands, we store 8 floats.
-    private fun getBandGainKey(mode: Int, index: Int) = floatPreferencesKey("band_gain_${mode}_${index}")
+    private fun getBandGainKey(ear: String, mode: Int, index: Int) = floatPreferencesKey("band_gain_${ear}_${mode}_${index}")
     private fun getBandQKey(mode: Int, index: Int) = floatPreferencesKey("band_q_${mode}_${index}")
 
-    fun getBandGainsFlow(mode: Int, numBands: Int): Flow<List<Float>> = context.dataStore.data.map { preferences ->
+    fun getBandGainsFlow(ear: String, mode: Int, numBands: Int): Flow<List<Float>> = context.dataStore.data.map { preferences ->
         val gains = mutableListOf<Float>()
         for (i in 0 until numBands) {
-            gains.add(preferences[getBandGainKey(mode, i)] ?: 0f)
+            gains.add(preferences[getBandGainKey(ear, mode, i)] ?: 0f)
         }
         gains
     }
@@ -35,9 +35,9 @@ class EqSettingsRepository(private val context: Context) {
         qs
     }
 
-    suspend fun saveBandGain(mode: Int, index: Int, gain: Float) {
+    suspend fun saveBandGain(ear: String, mode: Int, index: Int, gain: Float) {
         context.dataStore.edit { preferences ->
-            preferences[getBandGainKey(mode, index)] = gain
+            preferences[getBandGainKey(ear, mode, index)] = gain
         }
     }
 
@@ -50,7 +50,8 @@ class EqSettingsRepository(private val context: Context) {
     suspend fun resetBands(mode: Int, numBands: Int) {
         context.dataStore.edit { preferences ->
             for (i in 0 until numBands) {
-                preferences[getBandGainKey(mode, i)] = 0f
+                preferences[getBandGainKey("left", mode, i)] = 0f
+                preferences[getBandGainKey("right", mode, i)] = 0f
                 preferences[getBandQKey(mode, i)] = 1.8f
             }
         }

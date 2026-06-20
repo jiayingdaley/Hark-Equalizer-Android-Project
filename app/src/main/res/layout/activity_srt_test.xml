@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp"
+    tools:context=".SRTTestActivity">
+
+    <TextView
+        android:id="@+id/textViewQuestionCount"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:layout_marginEnd="8dp"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        tools:text="01 / 25" />
+
+    <TextView
+        android:id="@+id/textViewInstruction"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="36dp"
+        android:text="請聽音檔，然後選擇您聽到的詞語："
+        android:textSize="20sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.494"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/textViewQuestionCount" />
+
+    <GridLayout
+        android:id="@+id/gridLayoutOptions"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="96dp"
+        android:alignmentMode="alignMargins"
+        android:columnCount="2"
+        android:columnOrderPreserved="false"
+        android:rowCount="2"
+        android:useDefaultMargins="true"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/textViewInstruction"
+        app:layout_constraintWidth_percent="0.9">
+
+        <Button
+            android:id="@+id/buttonOption1"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_columnWeight="1"
+            android:layout_gravity="fill_horizontal"
+            android:minHeight="100dp"
+            android:textSize="22sp"
+            tools:text="選項一" />
+
+        <Button
+            android:id="@+id/buttonOption2"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_columnWeight="1"
+            android:layout_gravity="fill_horizontal"
+            android:minHeight="100dp"
+            android:textSize="22sp"
+            tools:text="選項二" />
+
+        <Button
+            android:id="@+id/buttonOption3"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_columnWeight="1"
+            android:layout_gravity="fill_horizontal"
+            android:minHeight="100dp"
+            android:textSize="22sp"
+            tools:text="選項三" />
+
+        <Button
+            android:id="@+id/buttonOption4"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_columnWeight="1"
+            android:layout_gravity="fill_horizontal"
+            android:minHeight="100dp"
+            android:textSize="22sp"
+            tools:text="選項四" />
+    </GridLayout>
+
+    <Button
+        android:id="@+id/buttonNotSure"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="我不確定"
+        android:textSize="18sp"
+        android:layout_marginTop="24dp"
+        app:layout_constraintTop_toBottomOf="@id/gridLayoutOptions"
+        app:layout_constraintStart_toStartOf="@id/gridLayoutOptions"
+        app:layout_constraintEnd_toEndOf="@id/gridLayoutOptions" />
+
+    <LinearLayout
+        android:id="@+id/linearLayoutControls"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="32dp"
+        app:layout_constraintTop_toBottomOf="@id/buttonNotSure"
+        app:layout_constraintStart_toStartOf="@id/gridLayoutOptions"
+        app:layout_constraintEnd_toEndOf="@id/gridLayoutOptions">
+
+        <Button
+            android:id="@+id/buttonPauseResume"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="暫停"
+            android:textSize="16sp"
+            android:layout_marginEnd="8dp"/>
+
+        <Button
+            android:id="@+id/buttonEndEarly"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="提早結束測驗"
+            android:textSize="16sp"
+            android:backgroundTint="@android:color/holo_red_light"
+            android:textColor="@android:color/white"
+            android:layout_marginStart="8dp"/>
+    </LinearLayout>
+
+    <ProgressBar
+        android:id="@+id/progressBarAudioLoading"
+        style="?android:attr/progressBarStyle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        tools:visibility="visible"
+        app:layout_constraintTop_toBottomOf="@id/textViewInstruction"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/gridLayoutOptions"
+        android:layout_marginBottom="8dp"/>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

@@ -12,7 +12,7 @@ object HarkAudioBridge {
      * Sets the gain for a specific parametric EQ band.
      * Note: In V3, this maps to the pre-WDRC prescription gain.
      */
-    external fun setBandGain(bandIndex: Int, gainDb: Float)
+    external fun setBandGain(ear: Int, bandIndex: Int, gainDb: Float)
     external fun setBandQ(bandIndex: Int, q_factor: Float)
 
     external fun setAudioInputDeviceId(deviceId: Int)

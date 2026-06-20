@@ -13,6 +13,9 @@ firebaseBom = "34.11.0"
 googleServices = "4.4.4"
 crashlyticsPlugin = "3.0.2"
 timber = "5.0.1"
+appcompat = "1.7.0"
+constraintlayout = "2.2.1"
+cardview = "1.0.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -41,6 +44,11 @@ firebase-crashlytics = { module = "com.google.firebase:firebase-crashlytics" }
 
 # Timber (Logging)
 timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
+
+# AppCompat & ConstraintLayout (needed for migrated PureToneEqualizer XML Activities)
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
+androidx-cardview = { group = "androidx.cardview", name = "cardview", version.ref = "cardview" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

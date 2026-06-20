@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".SelectEarActivity">
+
+    <TextView
+        android:id="@+id/textView_select_ear_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="80dp"
+        android:text="@string/selectEar_title"
+        android:textSize="30sp"
+        android:textColor="@android:color/black"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <Button
+        android:id="@+id/button_left_ear"
+        android:layout_width="155dp"
+        android:layout_height="130dp"
+        android:layout_marginStart="48dp"
+        android:layout_marginTop="64dp"
+        android:layout_marginEnd="16dp"
+        android:backgroundTint="#536DFE"
+        android:text="@string/selectEar_button_Left"
+        android:textSize="36sp"
+        app:layout_constraintEnd_toStartOf="@+id/button_right_ear"
+        app:layout_constraintHorizontal_chainStyle="spread"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/textView_select_ear_title" />
+
+    <Button
+        android:id="@+id/button_right_ear"
+        android:layout_width="155dp"
+        android:layout_height="130dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="64dp"
+        android:layout_marginEnd="48dp"
+        android:backgroundTint="#FF4081"
+        android:text="@string/selectEar_button_Right"
+        android:textSize="36sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@+id/button_left_ear"
+        app:layout_constraintTop_toBottomOf="@+id/textView_select_ear_title" />
+
+    <TextView
+        android:id="@+id/textView_check_noise"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="32dp"
+        android:text="@string/selectEar_title_NoiseDetect"
+        android:textSize="18sp"
+        android:textColor="@android:color/black"
+        app:layout_constraintTop_toBottomOf="@+id/button_left_ear"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/noise_level_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/selectEar_unit_dbSPL"
+        android:textSize="16sp"
+        app:layout_constraintTop_toBottomOf="@+id/textView_check_noise"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <LinearLayout
+        android:id="@+id/noise_scale_bar"
+        android:layout_width="0dp"
+        android:layout_height="30dp"
+        android:layout_marginStart="64dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="64dp"
+        android:orientation="horizontal"
+        app:layout_constraintTop_toBottomOf="@+id/noise_level_text"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@android:color/holo_green_light" />
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@android:color/holo_orange_light" />
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@android:color/holo_red_light" />
+
+    </LinearLayout>
+
+    <ImageView
+        android:id="@+id/noise_indicator"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="-35dp"
+        android:src="@drawable/ic_arrow_drop_down"
+        app:layout_constraintEnd_toEndOf="@+id/noise_scale_bar"
+        app:layout_constraintStart_toStartOf="@+id/noise_scale_bar"
+        app:layout_constraintTop_toBottomOf="@+id/noise_scale_bar" />
+
+
+    <TextView
+    android:id="@+id/textView_noise_level"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="8dp"
+    android:text=""
+    android:textSize="16sp"
+    android:visibility="gone" app:layout_constraintTop_toBottomOf="@+id/noise_indicator"
+    app:layout_constraintStart_toStartOf="parent"
+    app:layout_constraintEnd_toEndOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>
