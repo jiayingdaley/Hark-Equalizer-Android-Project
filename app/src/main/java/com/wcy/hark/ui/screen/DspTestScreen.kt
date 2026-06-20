@@ -24,7 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.wcy.hark.EqViewModel
+import com.wcy.hark.ui.viewmodel.EqViewModel
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -33,6 +33,13 @@ fun DspTestScreen(
     viewModel: EqViewModel,
     onBack: () -> Unit
 ) {
+    DisposableEffect(Unit) {
+        viewModel.setDiagnosticsActive(true)
+        onDispose {
+            viewModel.setDiagnosticsActive(false)
+        }
+    }
+
     val scrollState = rememberScrollState()
     val dcBlocker = viewModel.testDcBlockerEnabled.value
     val noiseReduction = viewModel.testNoiseReductionEnabled.value

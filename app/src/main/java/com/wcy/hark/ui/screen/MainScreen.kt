@@ -20,9 +20,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import com.wcy.hark.EqViewModel
-import com.wcy.hark.AudioSourceMode
-import com.wcy.hark.audio.SceneManager
+import com.wcy.hark.ui.viewmodel.EqViewModel
+import com.wcy.hark.ui.viewmodel.AudioSourceMode
+import com.wcy.hark.audio.manager.SceneManager
 import com.wcy.hark.ui.components.EqualizerCurveDisplay
 import com.wcy.hark.ui.components.SystemVolumeSlider
 

@@ -14,7 +14,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
-import com.wcy.hark.EqViewModel
+import com.wcy.hark.ui.viewmodel.EqViewModel
 
 /**
  * Equalizer Curve Display

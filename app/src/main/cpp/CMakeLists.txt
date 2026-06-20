@@ -4,16 +4,24 @@ cmake_minimum_required(VERSION 3.22.1)
 project("hark")
 
 add_library(hark SHARED
-        native-lib.cpp
-        HarkAudioEngine.cpp
-        BiquadFilter.cpp
-        FilterChain.cpp
-        DynamicsProcessor.cpp
-        NoiseSuppressor.cpp
-        GestureDetector.cpp
-        LinkwitzRileyCrossover.cpp
-        TransientSuppressor.cpp
-        OwnVoiceDetector.cpp
+        core/native-lib.cpp
+        core/HarkAudioEngine.cpp
+        dsp/BiquadFilter.cpp
+        dsp/FilterChain.cpp
+        dsp/DynamicsProcessor.cpp
+        dsp/NoiseSuppressor.cpp
+        dsp/LinkwitzRileyCrossover.cpp
+        dsp/TransientSuppressor.cpp
+        dsp/OwnVoiceDetector.cpp
+        dsp/SituationalPresets.cpp
+        dsp/PrescriptionFitting.cpp
+        interaction/GestureDetector.cpp
+)
+
+target_include_directories(hark PRIVATE
+        core
+        dsp
+        interaction
 )
 
 find_library(log-lib log)

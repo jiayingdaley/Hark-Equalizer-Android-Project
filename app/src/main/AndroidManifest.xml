@@ -34,7 +34,7 @@
 
         <!-- 背景音訊處理服務 -->
         <service
-            android:name=".audio.HarkAudioService"
+            android:name=".audio.service.HarkAudioService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="microphone" />
@@ -42,12 +42,12 @@
 
         <!-- 懸浮等化器服務 -->
         <service
-            android:name=".audio.FloatingEqService"
+            android:name=".audio.service.FloatingEqService"
             android:exported="false" />
 
         <!-- 媒體監測服務 (用於自動模式切換) -->
         <service
-            android:name=".audio.HarkNotificationListener"
+            android:name=".audio.service.HarkNotificationListener"
             android:label="Hark 媒體監測"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
             android:exported="true">
@@ -70,7 +70,7 @@
         </activity>
 
         <receiver
-            android:name=".audio.AudioEffectReceiver"
+            android:name=".audio.router.AudioEffectReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.media.action.OPEN_AUDIO_EFFECT_CONTROL_SESSION" />
