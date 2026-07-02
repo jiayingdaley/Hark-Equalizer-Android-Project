@@ -90,34 +90,38 @@ class EqViewModel(private val repository: EqSettingsRepository) : ViewModel() {
     private val saveJobsRight = arrayOfNulls<kotlinx.coroutines.Job>(16)
 
     init {
+        var isFirstLeft = true
         // Collect Left Channel Gains
         viewModelScope.launch {
             repository.getBandGainsFlow("left", 0, 16).collect { savedGains16 ->
                 savedGains16.forEachIndexed { index, gain -> 
                     if (saveJobsLeft[index]?.isActive != true) {
-                        if (_bandGainsLeft16[index].value != gain) {
+                        if (isFirstLeft || _bandGainsLeft16[index].value != gain) {
                             _bandGainsLeft16[index].value = gain 
                             HarkAudioBridge.setBandGain(0, index, gain)
                             SystemDspManager.updateBandGain(0, index, gain)
                         }
                     }
                 }
+                isFirstLeft = false
                 isDataLoaded.value = true
             }
         }
 
+        var isFirstRight = true
         // Collect Right Channel Gains
         viewModelScope.launch {
             repository.getBandGainsFlow("right", 0, 16).collect { savedGains16 ->
                 savedGains16.forEachIndexed { index, gain -> 
                     if (saveJobsRight[index]?.isActive != true) {
-                        if (_bandGainsRight16[index].value != gain) {
+                        if (isFirstRight || _bandGainsRight16[index].value != gain) {
                             _bandGainsRight16[index].value = gain 
                             HarkAudioBridge.setBandGain(1, index, gain)
                             SystemDspManager.updateBandGain(1, index, gain)
                         }
                     }
                 }
+                isFirstRight = false
             }
         }
 
@@ -339,6 +343,64 @@ fun selectSituationalMode(mode: SceneManager.Mode) {
             }
             statusText.value = "狀態：已套用物理配置並重啟"
         }
+    }
+
+    /**
+     * Applies DSL v5 compensation formula using saved audiogram thresholds.
+     */
+    fun applyDslV5Fitting() {
+        viewModelScope.launch {
+            val leftAudiogram = mutableMapOf<Int, Int>()
+            val rightAudiogram = mutableMapOf<Int, Int>()
+            val testFrequencies = listOf(250, 500, 1000, 2000, 3000, 4000, 6000, 8000)
+
+            for (freq in testFrequencies) {
+                leftAudiogram[freq] = repository.getAudiogramThresholdFlow("left", freq).first()
+                rightAudiogram[freq] = repository.getAudiogramThresholdFlow("right", freq).first()
+            }
+
+            // Apply to Left channel
+            if (leftAudiogram.values.any { it != -1 }) {
+                centerFrequencies16.forEachIndexed { index, freq ->
+                    val threshold = interpolateThreshold(freq, leftAudiogram)
+                    val dslGain = calculateDslV5Gain(threshold)
+                    updateBandGain(EarType.LEFT, index, dslGain)
+                }
+            }
+
+            // Apply to Right channel
+            if (rightAudiogram.values.any { it != -1 }) {
+                centerFrequencies16.forEachIndexed { index, freq ->
+                    val threshold = interpolateThreshold(freq, rightAudiogram)
+                    val dslGain = calculateDslV5Gain(threshold)
+                    updateBandGain(EarType.RIGHT, index, dslGain)
+                }
+            }
+        }
+    }
+
+    private fun calculateDslV5Gain(threshold: Float): Float {
+        if (threshold <= 20f) return 0f
+        // DSL v5 adult target gain approximation for moderate speech: Gain = 0.35 * (Threshold - 20) + 3.0
+        val targetGain = 0.35f * (threshold - 20f) + 3f
+        return targetGain.coerceIn(0f, MAX_GAIN_DB)
+    }
+
+    private fun interpolateThreshold(targetFreq: Int, audiogram: Map<Int, Int>): Float {
+        // Map 16 parametric EQ bands to nearest measured frequencies
+        val freqMap = mapOf(
+            250 to 250, 315 to 250, 400 to 250,
+            500 to 500, 630 to 500, 800 to 500,
+            1000 to 1000, 1250 to 1000,
+            1600 to 2000, 2000 to 2000,
+            2500 to 3000, 3150 to 3000,
+            4000 to 4000,
+            5000 to 6000, 6300 to 6000,
+            8000 to 8000
+        )
+        val measuredFreq = freqMap[targetFreq] ?: 1000
+        val threshold = audiogram[measuredFreq] ?: -1
+        return if (threshold == -1) 0f else threshold.toFloat()
     }
 }
 

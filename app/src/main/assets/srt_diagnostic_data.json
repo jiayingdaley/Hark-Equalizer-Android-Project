@@ -1,0 +1,7802 @@
+{
+  "動身,眾生": {
+    "question_id": 1,
+    "correct_word": "動身",
+    "heard_word": "眾生",
+    "risky_frequencies": [
+      800.0,
+      2000.0,
+      500.0,
+      250.0,
+      2500.0
+    ],
+    "confusion_score": 0.6291
+  },
+  "動身,供神": {
+    "question_id": 1,
+    "correct_word": "動身",
+    "heard_word": "供神",
+    "risky_frequencies": [
+      500.0,
+      6300.0,
+      3150.0,
+      1600.0,
+      800.0
+    ],
+    "confusion_score": 0.6036
+  },
+  "動身,共生": {
+    "question_id": 1,
+    "correct_word": "動身",
+    "heard_word": "共生",
+    "risky_frequencies": [
+      4000.0,
+      2500.0,
+      8000.0,
+      2000.0,
+      250.0
+    ],
+    "confusion_score": 0.6416
+  },
+  "眾生,動身": {
+    "question_id": 1,
+    "correct_word": "眾生",
+    "heard_word": "動身",
+    "risky_frequencies": [
+      800.0,
+      2000.0,
+      500.0,
+      250.0,
+      2500.0
+    ],
+    "confusion_score": 0.6291
+  },
+  "眾生,供神": {
+    "question_id": 1,
+    "correct_word": "眾生",
+    "heard_word": "供神",
+    "risky_frequencies": [
+      5000.0,
+      630.0,
+      1250.0,
+      800.0,
+      500.0
+    ],
+    "confusion_score": 0.5913
+  },
+  "眾生,共生": {
+    "question_id": 1,
+    "correct_word": "眾生",
+    "heard_word": "共生",
+    "risky_frequencies": [
+      250.0,
+      400.0,
+      5000.0,
+      1000.0,
+      500.0
+    ],
+    "confusion_score": 0.5601
+  },
+  "供神,動身": {
+    "question_id": 1,
+    "correct_word": "供神",
+    "heard_word": "動身",
+    "risky_frequencies": [
+      500.0,
+      6300.0,
+      3150.0,
+      1600.0,
+      800.0
+    ],
+    "confusion_score": 0.6036
+  },
+  "供神,眾生": {
+    "question_id": 1,
+    "correct_word": "供神",
+    "heard_word": "眾生",
+    "risky_frequencies": [
+      5000.0,
+      630.0,
+      1250.0,
+      800.0,
+      500.0
+    ],
+    "confusion_score": 0.5913
+  },
+  "供神,共生": {
+    "question_id": 1,
+    "correct_word": "供神",
+    "heard_word": "共生",
+    "risky_frequencies": [
+      1250.0,
+      5000.0,
+      630.0,
+      500.0,
+      6300.0
+    ],
+    "confusion_score": 0.6659
+  },
+  "共生,動身": {
+    "question_id": 1,
+    "correct_word": "共生",
+    "heard_word": "動身",
+    "risky_frequencies": [
+      4000.0,
+      2500.0,
+      8000.0,
+      2000.0,
+      250.0
+    ],
+    "confusion_score": 0.6416
+  },
+  "共生,眾生": {
+    "question_id": 1,
+    "correct_word": "共生",
+    "heard_word": "眾生",
+    "risky_frequencies": [
+      250.0,
+      400.0,
+      5000.0,
+      1000.0,
+      500.0
+    ],
+    "confusion_score": 0.5601
+  },
+  "共生,供神": {
+    "question_id": 1,
+    "correct_word": "共生",
+    "heard_word": "供神",
+    "risky_frequencies": [
+      1250.0,
+      5000.0,
+      630.0,
+      500.0,
+      6300.0
+    ],
+    "confusion_score": 0.6659
+  },
+  "堡壘,蘆葦": {
+    "question_id": 2,
+    "correct_word": "堡壘",
+    "heard_word": "蘆葦",
+    "risky_frequencies": [
+      8000.0,
+      315.0,
+      3150.0,
+      630.0,
+      6300.0
+    ],
+    "confusion_score": 0.4443
+  },
+  "堡壘,寶島": {
+    "question_id": 2,
+    "correct_word": "堡壘",
+    "heard_word": "寶島",
+    "risky_frequencies": [
+      1600.0,
+      6300.0,
+      4000.0,
+      630.0,
+      2000.0
+    ],
+    "confusion_score": 0.4687
+  },
+  "堡壘,跑壘": {
+    "question_id": 2,
+    "correct_word": "堡壘",
+    "heard_word": "跑壘",
+    "risky_frequencies": [
+      250.0,
+      5000.0,
+      315.0,
+      2500.0,
+      800.0
+    ],
+    "confusion_score": 0.481
+  },
+  "蘆葦,堡壘": {
+    "question_id": 2,
+    "correct_word": "蘆葦",
+    "heard_word": "堡壘",
+    "risky_frequencies": [
+      8000.0,
+      315.0,
+      3150.0,
+      630.0,
+      6300.0
+    ],
+    "confusion_score": 0.4443
+  },
+  "蘆葦,寶島": {
+    "question_id": 2,
+    "correct_word": "蘆葦",
+    "heard_word": "寶島",
+    "risky_frequencies": [
+      8000.0,
+      2500.0,
+      3150.0,
+      630.0,
+      6300.0
+    ],
+    "confusion_score": 0.5405
+  },
+  "蘆葦,跑壘": {
+    "question_id": 2,
+    "correct_word": "蘆葦",
+    "heard_word": "跑壘",
+    "risky_frequencies": [
+      630.0,
+      500.0,
+      315.0,
+      250.0,
+      8000.0
+    ],
+    "confusion_score": 0.4689
+  },
+  "寶島,堡壘": {
+    "question_id": 2,
+    "correct_word": "寶島",
+    "heard_word": "堡壘",
+    "risky_frequencies": [
+      1600.0,
+      6300.0,
+      4000.0,
+      630.0,
+      2000.0
+    ],
+    "confusion_score": 0.4687
+  },
+  "寶島,蘆葦": {
+    "question_id": 2,
+    "correct_word": "寶島",
+    "heard_word": "蘆葦",
+    "risky_frequencies": [
+      8000.0,
+      2500.0,
+      3150.0,
+      630.0,
+      6300.0
+    ],
+    "confusion_score": 0.5405
+  },
+  "寶島,跑壘": {
+    "question_id": 2,
+    "correct_word": "寶島",
+    "heard_word": "跑壘",
+    "risky_frequencies": [
+      630.0,
+      6300.0,
+      1600.0,
+      5000.0,
+      4000.0
+    ],
+    "confusion_score": 0.4527
+  },
+  "跑壘,堡壘": {
+    "question_id": 2,
+    "correct_word": "跑壘",
+    "heard_word": "堡壘",
+    "risky_frequencies": [
+      250.0,
+      5000.0,
+      315.0,
+      2500.0,
+      800.0
+    ],
+    "confusion_score": 0.481
+  },
+  "跑壘,蘆葦": {
+    "question_id": 2,
+    "correct_word": "跑壘",
+    "heard_word": "蘆葦",
+    "risky_frequencies": [
+      630.0,
+      500.0,
+      315.0,
+      250.0,
+      8000.0
+    ],
+    "confusion_score": 0.4689
+  },
+  "跑壘,寶島": {
+    "question_id": 2,
+    "correct_word": "跑壘",
+    "heard_word": "寶島",
+    "risky_frequencies": [
+      630.0,
+      6300.0,
+      1600.0,
+      5000.0,
+      4000.0
+    ],
+    "confusion_score": 0.4527
+  },
+  "隊員,桂圓": {
+    "question_id": 3,
+    "correct_word": "隊員",
+    "heard_word": "桂圓",
+    "risky_frequencies": [
+      4000.0,
+      3150.0,
+      2000.0,
+      5000.0,
+      2500.0
+    ],
+    "confusion_score": 0.4975
+  },
+  "隊員,會員": {
+    "question_id": 3,
+    "correct_word": "隊員",
+    "heard_word": "會員",
+    "risky_frequencies": [
+      4000.0,
+      3150.0,
+      1600.0,
+      2500.0,
+      1250.0
+    ],
+    "confusion_score": 0.6454
+  },
+  "隊員,匯錢": {
+    "question_id": 3,
+    "correct_word": "隊員",
+    "heard_word": "匯錢",
+    "risky_frequencies": [
+      2500.0,
+      500.0,
+      3150.0,
+      1600.0,
+      630.0
+    ],
+    "confusion_score": 0.7093
+  },
+  "桂圓,隊員": {
+    "question_id": 3,
+    "correct_word": "桂圓",
+    "heard_word": "隊員",
+    "risky_frequencies": [
+      4000.0,
+      3150.0,
+      2000.0,
+      5000.0,
+      2500.0
+    ],
+    "confusion_score": 0.4975
+  },
+  "桂圓,會員": {
+    "question_id": 3,
+    "correct_word": "桂圓",
+    "heard_word": "會員",
+    "risky_frequencies": [
+      6300.0,
+      2500.0,
+      4000.0,
+      8000.0,
+      400.0
+    ],
+    "confusion_score": 0.7273
+  },
+  "桂圓,匯錢": {
+    "question_id": 3,
+    "correct_word": "桂圓",
+    "heard_word": "匯錢",
+    "risky_frequencies": [
+      2500.0,
+      1000.0,
+      4000.0,
+      3150.0,
+      800.0
+    ],
+    "confusion_score": 0.6023
+  },
+  "會員,隊員": {
+    "question_id": 3,
+    "correct_word": "會員",
+    "heard_word": "隊員",
+    "risky_frequencies": [
+      4000.0,
+      3150.0,
+      1600.0,
+      2500.0,
+      1250.0
+    ],
+    "confusion_score": 0.6454
+  },
+  "會員,桂圓": {
+    "question_id": 3,
+    "correct_word": "會員",
+    "heard_word": "桂圓",
+    "risky_frequencies": [
+      6300.0,
+      2500.0,
+      4000.0,
+      8000.0,
+      400.0
+    ],
+    "confusion_score": 0.7273
+  },
+  "會員,匯錢": {
+    "question_id": 3,
+    "correct_word": "會員",
+    "heard_word": "匯錢",
+    "risky_frequencies": [
+      2000.0,
+      3150.0,
+      2500.0,
+      4000.0,
+      1600.0
+    ],
+    "confusion_score": 0.5764
+  },
+  "匯錢,隊員": {
+    "question_id": 3,
+    "correct_word": "匯錢",
+    "heard_word": "隊員",
+    "risky_frequencies": [
+      2500.0,
+      500.0,
+      3150.0,
+      1600.0,
+      630.0
+    ],
+    "confusion_score": 0.7093
+  },
+  "匯錢,桂圓": {
+    "question_id": 3,
+    "correct_word": "匯錢",
+    "heard_word": "桂圓",
+    "risky_frequencies": [
+      2500.0,
+      1000.0,
+      4000.0,
+      3150.0,
+      800.0
+    ],
+    "confusion_score": 0.6023
+  },
+  "匯錢,會員": {
+    "question_id": 3,
+    "correct_word": "匯錢",
+    "heard_word": "會員",
+    "risky_frequencies": [
+      2000.0,
+      3150.0,
+      2500.0,
+      4000.0,
+      1600.0
+    ],
+    "confusion_score": 0.5764
+  },
+  "殘害,存在": {
+    "question_id": 4,
+    "correct_word": "殘害",
+    "heard_word": "存在",
+    "risky_frequencies": [
+      630.0,
+      500.0,
+      6300.0,
+      400.0,
+      8000.0
+    ],
+    "confusion_score": 0.5845
+  },
+  "殘害,拳賽": {
+    "question_id": 4,
+    "correct_word": "殘害",
+    "heard_word": "拳賽",
+    "risky_frequencies": [
+      8000.0,
+      5000.0,
+      2500.0,
+      6300.0,
+      250.0
+    ],
+    "confusion_score": 0.5454
+  },
+  "殘害,航太": {
+    "question_id": 4,
+    "correct_word": "殘害",
+    "heard_word": "航太",
+    "risky_frequencies": [
+      630.0,
+      400.0,
+      500.0,
+      1600.0,
+      800.0
+    ],
+    "confusion_score": 0.5217
+  },
+  "存在,殘害": {
+    "question_id": 4,
+    "correct_word": "存在",
+    "heard_word": "殘害",
+    "risky_frequencies": [
+      630.0,
+      500.0,
+      6300.0,
+      400.0,
+      8000.0
+    ],
+    "confusion_score": 0.5845
+  },
+  "存在,拳賽": {
+    "question_id": 4,
+    "correct_word": "存在",
+    "heard_word": "拳賽",
+    "risky_frequencies": [
+      8000.0,
+      4000.0,
+      2500.0,
+      3150.0,
+      5000.0
+    ],
+    "confusion_score": 0.5184
+  },
+  "存在,航太": {
+    "question_id": 4,
+    "correct_word": "存在",
+    "heard_word": "航太",
+    "risky_frequencies": [
+      400.0,
+      500.0,
+      4000.0,
+      2000.0,
+      630.0
+    ],
+    "confusion_score": 0.5278
+  },
+  "拳賽,殘害": {
+    "question_id": 4,
+    "correct_word": "拳賽",
+    "heard_word": "殘害",
+    "risky_frequencies": [
+      8000.0,
+      5000.0,
+      2500.0,
+      6300.0,
+      250.0
+    ],
+    "confusion_score": 0.5454
+  },
+  "拳賽,存在": {
+    "question_id": 4,
+    "correct_word": "拳賽",
+    "heard_word": "存在",
+    "risky_frequencies": [
+      8000.0,
+      4000.0,
+      2500.0,
+      3150.0,
+      5000.0
+    ],
+    "confusion_score": 0.5184
+  },
+  "拳賽,航太": {
+    "question_id": 4,
+    "correct_word": "拳賽",
+    "heard_word": "航太",
+    "risky_frequencies": [
+      2500.0,
+      4000.0,
+      3150.0,
+      250.0,
+      5000.0
+    ],
+    "confusion_score": 0.6684
+  },
+  "航太,殘害": {
+    "question_id": 4,
+    "correct_word": "航太",
+    "heard_word": "殘害",
+    "risky_frequencies": [
+      630.0,
+      400.0,
+      500.0,
+      1600.0,
+      800.0
+    ],
+    "confusion_score": 0.5217
+  },
+  "航太,存在": {
+    "question_id": 4,
+    "correct_word": "航太",
+    "heard_word": "存在",
+    "risky_frequencies": [
+      400.0,
+      500.0,
+      4000.0,
+      2000.0,
+      630.0
+    ],
+    "confusion_score": 0.5278
+  },
+  "航太,拳賽": {
+    "question_id": 4,
+    "correct_word": "航太",
+    "heard_word": "拳賽",
+    "risky_frequencies": [
+      2500.0,
+      4000.0,
+      3150.0,
+      250.0,
+      5000.0
+    ],
+    "confusion_score": 0.6684
+  },
+  "開拓,收穫": {
+    "question_id": 5,
+    "correct_word": "開拓",
+    "heard_word": "收穫",
+    "risky_frequencies": [
+      3150.0,
+      500.0,
+      800.0,
+      5000.0,
+      2000.0
+    ],
+    "confusion_score": 0.6766
+  },
+  "開拓,脫落": {
+    "question_id": 5,
+    "correct_word": "開拓",
+    "heard_word": "脫落",
+    "risky_frequencies": [
+      500.0,
+      6300.0,
+      8000.0,
+      1000.0,
+      4000.0
+    ],
+    "confusion_score": 0.505
+  },
+  "開拓,週末": {
+    "question_id": 5,
+    "correct_word": "開拓",
+    "heard_word": "週末",
+    "risky_frequencies": [
+      4000.0,
+      2000.0,
+      8000.0,
+      1600.0,
+      6300.0
+    ],
+    "confusion_score": 0.6593
+  },
+  "收穫,開拓": {
+    "question_id": 5,
+    "correct_word": "收穫",
+    "heard_word": "開拓",
+    "risky_frequencies": [
+      3150.0,
+      500.0,
+      800.0,
+      5000.0,
+      2000.0
+    ],
+    "confusion_score": 0.6766
+  },
+  "收穫,脫落": {
+    "question_id": 5,
+    "correct_word": "收穫",
+    "heard_word": "脫落",
+    "risky_frequencies": [
+      400.0,
+      4000.0,
+      500.0,
+      8000.0,
+      630.0
+    ],
+    "confusion_score": 0.5627
+  },
+  "收穫,週末": {
+    "question_id": 5,
+    "correct_word": "收穫",
+    "heard_word": "週末",
+    "risky_frequencies": [
+      1000.0,
+      4000.0,
+      400.0,
+      2000.0,
+      800.0
+    ],
+    "confusion_score": 0.5424
+  },
+  "脫落,開拓": {
+    "question_id": 5,
+    "correct_word": "脫落",
+    "heard_word": "開拓",
+    "risky_frequencies": [
+      500.0,
+      6300.0,
+      8000.0,
+      1000.0,
+      4000.0
+    ],
+    "confusion_score": 0.505
+  },
+  "脫落,收穫": {
+    "question_id": 5,
+    "correct_word": "脫落",
+    "heard_word": "收穫",
+    "risky_frequencies": [
+      400.0,
+      4000.0,
+      500.0,
+      8000.0,
+      630.0
+    ],
+    "confusion_score": 0.5627
+  },
+  "脫落,週末": {
+    "question_id": 5,
+    "correct_word": "脫落",
+    "heard_word": "週末",
+    "risky_frequencies": [
+      400.0,
+      6300.0,
+      315.0,
+      630.0,
+      8000.0
+    ],
+    "confusion_score": 0.7644
+  },
+  "週末,開拓": {
+    "question_id": 5,
+    "correct_word": "週末",
+    "heard_word": "開拓",
+    "risky_frequencies": [
+      4000.0,
+      2000.0,
+      8000.0,
+      1600.0,
+      6300.0
+    ],
+    "confusion_score": 0.6593
+  },
+  "週末,收穫": {
+    "question_id": 5,
+    "correct_word": "週末",
+    "heard_word": "收穫",
+    "risky_frequencies": [
+      1000.0,
+      4000.0,
+      400.0,
+      2000.0,
+      800.0
+    ],
+    "confusion_score": 0.5424
+  },
+  "週末,脫落": {
+    "question_id": 5,
+    "correct_word": "週末",
+    "heard_word": "脫落",
+    "risky_frequencies": [
+      400.0,
+      6300.0,
+      315.0,
+      630.0,
+      8000.0
+    ],
+    "confusion_score": 0.7644
+  },
+  "扶養,圖表": {
+    "question_id": 6,
+    "correct_word": "扶養",
+    "heard_word": "圖表",
+    "risky_frequencies": [
+      1000.0,
+      4000.0,
+      5000.0,
+      3150.0,
+      800.0
+    ],
+    "confusion_score": 0.607
+  },
+  "扶養,行搶": {
+    "question_id": 6,
+    "correct_word": "扶養",
+    "heard_word": "行搶",
+    "risky_frequencies": [
+      400.0,
+      1600.0,
+      2000.0,
+      500.0,
+      630.0
+    ],
+    "confusion_score": 0.5959
+  },
+  "扶養,冥想": {
+    "question_id": 6,
+    "correct_word": "扶養",
+    "heard_word": "冥想",
+    "risky_frequencies": [
+      1600.0,
+      315.0,
+      500.0,
+      2000.0,
+      630.0
+    ],
+    "confusion_score": 0.5168
+  },
+  "圖表,扶養": {
+    "question_id": 6,
+    "correct_word": "圖表",
+    "heard_word": "扶養",
+    "risky_frequencies": [
+      1000.0,
+      4000.0,
+      5000.0,
+      3150.0,
+      800.0
+    ],
+    "confusion_score": 0.607
+  },
+  "圖表,行搶": {
+    "question_id": 6,
+    "correct_word": "圖表",
+    "heard_word": "行搶",
+    "risky_frequencies": [
+      500.0,
+      1250.0,
+      630.0,
+      315.0,
+      400.0
+    ],
+    "confusion_score": 0.6063
+  },
+  "圖表,冥想": {
+    "question_id": 6,
+    "correct_word": "圖表",
+    "heard_word": "冥想",
+    "risky_frequencies": [
+      1250.0,
+      500.0,
+      3150.0,
+      250.0,
+      315.0
+    ],
+    "confusion_score": 0.4121
+  },
+  "行搶,扶養": {
+    "question_id": 6,
+    "correct_word": "行搶",
+    "heard_word": "扶養",
+    "risky_frequencies": [
+      400.0,
+      1600.0,
+      2000.0,
+      500.0,
+      630.0
+    ],
+    "confusion_score": 0.5959
+  },
+  "行搶,圖表": {
+    "question_id": 6,
+    "correct_word": "行搶",
+    "heard_word": "圖表",
+    "risky_frequencies": [
+      500.0,
+      1250.0,
+      630.0,
+      315.0,
+      400.0
+    ],
+    "confusion_score": 0.6063
+  },
+  "行搶,冥想": {
+    "question_id": 6,
+    "correct_word": "行搶",
+    "heard_word": "冥想",
+    "risky_frequencies": [
+      500.0,
+      1250.0,
+      1600.0,
+      1000.0,
+      2000.0
+    ],
+    "confusion_score": 0.5452
+  },
+  "冥想,扶養": {
+    "question_id": 6,
+    "correct_word": "冥想",
+    "heard_word": "扶養",
+    "risky_frequencies": [
+      1600.0,
+      315.0,
+      500.0,
+      2000.0,
+      630.0
+    ],
+    "confusion_score": 0.5168
+  },
+  "冥想,圖表": {
+    "question_id": 6,
+    "correct_word": "冥想",
+    "heard_word": "圖表",
+    "risky_frequencies": [
+      1250.0,
+      500.0,
+      3150.0,
+      250.0,
+      315.0
+    ],
+    "confusion_score": 0.4121
+  },
+  "冥想,行搶": {
+    "question_id": 6,
+    "correct_word": "冥想",
+    "heard_word": "行搶",
+    "risky_frequencies": [
+      500.0,
+      1250.0,
+      1600.0,
+      1000.0,
+      2000.0
+    ],
+    "confusion_score": 0.5452
+  },
+  "牽手,堅守": {
+    "question_id": 7,
+    "correct_word": "牽手",
+    "heard_word": "堅守",
+    "risky_frequencies": [
+      630.0,
+      500.0,
+      2500.0,
+      2000.0,
+      315.0
+    ],
+    "confusion_score": 0.5518
+  },
+  "牽手,煙斗": {
+    "question_id": 7,
+    "correct_word": "牽手",
+    "heard_word": "煙斗",
+    "risky_frequencies": [
+      400.0,
+      630.0,
+      500.0,
+      800.0,
+      1250.0
+    ],
+    "confusion_score": 0.5416
+  },
+  "牽手,親手": {
+    "question_id": 7,
+    "correct_word": "牽手",
+    "heard_word": "親手",
+    "risky_frequencies": [
+      500.0,
+      400.0,
+      315.0,
+      800.0,
+      3150.0
+    ],
+    "confusion_score": 0.4578
+  },
+  "堅守,牽手": {
+    "question_id": 7,
+    "correct_word": "堅守",
+    "heard_word": "牽手",
+    "risky_frequencies": [
+      630.0,
+      500.0,
+      2500.0,
+      2000.0,
+      315.0
+    ],
+    "confusion_score": 0.5518
+  },
+  "堅守,煙斗": {
+    "question_id": 7,
+    "correct_word": "堅守",
+    "heard_word": "煙斗",
+    "risky_frequencies": [
+      630.0,
+      800.0,
+      500.0,
+      400.0,
+      250.0
+    ],
+    "confusion_score": 0.5319
+  },
+  "堅守,親手": {
+    "question_id": 7,
+    "correct_word": "堅守",
+    "heard_word": "親手",
+    "risky_frequencies": [
+      3150.0,
+      500.0,
+      800.0,
+      8000.0,
+      5000.0
+    ],
+    "confusion_score": 0.6015
+  },
+  "煙斗,牽手": {
+    "question_id": 7,
+    "correct_word": "煙斗",
+    "heard_word": "牽手",
+    "risky_frequencies": [
+      400.0,
+      630.0,
+      500.0,
+      800.0,
+      1250.0
+    ],
+    "confusion_score": 0.5416
+  },
+  "煙斗,堅守": {
+    "question_id": 7,
+    "correct_word": "煙斗",
+    "heard_word": "堅守",
+    "risky_frequencies": [
+      630.0,
+      800.0,
+      500.0,
+      400.0,
+      250.0
+    ],
+    "confusion_score": 0.5319
+  },
+  "煙斗,親手": {
+    "question_id": 7,
+    "correct_word": "煙斗",
+    "heard_word": "親手",
+    "risky_frequencies": [
+      400.0,
+      1000.0,
+      1250.0,
+      500.0,
+      2000.0
+    ],
+    "confusion_score": 0.5833
+  },
+  "親手,牽手": {
+    "question_id": 7,
+    "correct_word": "親手",
+    "heard_word": "牽手",
+    "risky_frequencies": [
+      500.0,
+      400.0,
+      315.0,
+      800.0,
+      3150.0
+    ],
+    "confusion_score": 0.4578
+  },
+  "親手,堅守": {
+    "question_id": 7,
+    "correct_word": "親手",
+    "heard_word": "堅守",
+    "risky_frequencies": [
+      3150.0,
+      500.0,
+      800.0,
+      8000.0,
+      5000.0
+    ],
+    "confusion_score": 0.6015
+  },
+  "親手,煙斗": {
+    "question_id": 7,
+    "correct_word": "親手",
+    "heard_word": "煙斗",
+    "risky_frequencies": [
+      400.0,
+      1000.0,
+      1250.0,
+      500.0,
+      2000.0
+    ],
+    "confusion_score": 0.5833
+  },
+  "山巔,香菸": {
+    "question_id": 8,
+    "correct_word": "山巔",
+    "heard_word": "香菸",
+    "risky_frequencies": [
+      400.0,
+      5000.0,
+      4000.0,
+      1600.0,
+      3150.0
+    ],
+    "confusion_score": 0.7192
+  },
+  "山巔,身邊": {
+    "question_id": 8,
+    "correct_word": "山巔",
+    "heard_word": "身邊",
+    "risky_frequencies": [
+      2500.0,
+      630.0,
+      250.0,
+      315.0,
+      500.0
+    ],
+    "confusion_score": 0.5637
+  },
+  "山巔,升天": {
+    "question_id": 8,
+    "correct_word": "山巔",
+    "heard_word": "升天",
+    "risky_frequencies": [
+      630.0,
+      250.0,
+      5000.0,
+      4000.0,
+      400.0
+    ],
+    "confusion_score": 0.4784
+  },
+  "香菸,山巔": {
+    "question_id": 8,
+    "correct_word": "香菸",
+    "heard_word": "山巔",
+    "risky_frequencies": [
+      400.0,
+      5000.0,
+      4000.0,
+      1600.0,
+      3150.0
+    ],
+    "confusion_score": 0.7192
+  },
+  "香菸,身邊": {
+    "question_id": 8,
+    "correct_word": "香菸",
+    "heard_word": "身邊",
+    "risky_frequencies": [
+      1250.0,
+      2000.0,
+      3150.0,
+      8000.0,
+      315.0
+    ],
+    "confusion_score": 0.6814
+  },
+  "香菸,升天": {
+    "question_id": 8,
+    "correct_word": "香菸",
+    "heard_word": "升天",
+    "risky_frequencies": [
+      2500.0,
+      5000.0,
+      8000.0,
+      400.0,
+      3150.0
+    ],
+    "confusion_score": 0.572
+  },
+  "身邊,山巔": {
+    "question_id": 8,
+    "correct_word": "身邊",
+    "heard_word": "山巔",
+    "risky_frequencies": [
+      2500.0,
+      630.0,
+      250.0,
+      315.0,
+      500.0
+    ],
+    "confusion_score": 0.5637
+  },
+  "身邊,香菸": {
+    "question_id": 8,
+    "correct_word": "身邊",
+    "heard_word": "香菸",
+    "risky_frequencies": [
+      1250.0,
+      2000.0,
+      3150.0,
+      8000.0,
+      315.0
+    ],
+    "confusion_score": 0.6814
+  },
+  "身邊,升天": {
+    "question_id": 8,
+    "correct_word": "身邊",
+    "heard_word": "升天",
+    "risky_frequencies": [
+      8000.0,
+      250.0,
+      630.0,
+      1000.0,
+      4000.0
+    ],
+    "confusion_score": 0.586
+  },
+  "升天,山巔": {
+    "question_id": 8,
+    "correct_word": "升天",
+    "heard_word": "山巔",
+    "risky_frequencies": [
+      630.0,
+      250.0,
+      5000.0,
+      4000.0,
+      400.0
+    ],
+    "confusion_score": 0.4784
+  },
+  "升天,香菸": {
+    "question_id": 8,
+    "correct_word": "升天",
+    "heard_word": "香菸",
+    "risky_frequencies": [
+      2500.0,
+      5000.0,
+      8000.0,
+      400.0,
+      3150.0
+    ],
+    "confusion_score": 0.572
+  },
+  "升天,身邊": {
+    "question_id": 8,
+    "correct_word": "升天",
+    "heard_word": "身邊",
+    "risky_frequencies": [
+      8000.0,
+      250.0,
+      630.0,
+      1000.0,
+      4000.0
+    ],
+    "confusion_score": 0.586
+  },
+  "竹筍,蘆筍": {
+    "question_id": 9,
+    "correct_word": "竹筍",
+    "heard_word": "蘆筍",
+    "risky_frequencies": [
+      400.0,
+      500.0,
+      630.0,
+      250.0,
+      1600.0
+    ],
+    "confusion_score": 0.3638
+  },
+  "竹筍,毀損": {
+    "question_id": 9,
+    "correct_word": "竹筍",
+    "heard_word": "毀損",
+    "risky_frequencies": [
+      5000.0,
+      2500.0,
+      3150.0,
+      400.0,
+      500.0
+    ],
+    "confusion_score": 0.5499
+  },
+  "竹筍,主審": {
+    "question_id": 9,
+    "correct_word": "竹筍",
+    "heard_word": "主審",
+    "risky_frequencies": [
+      500.0,
+      6300.0,
+      2000.0,
+      250.0,
+      400.0
+    ],
+    "confusion_score": 0.6854
+  },
+  "蘆筍,竹筍": {
+    "question_id": 9,
+    "correct_word": "蘆筍",
+    "heard_word": "竹筍",
+    "risky_frequencies": [
+      400.0,
+      500.0,
+      630.0,
+      250.0,
+      1600.0
+    ],
+    "confusion_score": 0.3638
+  },
+  "蘆筍,毀損": {
+    "question_id": 9,
+    "correct_word": "蘆筍",
+    "heard_word": "毀損",
+    "risky_frequencies": [
+      1600.0,
+      2000.0,
+      500.0,
+      800.0,
+      6300.0
+    ],
+    "confusion_score": 0.487
+  },
+  "蘆筍,主審": {
+    "question_id": 9,
+    "correct_word": "蘆筍",
+    "heard_word": "主審",
+    "risky_frequencies": [
+      630.0,
+      400.0,
+      500.0,
+      315.0,
+      250.0
+    ],
+    "confusion_score": 0.6191
+  },
+  "毀損,竹筍": {
+    "question_id": 9,
+    "correct_word": "毀損",
+    "heard_word": "竹筍",
+    "risky_frequencies": [
+      5000.0,
+      2500.0,
+      3150.0,
+      400.0,
+      500.0
+    ],
+    "confusion_score": 0.5499
+  },
+  "毀損,蘆筍": {
+    "question_id": 9,
+    "correct_word": "毀損",
+    "heard_word": "蘆筍",
+    "risky_frequencies": [
+      1600.0,
+      2000.0,
+      500.0,
+      800.0,
+      6300.0
+    ],
+    "confusion_score": 0.487
+  },
+  "毀損,主審": {
+    "question_id": 9,
+    "correct_word": "毀損",
+    "heard_word": "主審",
+    "risky_frequencies": [
+      400.0,
+      500.0,
+      630.0,
+      8000.0,
+      1600.0
+    ],
+    "confusion_score": 0.424
+  },
+  "主審,竹筍": {
+    "question_id": 9,
+    "correct_word": "主審",
+    "heard_word": "竹筍",
+    "risky_frequencies": [
+      500.0,
+      6300.0,
+      2000.0,
+      250.0,
+      400.0
+    ],
+    "confusion_score": 0.6854
+  },
+  "主審,蘆筍": {
+    "question_id": 9,
+    "correct_word": "主審",
+    "heard_word": "蘆筍",
+    "risky_frequencies": [
+      630.0,
+      400.0,
+      500.0,
+      315.0,
+      250.0
+    ],
+    "confusion_score": 0.6191
+  },
+  "主審,毀損": {
+    "question_id": 9,
+    "correct_word": "主審",
+    "heard_word": "毀損",
+    "risky_frequencies": [
+      400.0,
+      500.0,
+      630.0,
+      8000.0,
+      1600.0
+    ],
+    "confusion_score": 0.424
+  },
+  "儲蓄,如意": {
+    "question_id": 10,
+    "correct_word": "儲蓄",
+    "heard_word": "如意",
+    "risky_frequencies": [
+      400.0,
+      500.0,
+      800.0,
+      630.0,
+      5000.0
+    ],
+    "confusion_score": 0.5978
+  },
+  "儲蓄,廚具": {
+    "question_id": 10,
+    "correct_word": "儲蓄",
+    "heard_word": "廚具",
+    "risky_frequencies": [
+      250.0,
+      315.0,
+      400.0,
+      500.0,
+      630.0
+    ],
+    "confusion_score": 0.362
+  },
+  "儲蓄,除夕": {
+    "question_id": 10,
+    "correct_word": "儲蓄",
+    "heard_word": "除夕",
+    "risky_frequencies": [
+      8000.0,
+      4000.0,
+      1000.0,
+      630.0,
+      1600.0
+    ],
+    "confusion_score": 0.7147
+  },
+  "如意,儲蓄": {
+    "question_id": 10,
+    "correct_word": "如意",
+    "heard_word": "儲蓄",
+    "risky_frequencies": [
+      400.0,
+      500.0,
+      800.0,
+      630.0,
+      5000.0
+    ],
+    "confusion_score": 0.5978
+  },
+  "如意,廚具": {
+    "question_id": 10,
+    "correct_word": "如意",
+    "heard_word": "廚具",
+    "risky_frequencies": [
+      630.0,
+      5000.0,
+      500.0,
+      400.0,
+      4000.0
+    ],
+    "confusion_score": 0.659
+  },
+  "如意,除夕": {
+    "question_id": 10,
+    "correct_word": "如意",
+    "heard_word": "除夕",
+    "risky_frequencies": [
+      800.0,
+      630.0,
+      500.0,
+      400.0,
+      1250.0
+    ],
+    "confusion_score": 0.5441
+  },
+  "廚具,儲蓄": {
+    "question_id": 10,
+    "correct_word": "廚具",
+    "heard_word": "儲蓄",
+    "risky_frequencies": [
+      250.0,
+      315.0,
+      400.0,
+      500.0,
+      630.0
+    ],
+    "confusion_score": 0.362
+  },
+  "廚具,如意": {
+    "question_id": 10,
+    "correct_word": "廚具",
+    "heard_word": "如意",
+    "risky_frequencies": [
+      630.0,
+      5000.0,
+      500.0,
+      400.0,
+      4000.0
+    ],
+    "confusion_score": 0.659
+  },
+  "廚具,除夕": {
+    "question_id": 10,
+    "correct_word": "廚具",
+    "heard_word": "除夕",
+    "risky_frequencies": [
+      3150.0,
+      630.0,
+      500.0,
+      400.0,
+      800.0
+    ],
+    "confusion_score": 0.6669
+  },
+  "除夕,儲蓄": {
+    "question_id": 10,
+    "correct_word": "除夕",
+    "heard_word": "儲蓄",
+    "risky_frequencies": [
+      8000.0,
+      4000.0,
+      1000.0,
+      630.0,
+      1600.0
+    ],
+    "confusion_score": 0.7147
+  },
+  "除夕,如意": {
+    "question_id": 10,
+    "correct_word": "除夕",
+    "heard_word": "如意",
+    "risky_frequencies": [
+      800.0,
+      630.0,
+      500.0,
+      400.0,
+      1250.0
+    ],
+    "confusion_score": 0.5441
+  },
+  "除夕,廚具": {
+    "question_id": 10,
+    "correct_word": "除夕",
+    "heard_word": "廚具",
+    "risky_frequencies": [
+      3150.0,
+      630.0,
+      500.0,
+      400.0,
+      800.0
+    ],
+    "confusion_score": 0.6669
+  },
+  "金錶,煎餃": {
+    "question_id": 11,
+    "correct_word": "金錶",
+    "heard_word": "煎餃",
+    "risky_frequencies": [
+      250.0,
+      500.0,
+      400.0,
+      800.0,
+      315.0
+    ],
+    "confusion_score": 0.58
+  },
+  "金錶,稀少": {
+    "question_id": 11,
+    "correct_word": "金錶",
+    "heard_word": "稀少",
+    "risky_frequencies": [
+      800.0,
+      630.0,
+      250.0,
+      2500.0,
+      500.0
+    ],
+    "confusion_score": 0.497
+  },
+  "金錶,春曉": {
+    "question_id": 11,
+    "correct_word": "金錶",
+    "heard_word": "春曉",
+    "risky_frequencies": [
+      315.0,
+      500.0,
+      250.0,
+      800.0,
+      400.0
+    ],
+    "confusion_score": 0.4895
+  },
+  "煎餃,金錶": {
+    "question_id": 11,
+    "correct_word": "煎餃",
+    "heard_word": "金錶",
+    "risky_frequencies": [
+      250.0,
+      500.0,
+      400.0,
+      800.0,
+      315.0
+    ],
+    "confusion_score": 0.58
+  },
+  "煎餃,稀少": {
+    "question_id": 11,
+    "correct_word": "煎餃",
+    "heard_word": "稀少",
+    "risky_frequencies": [
+      8000.0,
+      800.0,
+      2500.0,
+      1250.0,
+      1600.0
+    ],
+    "confusion_score": 0.5793
+  },
+  "煎餃,春曉": {
+    "question_id": 11,
+    "correct_word": "煎餃",
+    "heard_word": "春曉",
+    "risky_frequencies": [
+      5000.0,
+      8000.0,
+      6300.0,
+      2500.0,
+      4000.0
+    ],
+    "confusion_score": 0.6746
+  },
+  "稀少,金錶": {
+    "question_id": 11,
+    "correct_word": "稀少",
+    "heard_word": "金錶",
+    "risky_frequencies": [
+      800.0,
+      630.0,
+      250.0,
+      2500.0,
+      500.0
+    ],
+    "confusion_score": 0.497
+  },
+  "稀少,煎餃": {
+    "question_id": 11,
+    "correct_word": "稀少",
+    "heard_word": "煎餃",
+    "risky_frequencies": [
+      8000.0,
+      800.0,
+      2500.0,
+      1250.0,
+      1600.0
+    ],
+    "confusion_score": 0.5793
+  },
+  "稀少,春曉": {
+    "question_id": 11,
+    "correct_word": "稀少",
+    "heard_word": "春曉",
+    "risky_frequencies": [
+      8000.0,
+      1000.0,
+      2000.0,
+      400.0,
+      2500.0
+    ],
+    "confusion_score": 0.495
+  },
+  "春曉,金錶": {
+    "question_id": 11,
+    "correct_word": "春曉",
+    "heard_word": "金錶",
+    "risky_frequencies": [
+      315.0,
+      500.0,
+      250.0,
+      800.0,
+      400.0
+    ],
+    "confusion_score": 0.4895
+  },
+  "春曉,煎餃": {
+    "question_id": 11,
+    "correct_word": "春曉",
+    "heard_word": "煎餃",
+    "risky_frequencies": [
+      5000.0,
+      8000.0,
+      6300.0,
+      2500.0,
+      4000.0
+    ],
+    "confusion_score": 0.6746
+  },
+  "春曉,稀少": {
+    "question_id": 11,
+    "correct_word": "春曉",
+    "heard_word": "稀少",
+    "risky_frequencies": [
+      8000.0,
+      1000.0,
+      2000.0,
+      400.0,
+      2500.0
+    ],
+    "confusion_score": 0.495
+  },
+  "辛勞,煎熬": {
+    "question_id": 12,
+    "correct_word": "辛勞",
+    "heard_word": "煎熬",
+    "risky_frequencies": [
+      6300.0,
+      8000.0,
+      2500.0,
+      800.0,
+      4000.0
+    ],
+    "confusion_score": 0.535
+  },
+  "辛勞,薰陶": {
+    "question_id": 12,
+    "correct_word": "辛勞",
+    "heard_word": "薰陶",
+    "risky_frequencies": [
+      2000.0,
+      3150.0,
+      1250.0,
+      2500.0,
+      1600.0
+    ],
+    "confusion_score": 0.4064
+  },
+  "辛勞,新潮": {
+    "question_id": 12,
+    "correct_word": "辛勞",
+    "heard_word": "新潮",
+    "risky_frequencies": [
+      4000.0,
+      5000.0,
+      2500.0,
+      1000.0,
+      630.0
+    ],
+    "confusion_score": 0.5444
+  },
+  "煎熬,辛勞": {
+    "question_id": 12,
+    "correct_word": "煎熬",
+    "heard_word": "辛勞",
+    "risky_frequencies": [
+      6300.0,
+      8000.0,
+      2500.0,
+      800.0,
+      4000.0
+    ],
+    "confusion_score": 0.535
+  },
+  "煎熬,薰陶": {
+    "question_id": 12,
+    "correct_word": "煎熬",
+    "heard_word": "薰陶",
+    "risky_frequencies": [
+      400.0,
+      8000.0,
+      2500.0,
+      3150.0,
+      5000.0
+    ],
+    "confusion_score": 0.4605
+  },
+  "煎熬,新潮": {
+    "question_id": 12,
+    "correct_word": "煎熬",
+    "heard_word": "新潮",
+    "risky_frequencies": [
+      2500.0,
+      4000.0,
+      8000.0,
+      800.0,
+      400.0
+    ],
+    "confusion_score": 0.5799
+  },
+  "薰陶,辛勞": {
+    "question_id": 12,
+    "correct_word": "薰陶",
+    "heard_word": "辛勞",
+    "risky_frequencies": [
+      2000.0,
+      3150.0,
+      1250.0,
+      2500.0,
+      1600.0
+    ],
+    "confusion_score": 0.4064
+  },
+  "薰陶,煎熬": {
+    "question_id": 12,
+    "correct_word": "薰陶",
+    "heard_word": "煎熬",
+    "risky_frequencies": [
+      400.0,
+      8000.0,
+      2500.0,
+      3150.0,
+      5000.0
+    ],
+    "confusion_score": 0.4605
+  },
+  "薰陶,新潮": {
+    "question_id": 12,
+    "correct_word": "薰陶",
+    "heard_word": "新潮",
+    "risky_frequencies": [
+      250.0,
+      315.0,
+      8000.0,
+      630.0,
+      400.0
+    ],
+    "confusion_score": 0.4297
+  },
+  "新潮,辛勞": {
+    "question_id": 12,
+    "correct_word": "新潮",
+    "heard_word": "辛勞",
+    "risky_frequencies": [
+      4000.0,
+      5000.0,
+      2500.0,
+      1000.0,
+      630.0
+    ],
+    "confusion_score": 0.5444
+  },
+  "新潮,煎熬": {
+    "question_id": 12,
+    "correct_word": "新潮",
+    "heard_word": "煎熬",
+    "risky_frequencies": [
+      2500.0,
+      4000.0,
+      8000.0,
+      800.0,
+      400.0
+    ],
+    "confusion_score": 0.5799
+  },
+  "新潮,薰陶": {
+    "question_id": 12,
+    "correct_word": "新潮",
+    "heard_word": "薰陶",
+    "risky_frequencies": [
+      250.0,
+      315.0,
+      8000.0,
+      630.0,
+      400.0
+    ],
+    "confusion_score": 0.4297
+  },
+  "波浪,波棒": {
+    "question_id": 13,
+    "correct_word": "波浪",
+    "heard_word": "波棒",
+    "risky_frequencies": [
+      800.0,
+      500.0,
+      400.0,
+      2500.0,
+      4000.0
+    ],
+    "confusion_score": 0.5027
+  },
+  "波浪,衝浪": {
+    "question_id": 13,
+    "correct_word": "波浪",
+    "heard_word": "衝浪",
+    "risky_frequencies": [
+      8000.0,
+      315.0,
+      2500.0,
+      800.0,
+      500.0
+    ],
+    "confusion_score": 0.6116
+  },
+  "波浪,播放": {
+    "question_id": 13,
+    "correct_word": "波浪",
+    "heard_word": "播放",
+    "risky_frequencies": [
+      800.0,
+      500.0,
+      2500.0,
+      400.0,
+      3150.0
+    ],
+    "confusion_score": 0.5663
+  },
+  "波棒,波浪": {
+    "question_id": 13,
+    "correct_word": "波棒",
+    "heard_word": "波浪",
+    "risky_frequencies": [
+      800.0,
+      500.0,
+      400.0,
+      2500.0,
+      4000.0
+    ],
+    "confusion_score": 0.5027
+  },
+  "波棒,衝浪": {
+    "question_id": 13,
+    "correct_word": "波棒",
+    "heard_word": "衝浪",
+    "risky_frequencies": [
+      800.0,
+      500.0,
+      1250.0,
+      2500.0,
+      250.0
+    ],
+    "confusion_score": 0.3374
+  },
+  "波棒,播放": {
+    "question_id": 13,
+    "correct_word": "波棒",
+    "heard_word": "播放",
+    "risky_frequencies": [
+      4000.0,
+      5000.0,
+      1600.0,
+      315.0,
+      6300.0
+    ],
+    "confusion_score": 0.4652
+  },
+  "衝浪,波浪": {
+    "question_id": 13,
+    "correct_word": "衝浪",
+    "heard_word": "波浪",
+    "risky_frequencies": [
+      8000.0,
+      315.0,
+      2500.0,
+      800.0,
+      500.0
+    ],
+    "confusion_score": 0.6116
+  },
+  "衝浪,波棒": {
+    "question_id": 13,
+    "correct_word": "衝浪",
+    "heard_word": "波棒",
+    "risky_frequencies": [
+      800.0,
+      500.0,
+      1250.0,
+      2500.0,
+      250.0
+    ],
+    "confusion_score": 0.3374
+  },
+  "衝浪,播放": {
+    "question_id": 13,
+    "correct_word": "衝浪",
+    "heard_word": "播放",
+    "risky_frequencies": [
+      800.0,
+      500.0,
+      1250.0,
+      2500.0,
+      8000.0
+    ],
+    "confusion_score": 0.3244
+  },
+  "播放,波浪": {
+    "question_id": 13,
+    "correct_word": "播放",
+    "heard_word": "波浪",
+    "risky_frequencies": [
+      800.0,
+      500.0,
+      2500.0,
+      400.0,
+      3150.0
+    ],
+    "confusion_score": 0.5663
+  },
+  "播放,波棒": {
+    "question_id": 13,
+    "correct_word": "播放",
+    "heard_word": "波棒",
+    "risky_frequencies": [
+      4000.0,
+      5000.0,
+      1600.0,
+      315.0,
+      6300.0
+    ],
+    "confusion_score": 0.4652
+  },
+  "播放,衝浪": {
+    "question_id": 13,
+    "correct_word": "播放",
+    "heard_word": "衝浪",
+    "risky_frequencies": [
+      800.0,
+      500.0,
+      1250.0,
+      2500.0,
+      8000.0
+    ],
+    "confusion_score": 0.3244
+  },
+  "核能,合成": {
+    "question_id": 14,
+    "correct_word": "核能",
+    "heard_word": "合成",
+    "risky_frequencies": [
+      6300.0,
+      1250.0,
+      8000.0,
+      800.0,
+      2000.0
+    ],
+    "confusion_score": 0.6748
+  },
+  "核能,合同": {
+    "question_id": 14,
+    "correct_word": "核能",
+    "heard_word": "合同",
+    "risky_frequencies": [
+      400.0,
+      500.0,
+      6300.0,
+      2500.0,
+      1250.0
+    ],
+    "confusion_score": 0.4376
+  },
+  "核能,荷蘭": {
+    "question_id": 14,
+    "correct_word": "核能",
+    "heard_word": "荷蘭",
+    "risky_frequencies": [
+      6300.0,
+      8000.0,
+      315.0,
+      250.0,
+      1600.0
+    ],
+    "confusion_score": 0.4343
+  },
+  "合成,核能": {
+    "question_id": 14,
+    "correct_word": "合成",
+    "heard_word": "核能",
+    "risky_frequencies": [
+      6300.0,
+      1250.0,
+      8000.0,
+      800.0,
+      2000.0
+    ],
+    "confusion_score": 0.6748
+  },
+  "合成,合同": {
+    "question_id": 14,
+    "correct_word": "合成",
+    "heard_word": "合同",
+    "risky_frequencies": [
+      250.0,
+      1000.0,
+      400.0,
+      315.0,
+      6300.0
+    ],
+    "confusion_score": 0.5269
+  },
+  "合成,荷蘭": {
+    "question_id": 14,
+    "correct_word": "合成",
+    "heard_word": "荷蘭",
+    "risky_frequencies": [
+      3150.0,
+      6300.0,
+      4000.0,
+      1600.0,
+      8000.0
+    ],
+    "confusion_score": 0.4841
+  },
+  "合同,核能": {
+    "question_id": 14,
+    "correct_word": "合同",
+    "heard_word": "核能",
+    "risky_frequencies": [
+      400.0,
+      500.0,
+      6300.0,
+      2500.0,
+      1250.0
+    ],
+    "confusion_score": 0.4376
+  },
+  "合同,合成": {
+    "question_id": 14,
+    "correct_word": "合同",
+    "heard_word": "合成",
+    "risky_frequencies": [
+      250.0,
+      1000.0,
+      400.0,
+      315.0,
+      6300.0
+    ],
+    "confusion_score": 0.5269
+  },
+  "合同,荷蘭": {
+    "question_id": 14,
+    "correct_word": "合同",
+    "heard_word": "荷蘭",
+    "risky_frequencies": [
+      6300.0,
+      400.0,
+      4000.0,
+      8000.0,
+      1250.0
+    ],
+    "confusion_score": 0.4326
+  },
+  "荷蘭,核能": {
+    "question_id": 14,
+    "correct_word": "荷蘭",
+    "heard_word": "核能",
+    "risky_frequencies": [
+      6300.0,
+      8000.0,
+      315.0,
+      250.0,
+      1600.0
+    ],
+    "confusion_score": 0.4343
+  },
+  "荷蘭,合成": {
+    "question_id": 14,
+    "correct_word": "荷蘭",
+    "heard_word": "合成",
+    "risky_frequencies": [
+      3150.0,
+      6300.0,
+      4000.0,
+      1600.0,
+      8000.0
+    ],
+    "confusion_score": 0.4841
+  },
+  "荷蘭,合同": {
+    "question_id": 14,
+    "correct_word": "荷蘭",
+    "heard_word": "合同",
+    "risky_frequencies": [
+      6300.0,
+      400.0,
+      4000.0,
+      8000.0,
+      1250.0
+    ],
+    "confusion_score": 0.4326
+  },
+  "熄滅,實驗": {
+    "question_id": 15,
+    "correct_word": "熄滅",
+    "heard_word": "實驗",
+    "risky_frequencies": [
+      6300.0,
+      630.0,
+      250.0,
+      400.0,
+      8000.0
+    ],
+    "confusion_score": 0.6464
+  },
+  "熄滅,靈驗": {
+    "question_id": 15,
+    "correct_word": "熄滅",
+    "heard_word": "靈驗",
+    "risky_frequencies": [
+      1000.0,
+      800.0,
+      1600.0,
+      1250.0,
+      2500.0
+    ],
+    "confusion_score": 0.5652
+  },
+  "熄滅,皮件": {
+    "question_id": 15,
+    "correct_word": "熄滅",
+    "heard_word": "皮件",
+    "risky_frequencies": [
+      1600.0,
+      3150.0,
+      400.0,
+      6300.0,
+      8000.0
+    ],
+    "confusion_score": 0.7497
+  },
+  "實驗,熄滅": {
+    "question_id": 15,
+    "correct_word": "實驗",
+    "heard_word": "熄滅",
+    "risky_frequencies": [
+      6300.0,
+      630.0,
+      250.0,
+      400.0,
+      8000.0
+    ],
+    "confusion_score": 0.6464
+  },
+  "實驗,靈驗": {
+    "question_id": 15,
+    "correct_word": "實驗",
+    "heard_word": "靈驗",
+    "risky_frequencies": [
+      500.0,
+      1250.0,
+      8000.0,
+      800.0,
+      1000.0
+    ],
+    "confusion_score": 0.4698
+  },
+  "實驗,皮件": {
+    "question_id": 15,
+    "correct_word": "實驗",
+    "heard_word": "皮件",
+    "risky_frequencies": [
+      6300.0,
+      8000.0,
+      400.0,
+      5000.0,
+      1250.0
+    ],
+    "confusion_score": 0.4919
+  },
+  "靈驗,熄滅": {
+    "question_id": 15,
+    "correct_word": "靈驗",
+    "heard_word": "熄滅",
+    "risky_frequencies": [
+      1000.0,
+      800.0,
+      1600.0,
+      1250.0,
+      2500.0
+    ],
+    "confusion_score": 0.5652
+  },
+  "靈驗,實驗": {
+    "question_id": 15,
+    "correct_word": "靈驗",
+    "heard_word": "實驗",
+    "risky_frequencies": [
+      500.0,
+      1250.0,
+      8000.0,
+      800.0,
+      1000.0
+    ],
+    "confusion_score": 0.4698
+  },
+  "靈驗,皮件": {
+    "question_id": 15,
+    "correct_word": "靈驗",
+    "heard_word": "皮件",
+    "risky_frequencies": [
+      1600.0,
+      1250.0,
+      800.0,
+      1000.0,
+      2000.0
+    ],
+    "confusion_score": 0.5268
+  },
+  "皮件,熄滅": {
+    "question_id": 15,
+    "correct_word": "皮件",
+    "heard_word": "熄滅",
+    "risky_frequencies": [
+      1600.0,
+      3150.0,
+      400.0,
+      6300.0,
+      8000.0
+    ],
+    "confusion_score": 0.7497
+  },
+  "皮件,實驗": {
+    "question_id": 15,
+    "correct_word": "皮件",
+    "heard_word": "實驗",
+    "risky_frequencies": [
+      6300.0,
+      8000.0,
+      400.0,
+      5000.0,
+      1250.0
+    ],
+    "confusion_score": 0.4919
+  },
+  "皮件,靈驗": {
+    "question_id": 15,
+    "correct_word": "皮件",
+    "heard_word": "靈驗",
+    "risky_frequencies": [
+      1600.0,
+      1250.0,
+      800.0,
+      1000.0,
+      2000.0
+    ],
+    "confusion_score": 0.5268
+  },
+  "價值,電池": {
+    "question_id": 16,
+    "correct_word": "價值",
+    "heard_word": "電池",
+    "risky_frequencies": [
+      5000.0,
+      250.0,
+      2500.0,
+      315.0,
+      400.0
+    ],
+    "confusion_score": 0.549
+  },
+  "價值,現實": {
+    "question_id": 16,
+    "correct_word": "價值",
+    "heard_word": "現實",
+    "risky_frequencies": [
+      400.0,
+      2500.0,
+      315.0,
+      2000.0,
+      630.0
+    ],
+    "confusion_score": 0.4207
+  },
+  "價值,建築": {
+    "question_id": 16,
+    "correct_word": "價值",
+    "heard_word": "建築",
+    "risky_frequencies": [
+      400.0,
+      500.0,
+      630.0,
+      1250.0,
+      1000.0
+    ],
+    "confusion_score": 0.6031
+  },
+  "電池,價值": {
+    "question_id": 16,
+    "correct_word": "電池",
+    "heard_word": "價值",
+    "risky_frequencies": [
+      5000.0,
+      250.0,
+      2500.0,
+      315.0,
+      400.0
+    ],
+    "confusion_score": 0.549
+  },
+  "電池,現實": {
+    "question_id": 16,
+    "correct_word": "電池",
+    "heard_word": "現實",
+    "risky_frequencies": [
+      630.0,
+      800.0,
+      2500.0,
+      1250.0,
+      1600.0
+    ],
+    "confusion_score": 0.6683
+  },
+  "電池,建築": {
+    "question_id": 16,
+    "correct_word": "電池",
+    "heard_word": "建築",
+    "risky_frequencies": [
+      400.0,
+      8000.0,
+      500.0,
+      1250.0,
+      630.0
+    ],
+    "confusion_score": 0.6644
+  },
+  "現實,價值": {
+    "question_id": 16,
+    "correct_word": "現實",
+    "heard_word": "價值",
+    "risky_frequencies": [
+      400.0,
+      2500.0,
+      315.0,
+      2000.0,
+      630.0
+    ],
+    "confusion_score": 0.4207
+  },
+  "現實,電池": {
+    "question_id": 16,
+    "correct_word": "現實",
+    "heard_word": "電池",
+    "risky_frequencies": [
+      630.0,
+      800.0,
+      2500.0,
+      1250.0,
+      1600.0
+    ],
+    "confusion_score": 0.6683
+  },
+  "現實,建築": {
+    "question_id": 16,
+    "correct_word": "現實",
+    "heard_word": "建築",
+    "risky_frequencies": [
+      1000.0,
+      630.0,
+      1250.0,
+      8000.0,
+      400.0
+    ],
+    "confusion_score": 0.5416
+  },
+  "建築,價值": {
+    "question_id": 16,
+    "correct_word": "建築",
+    "heard_word": "價值",
+    "risky_frequencies": [
+      400.0,
+      500.0,
+      630.0,
+      1250.0,
+      1000.0
+    ],
+    "confusion_score": 0.6031
+  },
+  "建築,電池": {
+    "question_id": 16,
+    "correct_word": "建築",
+    "heard_word": "電池",
+    "risky_frequencies": [
+      400.0,
+      8000.0,
+      500.0,
+      1250.0,
+      630.0
+    ],
+    "confusion_score": 0.6644
+  },
+  "建築,現實": {
+    "question_id": 16,
+    "correct_word": "建築",
+    "heard_word": "現實",
+    "risky_frequencies": [
+      1000.0,
+      630.0,
+      1250.0,
+      8000.0,
+      400.0
+    ],
+    "confusion_score": 0.5416
+  },
+  "職位,辭退": {
+    "question_id": 17,
+    "correct_word": "職位",
+    "heard_word": "辭退",
+    "risky_frequencies": [
+      2500.0,
+      400.0,
+      4000.0,
+      2000.0,
+      1600.0
+    ],
+    "confusion_score": 0.6809
+  },
+  "職位,蘆薈": {
+    "question_id": 17,
+    "correct_word": "職位",
+    "heard_word": "蘆薈",
+    "risky_frequencies": [
+      1000.0,
+      800.0,
+      1250.0,
+      630.0,
+      500.0
+    ],
+    "confusion_score": 0.4827
+  },
+  "職位,疲憊": {
+    "question_id": 17,
+    "correct_word": "職位",
+    "heard_word": "疲憊",
+    "risky_frequencies": [
+      2500.0,
+      400.0,
+      8000.0,
+      3150.0,
+      1600.0
+    ],
+    "confusion_score": 0.5746
+  },
+  "辭退,職位": {
+    "question_id": 17,
+    "correct_word": "辭退",
+    "heard_word": "職位",
+    "risky_frequencies": [
+      2500.0,
+      400.0,
+      4000.0,
+      2000.0,
+      1600.0
+    ],
+    "confusion_score": 0.6809
+  },
+  "辭退,蘆薈": {
+    "question_id": 17,
+    "correct_word": "辭退",
+    "heard_word": "蘆薈",
+    "risky_frequencies": [
+      500.0,
+      1250.0,
+      1000.0,
+      250.0,
+      630.0
+    ],
+    "confusion_score": 0.4878
+  },
+  "辭退,疲憊": {
+    "question_id": 17,
+    "correct_word": "辭退",
+    "heard_word": "疲憊",
+    "risky_frequencies": [
+      400.0,
+      2500.0,
+      8000.0,
+      630.0,
+      500.0
+    ],
+    "confusion_score": 0.6054
+  },
+  "蘆薈,職位": {
+    "question_id": 17,
+    "correct_word": "蘆薈",
+    "heard_word": "職位",
+    "risky_frequencies": [
+      1000.0,
+      800.0,
+      1250.0,
+      630.0,
+      500.0
+    ],
+    "confusion_score": 0.4827
+  },
+  "蘆薈,辭退": {
+    "question_id": 17,
+    "correct_word": "蘆薈",
+    "heard_word": "辭退",
+    "risky_frequencies": [
+      500.0,
+      1250.0,
+      1000.0,
+      250.0,
+      630.0
+    ],
+    "confusion_score": 0.4878
+  },
+  "蘆薈,疲憊": {
+    "question_id": 17,
+    "correct_word": "蘆薈",
+    "heard_word": "疲憊",
+    "risky_frequencies": [
+      315.0,
+      250.0,
+      2000.0,
+      1600.0,
+      500.0
+    ],
+    "confusion_score": 0.5601
+  },
+  "疲憊,職位": {
+    "question_id": 17,
+    "correct_word": "疲憊",
+    "heard_word": "職位",
+    "risky_frequencies": [
+      2500.0,
+      400.0,
+      8000.0,
+      3150.0,
+      1600.0
+    ],
+    "confusion_score": 0.5746
+  },
+  "疲憊,辭退": {
+    "question_id": 17,
+    "correct_word": "疲憊",
+    "heard_word": "辭退",
+    "risky_frequencies": [
+      400.0,
+      2500.0,
+      8000.0,
+      630.0,
+      500.0
+    ],
+    "confusion_score": 0.6054
+  },
+  "疲憊,蘆薈": {
+    "question_id": 17,
+    "correct_word": "疲憊",
+    "heard_word": "蘆薈",
+    "risky_frequencies": [
+      315.0,
+      250.0,
+      2000.0,
+      1600.0,
+      500.0
+    ],
+    "confusion_score": 0.5601
+  },
+  "罐頭,卷軸": {
+    "question_id": 18,
+    "correct_word": "罐頭",
+    "heard_word": "卷軸",
+    "risky_frequencies": [
+      250.0,
+      2000.0,
+      6300.0,
+      400.0,
+      500.0
+    ],
+    "confusion_score": 0.5383
+  },
+  "罐頭,控球": {
+    "question_id": 18,
+    "correct_word": "罐頭",
+    "heard_word": "控球",
+    "risky_frequencies": [
+      2000.0,
+      1250.0,
+      250.0,
+      500.0,
+      1600.0
+    ],
+    "confusion_score": 0.5635
+  },
+  "罐頭,戶頭": {
+    "question_id": 18,
+    "correct_word": "罐頭",
+    "heard_word": "戶頭",
+    "risky_frequencies": [
+      8000.0,
+      630.0,
+      6300.0,
+      250.0,
+      500.0
+    ],
+    "confusion_score": 0.4842
+  },
+  "卷軸,罐頭": {
+    "question_id": 18,
+    "correct_word": "卷軸",
+    "heard_word": "罐頭",
+    "risky_frequencies": [
+      250.0,
+      2000.0,
+      6300.0,
+      400.0,
+      500.0
+    ],
+    "confusion_score": 0.5383
+  },
+  "卷軸,控球": {
+    "question_id": 18,
+    "correct_word": "卷軸",
+    "heard_word": "控球",
+    "risky_frequencies": [
+      2000.0,
+      250.0,
+      630.0,
+      8000.0,
+      500.0
+    ],
+    "confusion_score": 0.6576
+  },
+  "卷軸,戶頭": {
+    "question_id": 18,
+    "correct_word": "卷軸",
+    "heard_word": "戶頭",
+    "risky_frequencies": [
+      1250.0,
+      6300.0,
+      250.0,
+      315.0,
+      1600.0
+    ],
+    "confusion_score": 0.6098
+  },
+  "控球,罐頭": {
+    "question_id": 18,
+    "correct_word": "控球",
+    "heard_word": "罐頭",
+    "risky_frequencies": [
+      2000.0,
+      1250.0,
+      250.0,
+      500.0,
+      1600.0
+    ],
+    "confusion_score": 0.5635
+  },
+  "控球,卷軸": {
+    "question_id": 18,
+    "correct_word": "控球",
+    "heard_word": "卷軸",
+    "risky_frequencies": [
+      2000.0,
+      250.0,
+      630.0,
+      8000.0,
+      500.0
+    ],
+    "confusion_score": 0.6576
+  },
+  "控球,戶頭": {
+    "question_id": 18,
+    "correct_word": "控球",
+    "heard_word": "戶頭",
+    "risky_frequencies": [
+      500.0,
+      800.0,
+      315.0,
+      250.0,
+      400.0
+    ],
+    "confusion_score": 0.6301
+  },
+  "戶頭,罐頭": {
+    "question_id": 18,
+    "correct_word": "戶頭",
+    "heard_word": "罐頭",
+    "risky_frequencies": [
+      8000.0,
+      630.0,
+      6300.0,
+      250.0,
+      500.0
+    ],
+    "confusion_score": 0.4842
+  },
+  "戶頭,卷軸": {
+    "question_id": 18,
+    "correct_word": "戶頭",
+    "heard_word": "卷軸",
+    "risky_frequencies": [
+      1250.0,
+      6300.0,
+      250.0,
+      315.0,
+      1600.0
+    ],
+    "confusion_score": 0.6098
+  },
+  "戶頭,控球": {
+    "question_id": 18,
+    "correct_word": "戶頭",
+    "heard_word": "控球",
+    "risky_frequencies": [
+      500.0,
+      800.0,
+      315.0,
+      250.0,
+      400.0
+    ],
+    "confusion_score": 0.6301
+  },
+  "巨大,巨蛋": {
+    "question_id": 19,
+    "correct_word": "巨大",
+    "heard_word": "巨蛋",
+    "risky_frequencies": [
+      630.0,
+      3150.0,
+      8000.0,
+      500.0,
+      2500.0
+    ],
+    "confusion_score": 0.625
+  },
+  "巨大,懼怕": {
+    "question_id": 19,
+    "correct_word": "巨大",
+    "heard_word": "懼怕",
+    "risky_frequencies": [
+      1600.0,
+      1250.0,
+      400.0,
+      800.0,
+      3150.0
+    ],
+    "confusion_score": 0.679
+  },
+  "巨大,木柵": {
+    "question_id": 19,
+    "correct_word": "巨大",
+    "heard_word": "木柵",
+    "risky_frequencies": [
+      1250.0,
+      1600.0,
+      6300.0,
+      4000.0,
+      8000.0
+    ],
+    "confusion_score": 0.4029
+  },
+  "巨蛋,巨大": {
+    "question_id": 19,
+    "correct_word": "巨蛋",
+    "heard_word": "巨大",
+    "risky_frequencies": [
+      630.0,
+      3150.0,
+      8000.0,
+      500.0,
+      2500.0
+    ],
+    "confusion_score": 0.625
+  },
+  "巨蛋,懼怕": {
+    "question_id": 19,
+    "correct_word": "巨蛋",
+    "heard_word": "懼怕",
+    "risky_frequencies": [
+      3150.0,
+      8000.0,
+      500.0,
+      315.0,
+      250.0
+    ],
+    "confusion_score": 0.6666
+  },
+  "巨蛋,木柵": {
+    "question_id": 19,
+    "correct_word": "巨蛋",
+    "heard_word": "木柵",
+    "risky_frequencies": [
+      8000.0,
+      400.0,
+      4000.0,
+      2500.0,
+      3150.0
+    ],
+    "confusion_score": 0.5077
+  },
+  "懼怕,巨大": {
+    "question_id": 19,
+    "correct_word": "懼怕",
+    "heard_word": "巨大",
+    "risky_frequencies": [
+      1600.0,
+      1250.0,
+      400.0,
+      800.0,
+      3150.0
+    ],
+    "confusion_score": 0.679
+  },
+  "懼怕,巨蛋": {
+    "question_id": 19,
+    "correct_word": "懼怕",
+    "heard_word": "巨蛋",
+    "risky_frequencies": [
+      3150.0,
+      8000.0,
+      500.0,
+      315.0,
+      250.0
+    ],
+    "confusion_score": 0.6666
+  },
+  "懼怕,木柵": {
+    "question_id": 19,
+    "correct_word": "懼怕",
+    "heard_word": "木柵",
+    "risky_frequencies": [
+      1250.0,
+      5000.0,
+      6300.0,
+      4000.0,
+      1600.0
+    ],
+    "confusion_score": 0.6295
+  },
+  "木柵,巨大": {
+    "question_id": 19,
+    "correct_word": "木柵",
+    "heard_word": "巨大",
+    "risky_frequencies": [
+      1250.0,
+      1600.0,
+      6300.0,
+      4000.0,
+      8000.0
+    ],
+    "confusion_score": 0.4029
+  },
+  "木柵,巨蛋": {
+    "question_id": 19,
+    "correct_word": "木柵",
+    "heard_word": "巨蛋",
+    "risky_frequencies": [
+      8000.0,
+      400.0,
+      4000.0,
+      2500.0,
+      3150.0
+    ],
+    "confusion_score": 0.5077
+  },
+  "木柵,懼怕": {
+    "question_id": 19,
+    "correct_word": "木柵",
+    "heard_word": "懼怕",
+    "risky_frequencies": [
+      1250.0,
+      5000.0,
+      6300.0,
+      4000.0,
+      1600.0
+    ],
+    "confusion_score": 0.6295
+  },
+  "竹竿,爬山": {
+    "question_id": 20,
+    "correct_word": "竹竿",
+    "heard_word": "爬山",
+    "risky_frequencies": [
+      400.0,
+      630.0,
+      315.0,
+      8000.0,
+      500.0
+    ],
+    "confusion_score": 0.4593
+  },
+  "竹竿,圖刊": {
+    "question_id": 20,
+    "correct_word": "竹竿",
+    "heard_word": "圖刊",
+    "risky_frequencies": [
+      400.0,
+      6300.0,
+      630.0,
+      5000.0,
+      2500.0
+    ],
+    "confusion_score": 0.7014
+  },
+  "竹竿,存單": {
+    "question_id": 20,
+    "correct_word": "竹竿",
+    "heard_word": "存單",
+    "risky_frequencies": [
+      3150.0,
+      4000.0,
+      315.0,
+      800.0,
+      1000.0
+    ],
+    "confusion_score": 0.5166
+  },
+  "爬山,竹竿": {
+    "question_id": 20,
+    "correct_word": "爬山",
+    "heard_word": "竹竿",
+    "risky_frequencies": [
+      400.0,
+      630.0,
+      315.0,
+      8000.0,
+      500.0
+    ],
+    "confusion_score": 0.4593
+  },
+  "爬山,圖刊": {
+    "question_id": 20,
+    "correct_word": "爬山",
+    "heard_word": "圖刊",
+    "risky_frequencies": [
+      630.0,
+      400.0,
+      250.0,
+      500.0,
+      315.0
+    ],
+    "confusion_score": 0.4934
+  },
+  "爬山,存單": {
+    "question_id": 20,
+    "correct_word": "爬山",
+    "heard_word": "存單",
+    "risky_frequencies": [
+      8000.0,
+      1250.0,
+      500.0,
+      400.0,
+      315.0
+    ],
+    "confusion_score": 0.5318
+  },
+  "圖刊,竹竿": {
+    "question_id": 20,
+    "correct_word": "圖刊",
+    "heard_word": "竹竿",
+    "risky_frequencies": [
+      400.0,
+      6300.0,
+      630.0,
+      5000.0,
+      2500.0
+    ],
+    "confusion_score": 0.7014
+  },
+  "圖刊,爬山": {
+    "question_id": 20,
+    "correct_word": "圖刊",
+    "heard_word": "爬山",
+    "risky_frequencies": [
+      630.0,
+      400.0,
+      250.0,
+      500.0,
+      315.0
+    ],
+    "confusion_score": 0.4934
+  },
+  "圖刊,存單": {
+    "question_id": 20,
+    "correct_word": "圖刊",
+    "heard_word": "存單",
+    "risky_frequencies": [
+      800.0,
+      1000.0,
+      3150.0,
+      500.0,
+      6300.0
+    ],
+    "confusion_score": 0.4926
+  },
+  "存單,竹竿": {
+    "question_id": 20,
+    "correct_word": "存單",
+    "heard_word": "竹竿",
+    "risky_frequencies": [
+      3150.0,
+      4000.0,
+      315.0,
+      800.0,
+      1000.0
+    ],
+    "confusion_score": 0.5166
+  },
+  "存單,爬山": {
+    "question_id": 20,
+    "correct_word": "存單",
+    "heard_word": "爬山",
+    "risky_frequencies": [
+      8000.0,
+      1250.0,
+      500.0,
+      400.0,
+      315.0
+    ],
+    "confusion_score": 0.5318
+  },
+  "存單,圖刊": {
+    "question_id": 20,
+    "correct_word": "存單",
+    "heard_word": "圖刊",
+    "risky_frequencies": [
+      800.0,
+      1000.0,
+      3150.0,
+      500.0,
+      6300.0
+    ],
+    "confusion_score": 0.4926
+  },
+  "婦女,數理": {
+    "question_id": 21,
+    "correct_word": "婦女",
+    "heard_word": "數理",
+    "risky_frequencies": [
+      1600.0,
+      630.0,
+      800.0,
+      500.0,
+      250.0
+    ],
+    "confusion_score": 0.2966
+  },
+  "婦女,副理": {
+    "question_id": 21,
+    "correct_word": "婦女",
+    "heard_word": "副理",
+    "risky_frequencies": [
+      800.0,
+      1000.0,
+      1600.0,
+      500.0,
+      315.0
+    ],
+    "confusion_score": 0.7004
+  },
+  "婦女,護理": {
+    "question_id": 21,
+    "correct_word": "婦女",
+    "heard_word": "護理",
+    "risky_frequencies": [
+      4000.0,
+      630.0,
+      2000.0,
+      3150.0,
+      800.0
+    ],
+    "confusion_score": 0.7987
+  },
+  "數理,婦女": {
+    "question_id": 21,
+    "correct_word": "數理",
+    "heard_word": "婦女",
+    "risky_frequencies": [
+      1600.0,
+      630.0,
+      800.0,
+      500.0,
+      250.0
+    ],
+    "confusion_score": 0.2966
+  },
+  "數理,副理": {
+    "question_id": 21,
+    "correct_word": "數理",
+    "heard_word": "副理",
+    "risky_frequencies": [
+      8000.0,
+      1600.0,
+      1250.0,
+      6300.0,
+      2500.0
+    ],
+    "confusion_score": 0.489
+  },
+  "數理,護理": {
+    "question_id": 21,
+    "correct_word": "數理",
+    "heard_word": "護理",
+    "risky_frequencies": [
+      1250.0,
+      500.0,
+      800.0,
+      6300.0,
+      1600.0
+    ],
+    "confusion_score": 0.3405
+  },
+  "副理,婦女": {
+    "question_id": 21,
+    "correct_word": "副理",
+    "heard_word": "婦女",
+    "risky_frequencies": [
+      800.0,
+      1000.0,
+      1600.0,
+      500.0,
+      315.0
+    ],
+    "confusion_score": 0.7004
+  },
+  "副理,數理": {
+    "question_id": 21,
+    "correct_word": "副理",
+    "heard_word": "數理",
+    "risky_frequencies": [
+      8000.0,
+      1600.0,
+      1250.0,
+      6300.0,
+      2500.0
+    ],
+    "confusion_score": 0.489
+  },
+  "副理,護理": {
+    "question_id": 21,
+    "correct_word": "副理",
+    "heard_word": "護理",
+    "risky_frequencies": [
+      800.0,
+      500.0,
+      315.0,
+      250.0,
+      5000.0
+    ],
+    "confusion_score": 0.5384
+  },
+  "護理,婦女": {
+    "question_id": 21,
+    "correct_word": "護理",
+    "heard_word": "婦女",
+    "risky_frequencies": [
+      4000.0,
+      630.0,
+      2000.0,
+      3150.0,
+      800.0
+    ],
+    "confusion_score": 0.7987
+  },
+  "護理,數理": {
+    "question_id": 21,
+    "correct_word": "護理",
+    "heard_word": "數理",
+    "risky_frequencies": [
+      1250.0,
+      500.0,
+      800.0,
+      6300.0,
+      1600.0
+    ],
+    "confusion_score": 0.3405
+  },
+  "護理,副理": {
+    "question_id": 21,
+    "correct_word": "護理",
+    "heard_word": "副理",
+    "risky_frequencies": [
+      800.0,
+      500.0,
+      315.0,
+      250.0,
+      5000.0
+    ],
+    "confusion_score": 0.5384
+  },
+  "過敏,作品": {
+    "question_id": 22,
+    "correct_word": "過敏",
+    "heard_word": "作品",
+    "risky_frequencies": [
+      1600.0,
+      2000.0,
+      1250.0,
+      4000.0,
+      8000.0
+    ],
+    "confusion_score": 0.4056
+  },
+  "過敏,佈景": {
+    "question_id": 22,
+    "correct_word": "過敏",
+    "heard_word": "佈景",
+    "risky_frequencies": [
+      2000.0,
+      4000.0,
+      1600.0,
+      800.0,
+      250.0
+    ],
+    "confusion_score": 0.5016
+  },
+  "過敏,貨品": {
+    "question_id": 22,
+    "correct_word": "過敏",
+    "heard_word": "貨品",
+    "risky_frequencies": [
+      8000.0,
+      6300.0,
+      4000.0,
+      1600.0,
+      2000.0
+    ],
+    "confusion_score": 0.5324
+  },
+  "作品,過敏": {
+    "question_id": 22,
+    "correct_word": "作品",
+    "heard_word": "過敏",
+    "risky_frequencies": [
+      1600.0,
+      2000.0,
+      1250.0,
+      4000.0,
+      8000.0
+    ],
+    "confusion_score": 0.4056
+  },
+  "作品,佈景": {
+    "question_id": 22,
+    "correct_word": "作品",
+    "heard_word": "佈景",
+    "risky_frequencies": [
+      500.0,
+      1600.0,
+      2500.0,
+      400.0,
+      6300.0
+    ],
+    "confusion_score": 0.678
+  },
+  "作品,貨品": {
+    "question_id": 22,
+    "correct_word": "作品",
+    "heard_word": "貨品",
+    "risky_frequencies": [
+      400.0,
+      630.0,
+      315.0,
+      250.0,
+      500.0
+    ],
+    "confusion_score": 0.5162
+  },
+  "佈景,過敏": {
+    "question_id": 22,
+    "correct_word": "佈景",
+    "heard_word": "過敏",
+    "risky_frequencies": [
+      2000.0,
+      4000.0,
+      1600.0,
+      800.0,
+      250.0
+    ],
+    "confusion_score": 0.5016
+  },
+  "佈景,作品": {
+    "question_id": 22,
+    "correct_word": "佈景",
+    "heard_word": "作品",
+    "risky_frequencies": [
+      500.0,
+      1600.0,
+      2500.0,
+      400.0,
+      6300.0
+    ],
+    "confusion_score": 0.678
+  },
+  "佈景,貨品": {
+    "question_id": 22,
+    "correct_word": "佈景",
+    "heard_word": "貨品",
+    "risky_frequencies": [
+      800.0,
+      4000.0,
+      400.0,
+      1000.0,
+      1250.0
+    ],
+    "confusion_score": 0.5723
+  },
+  "貨品,過敏": {
+    "question_id": 22,
+    "correct_word": "貨品",
+    "heard_word": "過敏",
+    "risky_frequencies": [
+      8000.0,
+      6300.0,
+      4000.0,
+      1600.0,
+      2000.0
+    ],
+    "confusion_score": 0.5324
+  },
+  "貨品,作品": {
+    "question_id": 22,
+    "correct_word": "貨品",
+    "heard_word": "作品",
+    "risky_frequencies": [
+      400.0,
+      630.0,
+      315.0,
+      250.0,
+      500.0
+    ],
+    "confusion_score": 0.5162
+  },
+  "貨品,佈景": {
+    "question_id": 22,
+    "correct_word": "貨品",
+    "heard_word": "佈景",
+    "risky_frequencies": [
+      800.0,
+      4000.0,
+      400.0,
+      1000.0,
+      1250.0
+    ],
+    "confusion_score": 0.5723
+  },
+  "沙發,傷身": {
+    "question_id": 23,
+    "correct_word": "沙發",
+    "heard_word": "傷身",
+    "risky_frequencies": [
+      4000.0,
+      6300.0,
+      2500.0,
+      630.0,
+      250.0
+    ],
+    "confusion_score": 0.5755
+  },
+  "沙發,插花": {
+    "question_id": 23,
+    "correct_word": "沙發",
+    "heard_word": "插花",
+    "risky_frequencies": [
+      8000.0,
+      250.0,
+      315.0,
+      400.0,
+      4000.0
+    ],
+    "confusion_score": 0.5377
+  },
+  "沙發,搜刮": {
+    "question_id": 23,
+    "correct_word": "沙發",
+    "heard_word": "搜刮",
+    "risky_frequencies": [
+      6300.0,
+      500.0,
+      4000.0,
+      250.0,
+      2000.0
+    ],
+    "confusion_score": 0.6448
+  },
+  "傷身,沙發": {
+    "question_id": 23,
+    "correct_word": "傷身",
+    "heard_word": "沙發",
+    "risky_frequencies": [
+      4000.0,
+      6300.0,
+      2500.0,
+      630.0,
+      250.0
+    ],
+    "confusion_score": 0.5755
+  },
+  "傷身,插花": {
+    "question_id": 23,
+    "correct_word": "傷身",
+    "heard_word": "插花",
+    "risky_frequencies": [
+      630.0,
+      4000.0,
+      250.0,
+      6300.0,
+      400.0
+    ],
+    "confusion_score": 0.5976
+  },
+  "傷身,搜刮": {
+    "question_id": 23,
+    "correct_word": "傷身",
+    "heard_word": "搜刮",
+    "risky_frequencies": [
+      400.0,
+      6300.0,
+      250.0,
+      8000.0,
+      315.0
+    ],
+    "confusion_score": 0.6065
+  },
+  "插花,沙發": {
+    "question_id": 23,
+    "correct_word": "插花",
+    "heard_word": "沙發",
+    "risky_frequencies": [
+      8000.0,
+      250.0,
+      315.0,
+      400.0,
+      4000.0
+    ],
+    "confusion_score": 0.5377
+  },
+  "插花,傷身": {
+    "question_id": 23,
+    "correct_word": "插花",
+    "heard_word": "傷身",
+    "risky_frequencies": [
+      630.0,
+      4000.0,
+      250.0,
+      6300.0,
+      400.0
+    ],
+    "confusion_score": 0.5976
+  },
+  "插花,搜刮": {
+    "question_id": 23,
+    "correct_word": "插花",
+    "heard_word": "搜刮",
+    "risky_frequencies": [
+      5000.0,
+      2000.0,
+      1250.0,
+      1600.0,
+      250.0
+    ],
+    "confusion_score": 0.5755
+  },
+  "搜刮,沙發": {
+    "question_id": 23,
+    "correct_word": "搜刮",
+    "heard_word": "沙發",
+    "risky_frequencies": [
+      6300.0,
+      500.0,
+      4000.0,
+      250.0,
+      2000.0
+    ],
+    "confusion_score": 0.6448
+  },
+  "搜刮,傷身": {
+    "question_id": 23,
+    "correct_word": "搜刮",
+    "heard_word": "傷身",
+    "risky_frequencies": [
+      400.0,
+      6300.0,
+      250.0,
+      8000.0,
+      315.0
+    ],
+    "confusion_score": 0.6065
+  },
+  "搜刮,插花": {
+    "question_id": 23,
+    "correct_word": "搜刮",
+    "heard_word": "插花",
+    "risky_frequencies": [
+      5000.0,
+      2000.0,
+      1250.0,
+      1600.0,
+      250.0
+    ],
+    "confusion_score": 0.5755
+  },
+  "走失,損失": {
+    "question_id": 24,
+    "correct_word": "走失",
+    "heard_word": "損失",
+    "risky_frequencies": [
+      8000.0,
+      5000.0,
+      6300.0,
+      4000.0,
+      2500.0
+    ],
+    "confusion_score": 0.5231
+  },
+  "走失,導師": {
+    "question_id": 24,
+    "correct_word": "走失",
+    "heard_word": "導師",
+    "risky_frequencies": [
+      4000.0,
+      315.0,
+      630.0,
+      250.0,
+      1600.0
+    ],
+    "confusion_score": 0.5072
+  },
+  "走失,老師": {
+    "question_id": 24,
+    "correct_word": "走失",
+    "heard_word": "老師",
+    "risky_frequencies": [
+      4000.0,
+      630.0,
+      5000.0,
+      1600.0,
+      250.0
+    ],
+    "confusion_score": 0.3962
+  },
+  "損失,走失": {
+    "question_id": 24,
+    "correct_word": "損失",
+    "heard_word": "走失",
+    "risky_frequencies": [
+      8000.0,
+      5000.0,
+      6300.0,
+      4000.0,
+      2500.0
+    ],
+    "confusion_score": 0.5231
+  },
+  "損失,導師": {
+    "question_id": 24,
+    "correct_word": "損失",
+    "heard_word": "導師",
+    "risky_frequencies": [
+      2000.0,
+      4000.0,
+      2500.0,
+      5000.0,
+      6300.0
+    ],
+    "confusion_score": 0.5352
+  },
+  "損失,老師": {
+    "question_id": 24,
+    "correct_word": "損失",
+    "heard_word": "老師",
+    "risky_frequencies": [
+      2000.0,
+      5000.0,
+      4000.0,
+      2500.0,
+      3150.0
+    ],
+    "confusion_score": 0.5837
+  },
+  "導師,走失": {
+    "question_id": 24,
+    "correct_word": "導師",
+    "heard_word": "走失",
+    "risky_frequencies": [
+      4000.0,
+      315.0,
+      630.0,
+      250.0,
+      1600.0
+    ],
+    "confusion_score": 0.5072
+  },
+  "導師,損失": {
+    "question_id": 24,
+    "correct_word": "導師",
+    "heard_word": "損失",
+    "risky_frequencies": [
+      2000.0,
+      4000.0,
+      2500.0,
+      5000.0,
+      6300.0
+    ],
+    "confusion_score": 0.5352
+  },
+  "導師,老師": {
+    "question_id": 24,
+    "correct_word": "導師",
+    "heard_word": "老師",
+    "risky_frequencies": [
+      8000.0,
+      4000.0,
+      2500.0,
+      400.0,
+      1000.0
+    ],
+    "confusion_score": 0.5264
+  },
+  "老師,走失": {
+    "question_id": 24,
+    "correct_word": "老師",
+    "heard_word": "走失",
+    "risky_frequencies": [
+      4000.0,
+      630.0,
+      5000.0,
+      1600.0,
+      250.0
+    ],
+    "confusion_score": 0.3962
+  },
+  "老師,損失": {
+    "question_id": 24,
+    "correct_word": "老師",
+    "heard_word": "損失",
+    "risky_frequencies": [
+      2000.0,
+      5000.0,
+      4000.0,
+      2500.0,
+      3150.0
+    ],
+    "confusion_score": 0.5837
+  },
+  "老師,導師": {
+    "question_id": 24,
+    "correct_word": "老師",
+    "heard_word": "導師",
+    "risky_frequencies": [
+      8000.0,
+      4000.0,
+      2500.0,
+      400.0,
+      1000.0
+    ],
+    "confusion_score": 0.5264
+  },
+  "車輛,殺價": {
+    "question_id": 25,
+    "correct_word": "車輛",
+    "heard_word": "殺價",
+    "risky_frequencies": [
+      1000.0,
+      2000.0,
+      500.0,
+      1600.0,
+      4000.0
+    ],
+    "confusion_score": 0.5316
+  },
+  "車輛,擦亮": {
+    "question_id": 25,
+    "correct_word": "車輛",
+    "heard_word": "擦亮",
+    "risky_frequencies": [
+      1000.0,
+      800.0,
+      2500.0,
+      6300.0,
+      1600.0
+    ],
+    "confusion_score": 0.571
+  },
+  "車輛,春夏": {
+    "question_id": 25,
+    "correct_word": "車輛",
+    "heard_word": "春夏",
+    "risky_frequencies": [
+      1250.0,
+      4000.0,
+      800.0,
+      400.0,
+      5000.0
+    ],
+    "confusion_score": 0.6275
+  },
+  "殺價,車輛": {
+    "question_id": 25,
+    "correct_word": "殺價",
+    "heard_word": "車輛",
+    "risky_frequencies": [
+      1000.0,
+      2000.0,
+      500.0,
+      1600.0,
+      4000.0
+    ],
+    "confusion_score": 0.5316
+  },
+  "殺價,擦亮": {
+    "question_id": 25,
+    "correct_word": "殺價",
+    "heard_word": "擦亮",
+    "risky_frequencies": [
+      1000.0,
+      1250.0,
+      1600.0,
+      500.0,
+      400.0
+    ],
+    "confusion_score": 0.6092
+  },
+  "殺價,春夏": {
+    "question_id": 25,
+    "correct_word": "殺價",
+    "heard_word": "春夏",
+    "risky_frequencies": [
+      8000.0,
+      315.0,
+      400.0,
+      630.0,
+      800.0
+    ],
+    "confusion_score": 0.5813
+  },
+  "擦亮,車輛": {
+    "question_id": 25,
+    "correct_word": "擦亮",
+    "heard_word": "車輛",
+    "risky_frequencies": [
+      1000.0,
+      800.0,
+      2500.0,
+      6300.0,
+      1600.0
+    ],
+    "confusion_score": 0.571
+  },
+  "擦亮,殺價": {
+    "question_id": 25,
+    "correct_word": "擦亮",
+    "heard_word": "殺價",
+    "risky_frequencies": [
+      1000.0,
+      1250.0,
+      1600.0,
+      500.0,
+      400.0
+    ],
+    "confusion_score": 0.6092
+  },
+  "擦亮,春夏": {
+    "question_id": 25,
+    "correct_word": "擦亮",
+    "heard_word": "春夏",
+    "risky_frequencies": [
+      250.0,
+      800.0,
+      400.0,
+      3150.0,
+      2500.0
+    ],
+    "confusion_score": 0.6143
+  },
+  "春夏,車輛": {
+    "question_id": 25,
+    "correct_word": "春夏",
+    "heard_word": "車輛",
+    "risky_frequencies": [
+      1250.0,
+      4000.0,
+      800.0,
+      400.0,
+      5000.0
+    ],
+    "confusion_score": 0.6275
+  },
+  "春夏,殺價": {
+    "question_id": 25,
+    "correct_word": "春夏",
+    "heard_word": "殺價",
+    "risky_frequencies": [
+      8000.0,
+      315.0,
+      400.0,
+      630.0,
+      800.0
+    ],
+    "confusion_score": 0.5813
+  },
+  "春夏,擦亮": {
+    "question_id": 25,
+    "correct_word": "春夏",
+    "heard_word": "擦亮",
+    "risky_frequencies": [
+      250.0,
+      800.0,
+      400.0,
+      3150.0,
+      2500.0
+    ],
+    "confusion_score": 0.6143
+  },
+  "嘆氣,淡季": {
+    "question_id": 26,
+    "correct_word": "嘆氣",
+    "heard_word": "淡季",
+    "risky_frequencies": [
+      1600.0,
+      315.0,
+      1250.0,
+      250.0,
+      630.0
+    ],
+    "confusion_score": 0.314
+  },
+  "嘆氣,放棄": {
+    "question_id": 26,
+    "correct_word": "嘆氣",
+    "heard_word": "放棄",
+    "risky_frequencies": [
+      6300.0,
+      1000.0,
+      630.0,
+      1600.0,
+      400.0
+    ],
+    "confusion_score": 0.3278
+  },
+  "嘆氣,看戲": {
+    "question_id": 26,
+    "correct_word": "嘆氣",
+    "heard_word": "看戲",
+    "risky_frequencies": [
+      500.0,
+      1250.0,
+      2000.0,
+      400.0,
+      630.0
+    ],
+    "confusion_score": 0.5979
+  },
+  "淡季,嘆氣": {
+    "question_id": 26,
+    "correct_word": "淡季",
+    "heard_word": "嘆氣",
+    "risky_frequencies": [
+      1600.0,
+      315.0,
+      1250.0,
+      250.0,
+      630.0
+    ],
+    "confusion_score": 0.314
+  },
+  "淡季,放棄": {
+    "question_id": 26,
+    "correct_word": "淡季",
+    "heard_word": "放棄",
+    "risky_frequencies": [
+      1000.0,
+      6300.0,
+      630.0,
+      400.0,
+      8000.0
+    ],
+    "confusion_score": 0.5676
+  },
+  "淡季,看戲": {
+    "question_id": 26,
+    "correct_word": "淡季",
+    "heard_word": "看戲",
+    "risky_frequencies": [
+      315.0,
+      1250.0,
+      250.0,
+      1600.0,
+      630.0
+    ],
+    "confusion_score": 0.3372
+  },
+  "放棄,嘆氣": {
+    "question_id": 26,
+    "correct_word": "放棄",
+    "heard_word": "嘆氣",
+    "risky_frequencies": [
+      6300.0,
+      1000.0,
+      630.0,
+      1600.0,
+      400.0
+    ],
+    "confusion_score": 0.3278
+  },
+  "放棄,淡季": {
+    "question_id": 26,
+    "correct_word": "放棄",
+    "heard_word": "淡季",
+    "risky_frequencies": [
+      1000.0,
+      6300.0,
+      630.0,
+      400.0,
+      8000.0
+    ],
+    "confusion_score": 0.5676
+  },
+  "放棄,看戲": {
+    "question_id": 26,
+    "correct_word": "放棄",
+    "heard_word": "看戲",
+    "risky_frequencies": [
+      630.0,
+      400.0,
+      250.0,
+      315.0,
+      1250.0
+    ],
+    "confusion_score": 0.3548
+  },
+  "看戲,嘆氣": {
+    "question_id": 26,
+    "correct_word": "看戲",
+    "heard_word": "嘆氣",
+    "risky_frequencies": [
+      500.0,
+      1250.0,
+      2000.0,
+      400.0,
+      630.0
+    ],
+    "confusion_score": 0.5979
+  },
+  "看戲,淡季": {
+    "question_id": 26,
+    "correct_word": "看戲",
+    "heard_word": "淡季",
+    "risky_frequencies": [
+      315.0,
+      1250.0,
+      250.0,
+      1600.0,
+      630.0
+    ],
+    "confusion_score": 0.3372
+  },
+  "看戲,放棄": {
+    "question_id": 26,
+    "correct_word": "看戲",
+    "heard_word": "放棄",
+    "risky_frequencies": [
+      630.0,
+      400.0,
+      250.0,
+      315.0,
+      1250.0
+    ],
+    "confusion_score": 0.3548
+  },
+  "銀行,平常": {
+    "question_id": 27,
+    "correct_word": "銀行",
+    "heard_word": "平常",
+    "risky_frequencies": [
+      5000.0,
+      2000.0,
+      2500.0,
+      3150.0,
+      8000.0
+    ],
+    "confusion_score": 0.59
+  },
+  "銀行,情郎": {
+    "question_id": 27,
+    "correct_word": "銀行",
+    "heard_word": "情郎",
+    "risky_frequencies": [
+      400.0,
+      8000.0,
+      800.0,
+      2000.0,
+      6300.0
+    ],
+    "confusion_score": 0.6161
+  },
+  "銀行,行房": {
+    "question_id": 27,
+    "correct_word": "銀行",
+    "heard_word": "行房",
+    "risky_frequencies": [
+      2500.0,
+      800.0,
+      500.0,
+      8000.0,
+      6300.0
+    ],
+    "confusion_score": 0.4724
+  },
+  "平常,銀行": {
+    "question_id": 27,
+    "correct_word": "平常",
+    "heard_word": "銀行",
+    "risky_frequencies": [
+      5000.0,
+      2000.0,
+      2500.0,
+      3150.0,
+      8000.0
+    ],
+    "confusion_score": 0.59
+  },
+  "平常,情郎": {
+    "question_id": 27,
+    "correct_word": "平常",
+    "heard_word": "情郎",
+    "risky_frequencies": [
+      2000.0,
+      2500.0,
+      4000.0,
+      1600.0,
+      6300.0
+    ],
+    "confusion_score": 0.6059
+  },
+  "平常,行房": {
+    "question_id": 27,
+    "correct_word": "平常",
+    "heard_word": "行房",
+    "risky_frequencies": [
+      3150.0,
+      400.0,
+      500.0,
+      4000.0,
+      250.0
+    ],
+    "confusion_score": 0.4793
+  },
+  "情郎,銀行": {
+    "question_id": 27,
+    "correct_word": "情郎",
+    "heard_word": "銀行",
+    "risky_frequencies": [
+      400.0,
+      8000.0,
+      800.0,
+      2000.0,
+      6300.0
+    ],
+    "confusion_score": 0.6161
+  },
+  "情郎,平常": {
+    "question_id": 27,
+    "correct_word": "情郎",
+    "heard_word": "平常",
+    "risky_frequencies": [
+      2000.0,
+      2500.0,
+      4000.0,
+      1600.0,
+      6300.0
+    ],
+    "confusion_score": 0.6059
+  },
+  "情郎,行房": {
+    "question_id": 27,
+    "correct_word": "情郎",
+    "heard_word": "行房",
+    "risky_frequencies": [
+      315.0,
+      800.0,
+      1250.0,
+      250.0,
+      4000.0
+    ],
+    "confusion_score": 0.5372
+  },
+  "行房,銀行": {
+    "question_id": 27,
+    "correct_word": "行房",
+    "heard_word": "銀行",
+    "risky_frequencies": [
+      2500.0,
+      800.0,
+      500.0,
+      8000.0,
+      6300.0
+    ],
+    "confusion_score": 0.4724
+  },
+  "行房,平常": {
+    "question_id": 27,
+    "correct_word": "行房",
+    "heard_word": "平常",
+    "risky_frequencies": [
+      3150.0,
+      400.0,
+      500.0,
+      4000.0,
+      250.0
+    ],
+    "confusion_score": 0.4793
+  },
+  "行房,情郎": {
+    "question_id": 27,
+    "correct_word": "行房",
+    "heard_word": "情郎",
+    "risky_frequencies": [
+      315.0,
+      800.0,
+      1250.0,
+      250.0,
+      4000.0
+    ],
+    "confusion_score": 0.5372
+  },
+  "舅媽,舊傷": {
+    "question_id": 28,
+    "correct_word": "舅媽",
+    "heard_word": "舊傷",
+    "risky_frequencies": [
+      4000.0,
+      1600.0,
+      315.0,
+      630.0,
+      400.0
+    ],
+    "confusion_score": 0.5426
+  },
+  "舅媽,用餐": {
+    "question_id": 28,
+    "correct_word": "舅媽",
+    "heard_word": "用餐",
+    "risky_frequencies": [
+      250.0,
+      400.0,
+      315.0,
+      6300.0,
+      3150.0
+    ],
+    "confusion_score": 0.6473
+  },
+  "舅媽,誘發": {
+    "question_id": 28,
+    "correct_word": "舅媽",
+    "heard_word": "誘發",
+    "risky_frequencies": [
+      800.0,
+      3150.0,
+      1000.0,
+      1600.0,
+      2000.0
+    ],
+    "confusion_score": 0.4787
+  },
+  "舊傷,舅媽": {
+    "question_id": 28,
+    "correct_word": "舊傷",
+    "heard_word": "舅媽",
+    "risky_frequencies": [
+      4000.0,
+      1600.0,
+      315.0,
+      630.0,
+      400.0
+    ],
+    "confusion_score": 0.5426
+  },
+  "舊傷,用餐": {
+    "question_id": 28,
+    "correct_word": "舊傷",
+    "heard_word": "用餐",
+    "risky_frequencies": [
+      2500.0,
+      630.0,
+      800.0,
+      5000.0,
+      500.0
+    ],
+    "confusion_score": 0.5611
+  },
+  "舊傷,誘發": {
+    "question_id": 28,
+    "correct_word": "舊傷",
+    "heard_word": "誘發",
+    "risky_frequencies": [
+      500.0,
+      1250.0,
+      400.0,
+      800.0,
+      1600.0
+    ],
+    "confusion_score": 0.5512
+  },
+  "用餐,舅媽": {
+    "question_id": 28,
+    "correct_word": "用餐",
+    "heard_word": "舅媽",
+    "risky_frequencies": [
+      250.0,
+      400.0,
+      315.0,
+      6300.0,
+      3150.0
+    ],
+    "confusion_score": 0.6473
+  },
+  "用餐,舊傷": {
+    "question_id": 28,
+    "correct_word": "用餐",
+    "heard_word": "舊傷",
+    "risky_frequencies": [
+      2500.0,
+      630.0,
+      800.0,
+      5000.0,
+      500.0
+    ],
+    "confusion_score": 0.5611
+  },
+  "用餐,誘發": {
+    "question_id": 28,
+    "correct_word": "用餐",
+    "heard_word": "誘發",
+    "risky_frequencies": [
+      4000.0,
+      800.0,
+      500.0,
+      6300.0,
+      3150.0
+    ],
+    "confusion_score": 0.4583
+  },
+  "誘發,舅媽": {
+    "question_id": 28,
+    "correct_word": "誘發",
+    "heard_word": "舅媽",
+    "risky_frequencies": [
+      800.0,
+      3150.0,
+      1000.0,
+      1600.0,
+      2000.0
+    ],
+    "confusion_score": 0.4787
+  },
+  "誘發,舊傷": {
+    "question_id": 28,
+    "correct_word": "誘發",
+    "heard_word": "舊傷",
+    "risky_frequencies": [
+      500.0,
+      1250.0,
+      400.0,
+      800.0,
+      1600.0
+    ],
+    "confusion_score": 0.5512
+  },
+  "誘發,用餐": {
+    "question_id": 28,
+    "correct_word": "誘發",
+    "heard_word": "用餐",
+    "risky_frequencies": [
+      4000.0,
+      800.0,
+      500.0,
+      6300.0,
+      3150.0
+    ],
+    "confusion_score": 0.4583
+  },
+  "成熟,蟾蜍": {
+    "question_id": 29,
+    "correct_word": "成熟",
+    "heard_word": "蟾蜍",
+    "risky_frequencies": [
+      400.0,
+      800.0,
+      2000.0,
+      1250.0,
+      5000.0
+    ],
+    "confusion_score": 0.6799
+  },
+  "成熟,乘除": {
+    "question_id": 29,
+    "correct_word": "成熟",
+    "heard_word": "乘除",
+    "risky_frequencies": [
+      250.0,
+      8000.0,
+      400.0,
+      6300.0,
+      315.0
+    ],
+    "confusion_score": 0.669
+  },
+  "成熟,純熟": {
+    "question_id": 29,
+    "correct_word": "成熟",
+    "heard_word": "純熟",
+    "risky_frequencies": [
+      4000.0,
+      6300.0,
+      2500.0,
+      3150.0,
+      8000.0
+    ],
+    "confusion_score": 0.6267
+  },
+  "蟾蜍,成熟": {
+    "question_id": 29,
+    "correct_word": "蟾蜍",
+    "heard_word": "成熟",
+    "risky_frequencies": [
+      400.0,
+      800.0,
+      2000.0,
+      1250.0,
+      5000.0
+    ],
+    "confusion_score": 0.6799
+  },
+  "蟾蜍,乘除": {
+    "question_id": 29,
+    "correct_word": "蟾蜍",
+    "heard_word": "乘除",
+    "risky_frequencies": [
+      6300.0,
+      630.0,
+      8000.0,
+      315.0,
+      3150.0
+    ],
+    "confusion_score": 0.543
+  },
+  "蟾蜍,純熟": {
+    "question_id": 29,
+    "correct_word": "蟾蜍",
+    "heard_word": "純熟",
+    "risky_frequencies": [
+      1000.0,
+      315.0,
+      5000.0,
+      8000.0,
+      1600.0
+    ],
+    "confusion_score": 0.7246
+  },
+  "乘除,成熟": {
+    "question_id": 29,
+    "correct_word": "乘除",
+    "heard_word": "成熟",
+    "risky_frequencies": [
+      250.0,
+      8000.0,
+      400.0,
+      6300.0,
+      315.0
+    ],
+    "confusion_score": 0.669
+  },
+  "乘除,蟾蜍": {
+    "question_id": 29,
+    "correct_word": "乘除",
+    "heard_word": "蟾蜍",
+    "risky_frequencies": [
+      6300.0,
+      630.0,
+      8000.0,
+      315.0,
+      3150.0
+    ],
+    "confusion_score": 0.543
+  },
+  "乘除,純熟": {
+    "question_id": 29,
+    "correct_word": "乘除",
+    "heard_word": "純熟",
+    "risky_frequencies": [
+      1250.0,
+      1600.0,
+      500.0,
+      315.0,
+      8000.0
+    ],
+    "confusion_score": 0.7408
+  },
+  "純熟,成熟": {
+    "question_id": 29,
+    "correct_word": "純熟",
+    "heard_word": "成熟",
+    "risky_frequencies": [
+      4000.0,
+      6300.0,
+      2500.0,
+      3150.0,
+      8000.0
+    ],
+    "confusion_score": 0.6267
+  },
+  "純熟,蟾蜍": {
+    "question_id": 29,
+    "correct_word": "純熟",
+    "heard_word": "蟾蜍",
+    "risky_frequencies": [
+      1000.0,
+      315.0,
+      5000.0,
+      8000.0,
+      1600.0
+    ],
+    "confusion_score": 0.7246
+  },
+  "純熟,乘除": {
+    "question_id": 29,
+    "correct_word": "純熟",
+    "heard_word": "乘除",
+    "risky_frequencies": [
+      1250.0,
+      1600.0,
+      500.0,
+      315.0,
+      8000.0
+    ],
+    "confusion_score": 0.7408
+  },
+  "幸運,信譽": {
+    "question_id": 30,
+    "correct_word": "幸運",
+    "heard_word": "信譽",
+    "risky_frequencies": [
+      630.0,
+      6300.0,
+      800.0,
+      8000.0,
+      315.0
+    ],
+    "confusion_score": 0.7547
+  },
+  "幸運,禁慾": {
+    "question_id": 30,
+    "correct_word": "幸運",
+    "heard_word": "禁慾",
+    "risky_frequencies": [
+      1250.0,
+      800.0,
+      1000.0,
+      1600.0,
+      630.0
+    ],
+    "confusion_score": 0.676
+  },
+  "幸運,定律": {
+    "question_id": 30,
+    "correct_word": "幸運",
+    "heard_word": "定律",
+    "risky_frequencies": [
+      4000.0,
+      800.0,
+      1250.0,
+      3150.0,
+      250.0
+    ],
+    "confusion_score": 0.55
+  },
+  "信譽,幸運": {
+    "question_id": 30,
+    "correct_word": "信譽",
+    "heard_word": "幸運",
+    "risky_frequencies": [
+      630.0,
+      6300.0,
+      800.0,
+      8000.0,
+      315.0
+    ],
+    "confusion_score": 0.7547
+  },
+  "信譽,禁慾": {
+    "question_id": 30,
+    "correct_word": "信譽",
+    "heard_word": "禁慾",
+    "risky_frequencies": [
+      500.0,
+      2000.0,
+      4000.0,
+      400.0,
+      2500.0
+    ],
+    "confusion_score": 0.6038
+  },
+  "信譽,定律": {
+    "question_id": 30,
+    "correct_word": "信譽",
+    "heard_word": "定律",
+    "risky_frequencies": [
+      250.0,
+      1600.0,
+      800.0,
+      1250.0,
+      2500.0
+    ],
+    "confusion_score": 0.651
+  },
+  "禁慾,幸運": {
+    "question_id": 30,
+    "correct_word": "禁慾",
+    "heard_word": "幸運",
+    "risky_frequencies": [
+      1250.0,
+      800.0,
+      1000.0,
+      1600.0,
+      630.0
+    ],
+    "confusion_score": 0.676
+  },
+  "禁慾,信譽": {
+    "question_id": 30,
+    "correct_word": "禁慾",
+    "heard_word": "信譽",
+    "risky_frequencies": [
+      500.0,
+      2000.0,
+      4000.0,
+      400.0,
+      2500.0
+    ],
+    "confusion_score": 0.6038
+  },
+  "禁慾,定律": {
+    "question_id": 30,
+    "correct_word": "禁慾",
+    "heard_word": "定律",
+    "risky_frequencies": [
+      1250.0,
+      800.0,
+      2500.0,
+      5000.0,
+      1600.0
+    ],
+    "confusion_score": 0.6507
+  },
+  "定律,幸運": {
+    "question_id": 30,
+    "correct_word": "定律",
+    "heard_word": "幸運",
+    "risky_frequencies": [
+      4000.0,
+      800.0,
+      1250.0,
+      3150.0,
+      250.0
+    ],
+    "confusion_score": 0.55
+  },
+  "定律,信譽": {
+    "question_id": 30,
+    "correct_word": "定律",
+    "heard_word": "信譽",
+    "risky_frequencies": [
+      250.0,
+      1600.0,
+      800.0,
+      1250.0,
+      2500.0
+    ],
+    "confusion_score": 0.651
+  },
+  "定律,禁慾": {
+    "question_id": 30,
+    "correct_word": "定律",
+    "heard_word": "禁慾",
+    "risky_frequencies": [
+      1250.0,
+      800.0,
+      2500.0,
+      5000.0,
+      1600.0
+    ],
+    "confusion_score": 0.6507
+  },
+  "花瓶,發明": {
+    "question_id": 31,
+    "correct_word": "花瓶",
+    "heard_word": "發明",
+    "risky_frequencies": [
+      1600.0,
+      8000.0,
+      4000.0,
+      2000.0,
+      1000.0
+    ],
+    "confusion_score": 0.5989
+  },
+  "花瓶,瓜皮": {
+    "question_id": 31,
+    "correct_word": "花瓶",
+    "heard_word": "瓜皮",
+    "risky_frequencies": [
+      8000.0,
+      4000.0,
+      6300.0,
+      5000.0,
+      3150.0
+    ],
+    "confusion_score": 0.5612
+  },
+  "花瓶,芳名": {
+    "question_id": 31,
+    "correct_word": "花瓶",
+    "heard_word": "芳名",
+    "risky_frequencies": [
+      1250.0,
+      8000.0,
+      1000.0,
+      4000.0,
+      630.0
+    ],
+    "confusion_score": 0.3416
+  },
+  "發明,花瓶": {
+    "question_id": 31,
+    "correct_word": "發明",
+    "heard_word": "花瓶",
+    "risky_frequencies": [
+      1600.0,
+      8000.0,
+      4000.0,
+      2000.0,
+      1000.0
+    ],
+    "confusion_score": 0.5989
+  },
+  "發明,瓜皮": {
+    "question_id": 31,
+    "correct_word": "發明",
+    "heard_word": "瓜皮",
+    "risky_frequencies": [
+      8000.0,
+      5000.0,
+      3150.0,
+      800.0,
+      2500.0
+    ],
+    "confusion_score": 0.5499
+  },
+  "發明,芳名": {
+    "question_id": 31,
+    "correct_word": "發明",
+    "heard_word": "芳名",
+    "risky_frequencies": [
+      500.0,
+      8000.0,
+      315.0,
+      250.0,
+      5000.0
+    ],
+    "confusion_score": 0.529
+  },
+  "瓜皮,花瓶": {
+    "question_id": 31,
+    "correct_word": "瓜皮",
+    "heard_word": "花瓶",
+    "risky_frequencies": [
+      8000.0,
+      4000.0,
+      6300.0,
+      5000.0,
+      3150.0
+    ],
+    "confusion_score": 0.5612
+  },
+  "瓜皮,發明": {
+    "question_id": 31,
+    "correct_word": "瓜皮",
+    "heard_word": "發明",
+    "risky_frequencies": [
+      8000.0,
+      5000.0,
+      3150.0,
+      800.0,
+      2500.0
+    ],
+    "confusion_score": 0.5499
+  },
+  "瓜皮,芳名": {
+    "question_id": 31,
+    "correct_word": "瓜皮",
+    "heard_word": "芳名",
+    "risky_frequencies": [
+      2500.0,
+      8000.0,
+      800.0,
+      5000.0,
+      3150.0
+    ],
+    "confusion_score": 0.5805
+  },
+  "芳名,花瓶": {
+    "question_id": 31,
+    "correct_word": "芳名",
+    "heard_word": "花瓶",
+    "risky_frequencies": [
+      1250.0,
+      8000.0,
+      1000.0,
+      4000.0,
+      630.0
+    ],
+    "confusion_score": 0.3416
+  },
+  "芳名,發明": {
+    "question_id": 31,
+    "correct_word": "芳名",
+    "heard_word": "發明",
+    "risky_frequencies": [
+      500.0,
+      8000.0,
+      315.0,
+      250.0,
+      5000.0
+    ],
+    "confusion_score": 0.529
+  },
+  "芳名,瓜皮": {
+    "question_id": 31,
+    "correct_word": "芳名",
+    "heard_word": "瓜皮",
+    "risky_frequencies": [
+      2500.0,
+      8000.0,
+      800.0,
+      5000.0,
+      3150.0
+    ],
+    "confusion_score": 0.5805
+  },
+  "誤會,議會": {
+    "question_id": 32,
+    "correct_word": "誤會",
+    "heard_word": "議會",
+    "risky_frequencies": [
+      250.0,
+      1000.0,
+      500.0,
+      6300.0,
+      8000.0
+    ],
+    "confusion_score": 0.6055
+  },
+  "誤會,入會": {
+    "question_id": 32,
+    "correct_word": "誤會",
+    "heard_word": "入會",
+    "risky_frequencies": [
+      2000.0,
+      1250.0,
+      4000.0,
+      1600.0,
+      6300.0
+    ],
+    "confusion_score": 0.6011
+  },
+  "誤會,宿醉": {
+    "question_id": 32,
+    "correct_word": "誤會",
+    "heard_word": "宿醉",
+    "risky_frequencies": [
+      1000.0,
+      1600.0,
+      1250.0,
+      500.0,
+      400.0
+    ],
+    "confusion_score": 0.4344
+  },
+  "議會,誤會": {
+    "question_id": 32,
+    "correct_word": "議會",
+    "heard_word": "誤會",
+    "risky_frequencies": [
+      250.0,
+      1000.0,
+      500.0,
+      6300.0,
+      8000.0
+    ],
+    "confusion_score": 0.6055
+  },
+  "議會,入會": {
+    "question_id": 32,
+    "correct_word": "議會",
+    "heard_word": "入會",
+    "risky_frequencies": [
+      400.0,
+      800.0,
+      6300.0,
+      315.0,
+      1600.0
+    ],
+    "confusion_score": 0.5846
+  },
+  "議會,宿醉": {
+    "question_id": 32,
+    "correct_word": "議會",
+    "heard_word": "宿醉",
+    "risky_frequencies": [
+      1600.0,
+      1000.0,
+      4000.0,
+      3150.0,
+      5000.0
+    ],
+    "confusion_score": 0.641
+  },
+  "入會,誤會": {
+    "question_id": 32,
+    "correct_word": "入會",
+    "heard_word": "誤會",
+    "risky_frequencies": [
+      2000.0,
+      1250.0,
+      4000.0,
+      1600.0,
+      6300.0
+    ],
+    "confusion_score": 0.6011
+  },
+  "入會,議會": {
+    "question_id": 32,
+    "correct_word": "入會",
+    "heard_word": "議會",
+    "risky_frequencies": [
+      400.0,
+      800.0,
+      6300.0,
+      315.0,
+      1600.0
+    ],
+    "confusion_score": 0.5846
+  },
+  "入會,宿醉": {
+    "question_id": 32,
+    "correct_word": "入會",
+    "heard_word": "宿醉",
+    "risky_frequencies": [
+      500.0,
+      1600.0,
+      1000.0,
+      800.0,
+      400.0
+    ],
+    "confusion_score": 0.4963
+  },
+  "宿醉,誤會": {
+    "question_id": 32,
+    "correct_word": "宿醉",
+    "heard_word": "誤會",
+    "risky_frequencies": [
+      1000.0,
+      1600.0,
+      1250.0,
+      500.0,
+      400.0
+    ],
+    "confusion_score": 0.4344
+  },
+  "宿醉,議會": {
+    "question_id": 32,
+    "correct_word": "宿醉",
+    "heard_word": "議會",
+    "risky_frequencies": [
+      1600.0,
+      1000.0,
+      4000.0,
+      3150.0,
+      5000.0
+    ],
+    "confusion_score": 0.641
+  },
+  "宿醉,入會": {
+    "question_id": 32,
+    "correct_word": "宿醉",
+    "heard_word": "入會",
+    "risky_frequencies": [
+      500.0,
+      1600.0,
+      1000.0,
+      800.0,
+      400.0
+    ],
+    "confusion_score": 0.4963
+  },
+  "機器,激進": {
+    "question_id": 33,
+    "correct_word": "機器",
+    "heard_word": "激進",
+    "risky_frequencies": [
+      315.0,
+      630.0,
+      400.0,
+      1600.0,
+      1000.0
+    ],
+    "confusion_score": 0.5403
+  },
+  "機器,嬉戲": {
+    "question_id": 33,
+    "correct_word": "機器",
+    "heard_word": "嬉戲",
+    "risky_frequencies": [
+      4000.0,
+      8000.0,
+      1600.0,
+      2500.0,
+      5000.0
+    ],
+    "confusion_score": 0.6792
+  },
+  "機器,香氣": {
+    "question_id": 33,
+    "correct_word": "機器",
+    "heard_word": "香氣",
+    "risky_frequencies": [
+      315.0,
+      250.0,
+      400.0,
+      2500.0,
+      6300.0
+    ],
+    "confusion_score": 0.4881
+  },
+  "激進,機器": {
+    "question_id": 33,
+    "correct_word": "激進",
+    "heard_word": "機器",
+    "risky_frequencies": [
+      315.0,
+      630.0,
+      400.0,
+      1600.0,
+      1000.0
+    ],
+    "confusion_score": 0.5403
+  },
+  "激進,嬉戲": {
+    "question_id": 33,
+    "correct_word": "激進",
+    "heard_word": "嬉戲",
+    "risky_frequencies": [
+      500.0,
+      630.0,
+      1250.0,
+      1000.0,
+      1600.0
+    ],
+    "confusion_score": 0.4843
+  },
+  "激進,香氣": {
+    "question_id": 33,
+    "correct_word": "激進",
+    "heard_word": "香氣",
+    "risky_frequencies": [
+      315.0,
+      250.0,
+      1000.0,
+      630.0,
+      400.0
+    ],
+    "confusion_score": 0.5174
+  },
+  "嬉戲,機器": {
+    "question_id": 33,
+    "correct_word": "嬉戲",
+    "heard_word": "機器",
+    "risky_frequencies": [
+      4000.0,
+      8000.0,
+      1600.0,
+      2500.0,
+      5000.0
+    ],
+    "confusion_score": 0.6792
+  },
+  "嬉戲,激進": {
+    "question_id": 33,
+    "correct_word": "嬉戲",
+    "heard_word": "激進",
+    "risky_frequencies": [
+      500.0,
+      630.0,
+      1250.0,
+      1000.0,
+      1600.0
+    ],
+    "confusion_score": 0.4843
+  },
+  "嬉戲,香氣": {
+    "question_id": 33,
+    "correct_word": "嬉戲",
+    "heard_word": "香氣",
+    "risky_frequencies": [
+      2000.0,
+      1000.0,
+      3150.0,
+      400.0,
+      8000.0
+    ],
+    "confusion_score": 0.5028
+  },
+  "香氣,機器": {
+    "question_id": 33,
+    "correct_word": "香氣",
+    "heard_word": "機器",
+    "risky_frequencies": [
+      315.0,
+      250.0,
+      400.0,
+      2500.0,
+      6300.0
+    ],
+    "confusion_score": 0.4881
+  },
+  "香氣,激進": {
+    "question_id": 33,
+    "correct_word": "香氣",
+    "heard_word": "激進",
+    "risky_frequencies": [
+      315.0,
+      250.0,
+      1000.0,
+      630.0,
+      400.0
+    ],
+    "confusion_score": 0.5174
+  },
+  "香氣,嬉戲": {
+    "question_id": 33,
+    "correct_word": "香氣",
+    "heard_word": "嬉戲",
+    "risky_frequencies": [
+      2000.0,
+      1000.0,
+      3150.0,
+      400.0,
+      8000.0
+    ],
+    "confusion_score": 0.5028
+  },
+  "人間,房間": {
+    "question_id": 34,
+    "correct_word": "人間",
+    "heard_word": "房間",
+    "risky_frequencies": [
+      6300.0,
+      1600.0,
+      630.0,
+      500.0,
+      5000.0
+    ],
+    "confusion_score": 0.4727
+  },
+  "人間,晨間": {
+    "question_id": 34,
+    "correct_word": "人間",
+    "heard_word": "晨間",
+    "risky_frequencies": [
+      8000.0,
+      630.0,
+      1250.0,
+      4000.0,
+      2000.0
+    ],
+    "confusion_score": 0.5739
+  },
+  "人間,神仙": {
+    "question_id": 34,
+    "correct_word": "人間",
+    "heard_word": "神仙",
+    "risky_frequencies": [
+      1250.0,
+      500.0,
+      800.0,
+      630.0,
+      1600.0
+    ],
+    "confusion_score": 0.5761
+  },
+  "房間,人間": {
+    "question_id": 34,
+    "correct_word": "房間",
+    "heard_word": "人間",
+    "risky_frequencies": [
+      6300.0,
+      1600.0,
+      630.0,
+      500.0,
+      5000.0
+    ],
+    "confusion_score": 0.4727
+  },
+  "房間,晨間": {
+    "question_id": 34,
+    "correct_word": "房間",
+    "heard_word": "晨間",
+    "risky_frequencies": [
+      630.0,
+      400.0,
+      1600.0,
+      8000.0,
+      2000.0
+    ],
+    "confusion_score": 0.6056
+  },
+  "房間,神仙": {
+    "question_id": 34,
+    "correct_word": "房間",
+    "heard_word": "神仙",
+    "risky_frequencies": [
+      400.0,
+      500.0,
+      1000.0,
+      630.0,
+      2000.0
+    ],
+    "confusion_score": 0.6001
+  },
+  "晨間,人間": {
+    "question_id": 34,
+    "correct_word": "晨間",
+    "heard_word": "人間",
+    "risky_frequencies": [
+      8000.0,
+      630.0,
+      1250.0,
+      4000.0,
+      2000.0
+    ],
+    "confusion_score": 0.5739
+  },
+  "晨間,房間": {
+    "question_id": 34,
+    "correct_word": "晨間",
+    "heard_word": "房間",
+    "risky_frequencies": [
+      630.0,
+      400.0,
+      1600.0,
+      8000.0,
+      2000.0
+    ],
+    "confusion_score": 0.6056
+  },
+  "晨間,神仙": {
+    "question_id": 34,
+    "correct_word": "晨間",
+    "heard_word": "神仙",
+    "risky_frequencies": [
+      1250.0,
+      1600.0,
+      400.0,
+      315.0,
+      630.0
+    ],
+    "confusion_score": 0.5816
+  },
+  "神仙,人間": {
+    "question_id": 34,
+    "correct_word": "神仙",
+    "heard_word": "人間",
+    "risky_frequencies": [
+      1250.0,
+      500.0,
+      800.0,
+      630.0,
+      1600.0
+    ],
+    "confusion_score": 0.5761
+  },
+  "神仙,房間": {
+    "question_id": 34,
+    "correct_word": "神仙",
+    "heard_word": "房間",
+    "risky_frequencies": [
+      400.0,
+      500.0,
+      1000.0,
+      630.0,
+      2000.0
+    ],
+    "confusion_score": 0.6001
+  },
+  "神仙,晨間": {
+    "question_id": 34,
+    "correct_word": "神仙",
+    "heard_word": "晨間",
+    "risky_frequencies": [
+      1250.0,
+      1600.0,
+      400.0,
+      315.0,
+      630.0
+    ],
+    "confusion_score": 0.5816
+  },
+  "笑容,倦容": {
+    "question_id": 35,
+    "correct_word": "笑容",
+    "heard_word": "倦容",
+    "risky_frequencies": [
+      315.0,
+      1600.0,
+      400.0,
+      8000.0,
+      5000.0
+    ],
+    "confusion_score": 0.5844
+  },
+  "笑容,掉頭": {
+    "question_id": 35,
+    "correct_word": "笑容",
+    "heard_word": "掉頭",
+    "risky_frequencies": [
+      1250.0,
+      3150.0,
+      250.0,
+      5000.0,
+      4000.0
+    ],
+    "confusion_score": 0.6093
+  },
+  "笑容,校園": {
+    "question_id": 35,
+    "correct_word": "笑容",
+    "heard_word": "校園",
+    "risky_frequencies": [
+      630.0,
+      6300.0,
+      8000.0,
+      400.0,
+      2000.0
+    ],
+    "confusion_score": 0.7356
+  },
+  "倦容,笑容": {
+    "question_id": 35,
+    "correct_word": "倦容",
+    "heard_word": "笑容",
+    "risky_frequencies": [
+      315.0,
+      1600.0,
+      400.0,
+      8000.0,
+      5000.0
+    ],
+    "confusion_score": 0.5844
+  },
+  "倦容,掉頭": {
+    "question_id": 35,
+    "correct_word": "倦容",
+    "heard_word": "掉頭",
+    "risky_frequencies": [
+      5000.0,
+      4000.0,
+      1600.0,
+      1000.0,
+      8000.0
+    ],
+    "confusion_score": 0.5805
+  },
+  "倦容,校園": {
+    "question_id": 35,
+    "correct_word": "倦容",
+    "heard_word": "校園",
+    "risky_frequencies": [
+      2500.0,
+      8000.0,
+      3150.0,
+      250.0,
+      400.0
+    ],
+    "confusion_score": 0.6853
+  },
+  "掉頭,笑容": {
+    "question_id": 35,
+    "correct_word": "掉頭",
+    "heard_word": "笑容",
+    "risky_frequencies": [
+      1250.0,
+      3150.0,
+      250.0,
+      5000.0,
+      4000.0
+    ],
+    "confusion_score": 0.6093
+  },
+  "掉頭,倦容": {
+    "question_id": 35,
+    "correct_word": "掉頭",
+    "heard_word": "倦容",
+    "risky_frequencies": [
+      5000.0,
+      4000.0,
+      1600.0,
+      1000.0,
+      8000.0
+    ],
+    "confusion_score": 0.5805
+  },
+  "掉頭,校園": {
+    "question_id": 35,
+    "correct_word": "掉頭",
+    "heard_word": "校園",
+    "risky_frequencies": [
+      1000.0,
+      1600.0,
+      2000.0,
+      4000.0,
+      500.0
+    ],
+    "confusion_score": 0.6555
+  },
+  "校園,笑容": {
+    "question_id": 35,
+    "correct_word": "校園",
+    "heard_word": "笑容",
+    "risky_frequencies": [
+      630.0,
+      6300.0,
+      8000.0,
+      400.0,
+      2000.0
+    ],
+    "confusion_score": 0.7356
+  },
+  "校園,倦容": {
+    "question_id": 35,
+    "correct_word": "校園",
+    "heard_word": "倦容",
+    "risky_frequencies": [
+      2500.0,
+      8000.0,
+      3150.0,
+      250.0,
+      400.0
+    ],
+    "confusion_score": 0.6853
+  },
+  "校園,掉頭": {
+    "question_id": 35,
+    "correct_word": "校園",
+    "heard_word": "掉頭",
+    "risky_frequencies": [
+      1000.0,
+      1600.0,
+      2000.0,
+      4000.0,
+      500.0
+    ],
+    "confusion_score": 0.6555
+  },
+  "整潔,貞節": {
+    "question_id": 36,
+    "correct_word": "整潔",
+    "heard_word": "貞節",
+    "risky_frequencies": [
+      2000.0,
+      1000.0,
+      630.0,
+      6300.0,
+      8000.0
+    ],
+    "confusion_score": 0.7573
+  },
+  "整潔,搶劫": {
+    "question_id": 36,
+    "correct_word": "整潔",
+    "heard_word": "搶劫",
+    "risky_frequencies": [
+      315.0,
+      400.0,
+      3150.0,
+      8000.0,
+      4000.0
+    ],
+    "confusion_score": 0.3708
+  },
+  "整潔,終結": {
+    "question_id": 36,
+    "correct_word": "整潔",
+    "heard_word": "終結",
+    "risky_frequencies": [
+      800.0,
+      1600.0,
+      4000.0,
+      1250.0,
+      3150.0
+    ],
+    "confusion_score": 0.6573
+  },
+  "貞節,整潔": {
+    "question_id": 36,
+    "correct_word": "貞節",
+    "heard_word": "整潔",
+    "risky_frequencies": [
+      2000.0,
+      1000.0,
+      630.0,
+      6300.0,
+      8000.0
+    ],
+    "confusion_score": 0.7573
+  },
+  "貞節,搶劫": {
+    "question_id": 36,
+    "correct_word": "貞節",
+    "heard_word": "搶劫",
+    "risky_frequencies": [
+      315.0,
+      400.0,
+      4000.0,
+      5000.0,
+      8000.0
+    ],
+    "confusion_score": 0.486
+  },
+  "貞節,終結": {
+    "question_id": 36,
+    "correct_word": "貞節",
+    "heard_word": "終結",
+    "risky_frequencies": [
+      6300.0,
+      5000.0,
+      3150.0,
+      8000.0,
+      4000.0
+    ],
+    "confusion_score": 0.5792
+  },
+  "搶劫,整潔": {
+    "question_id": 36,
+    "correct_word": "搶劫",
+    "heard_word": "整潔",
+    "risky_frequencies": [
+      315.0,
+      400.0,
+      3150.0,
+      8000.0,
+      4000.0
+    ],
+    "confusion_score": 0.3708
+  },
+  "搶劫,貞節": {
+    "question_id": 36,
+    "correct_word": "搶劫",
+    "heard_word": "貞節",
+    "risky_frequencies": [
+      315.0,
+      400.0,
+      4000.0,
+      5000.0,
+      8000.0
+    ],
+    "confusion_score": 0.486
+  },
+  "搶劫,終結": {
+    "question_id": 36,
+    "correct_word": "搶劫",
+    "heard_word": "終結",
+    "risky_frequencies": [
+      250.0,
+      400.0,
+      630.0,
+      315.0,
+      8000.0
+    ],
+    "confusion_score": 0.5168
+  },
+  "終結,整潔": {
+    "question_id": 36,
+    "correct_word": "終結",
+    "heard_word": "整潔",
+    "risky_frequencies": [
+      800.0,
+      1600.0,
+      4000.0,
+      1250.0,
+      3150.0
+    ],
+    "confusion_score": 0.6573
+  },
+  "終結,貞節": {
+    "question_id": 36,
+    "correct_word": "終結",
+    "heard_word": "貞節",
+    "risky_frequencies": [
+      6300.0,
+      5000.0,
+      3150.0,
+      8000.0,
+      4000.0
+    ],
+    "confusion_score": 0.5792
+  },
+  "終結,搶劫": {
+    "question_id": 36,
+    "correct_word": "終結",
+    "heard_word": "搶劫",
+    "risky_frequencies": [
+      250.0,
+      400.0,
+      630.0,
+      315.0,
+      8000.0
+    ],
+    "confusion_score": 0.5168
+  },
+  "眼淚,演戲": {
+    "question_id": 37,
+    "correct_word": "眼淚",
+    "heard_word": "演戲",
+    "risky_frequencies": [
+      2500.0,
+      1600.0,
+      1250.0,
+      1000.0,
+      800.0
+    ],
+    "confusion_score": 0.4794
+  },
+  "眼淚,蕨類": {
+    "question_id": 37,
+    "correct_word": "眼淚",
+    "heard_word": "蕨類",
+    "risky_frequencies": [
+      5000.0,
+      250.0,
+      630.0,
+      800.0,
+      1600.0
+    ],
+    "confusion_score": 0.603
+  },
+  "眼淚,絕對": {
+    "question_id": 37,
+    "correct_word": "眼淚",
+    "heard_word": "絕對",
+    "risky_frequencies": [
+      6300.0,
+      1600.0,
+      8000.0,
+      1250.0,
+      630.0
+    ],
+    "confusion_score": 0.6239
+  },
+  "演戲,眼淚": {
+    "question_id": 37,
+    "correct_word": "演戲",
+    "heard_word": "眼淚",
+    "risky_frequencies": [
+      2500.0,
+      1600.0,
+      1250.0,
+      1000.0,
+      800.0
+    ],
+    "confusion_score": 0.4794
+  },
+  "演戲,蕨類": {
+    "question_id": 37,
+    "correct_word": "演戲",
+    "heard_word": "蕨類",
+    "risky_frequencies": [
+      315.0,
+      400.0,
+      1000.0,
+      1600.0,
+      3150.0
+    ],
+    "confusion_score": 0.489
+  },
+  "演戲,絕對": {
+    "question_id": 37,
+    "correct_word": "演戲",
+    "heard_word": "絕對",
+    "risky_frequencies": [
+      3150.0,
+      800.0,
+      400.0,
+      500.0,
+      1000.0
+    ],
+    "confusion_score": 0.6576
+  },
+  "蕨類,眼淚": {
+    "question_id": 37,
+    "correct_word": "蕨類",
+    "heard_word": "眼淚",
+    "risky_frequencies": [
+      5000.0,
+      250.0,
+      630.0,
+      800.0,
+      1600.0
+    ],
+    "confusion_score": 0.603
+  },
+  "蕨類,演戲": {
+    "question_id": 37,
+    "correct_word": "蕨類",
+    "heard_word": "演戲",
+    "risky_frequencies": [
+      315.0,
+      400.0,
+      1000.0,
+      1600.0,
+      3150.0
+    ],
+    "confusion_score": 0.489
+  },
+  "蕨類,絕對": {
+    "question_id": 37,
+    "correct_word": "蕨類",
+    "heard_word": "絕對",
+    "risky_frequencies": [
+      1250.0,
+      2500.0,
+      1600.0,
+      1000.0,
+      4000.0
+    ],
+    "confusion_score": 0.6608
+  },
+  "絕對,眼淚": {
+    "question_id": 37,
+    "correct_word": "絕對",
+    "heard_word": "眼淚",
+    "risky_frequencies": [
+      6300.0,
+      1600.0,
+      8000.0,
+      1250.0,
+      630.0
+    ],
+    "confusion_score": 0.6239
+  },
+  "絕對,演戲": {
+    "question_id": 37,
+    "correct_word": "絕對",
+    "heard_word": "演戲",
+    "risky_frequencies": [
+      3150.0,
+      800.0,
+      400.0,
+      500.0,
+      1000.0
+    ],
+    "confusion_score": 0.6576
+  },
+  "絕對,蕨類": {
+    "question_id": 37,
+    "correct_word": "絕對",
+    "heard_word": "蕨類",
+    "risky_frequencies": [
+      1250.0,
+      2500.0,
+      1600.0,
+      1000.0,
+      4000.0
+    ],
+    "confusion_score": 0.6608
+  },
+  "聽見,偏見": {
+    "question_id": 38,
+    "correct_word": "聽見",
+    "heard_word": "偏見",
+    "risky_frequencies": [
+      8000.0,
+      250.0,
+      6300.0,
+      1000.0,
+      1600.0
+    ],
+    "confusion_score": 0.5548
+  },
+  "聽見,低賤": {
+    "question_id": 38,
+    "correct_word": "聽見",
+    "heard_word": "低賤",
+    "risky_frequencies": [
+      630.0,
+      8000.0,
+      2000.0,
+      1600.0,
+      315.0
+    ],
+    "confusion_score": 0.6169
+  },
+  "聽見,天線": {
+    "question_id": 38,
+    "correct_word": "聽見",
+    "heard_word": "天線",
+    "risky_frequencies": [
+      1600.0,
+      400.0,
+      1250.0,
+      250.0,
+      1000.0
+    ],
+    "confusion_score": 0.4642
+  },
+  "偏見,聽見": {
+    "question_id": 38,
+    "correct_word": "偏見",
+    "heard_word": "聽見",
+    "risky_frequencies": [
+      8000.0,
+      250.0,
+      6300.0,
+      1000.0,
+      1600.0
+    ],
+    "confusion_score": 0.5548
+  },
+  "偏見,低賤": {
+    "question_id": 38,
+    "correct_word": "偏見",
+    "heard_word": "低賤",
+    "risky_frequencies": [
+      315.0,
+      4000.0,
+      1250.0,
+      8000.0,
+      5000.0
+    ],
+    "confusion_score": 0.6171
+  },
+  "偏見,天線": {
+    "question_id": 38,
+    "correct_word": "偏見",
+    "heard_word": "天線",
+    "risky_frequencies": [
+      800.0,
+      500.0,
+      630.0,
+      315.0,
+      2500.0
+    ],
+    "confusion_score": 0.5541
+  },
+  "低賤,聽見": {
+    "question_id": 38,
+    "correct_word": "低賤",
+    "heard_word": "聽見",
+    "risky_frequencies": [
+      630.0,
+      8000.0,
+      2000.0,
+      1600.0,
+      315.0
+    ],
+    "confusion_score": 0.6169
+  },
+  "低賤,偏見": {
+    "question_id": 38,
+    "correct_word": "低賤",
+    "heard_word": "偏見",
+    "risky_frequencies": [
+      315.0,
+      4000.0,
+      1250.0,
+      8000.0,
+      5000.0
+    ],
+    "confusion_score": 0.6171
+  },
+  "低賤,天線": {
+    "question_id": 38,
+    "correct_word": "低賤",
+    "heard_word": "天線",
+    "risky_frequencies": [
+      1600.0,
+      315.0,
+      3150.0,
+      6300.0,
+      1250.0
+    ],
+    "confusion_score": 0.5796
+  },
+  "天線,聽見": {
+    "question_id": 38,
+    "correct_word": "天線",
+    "heard_word": "聽見",
+    "risky_frequencies": [
+      1600.0,
+      400.0,
+      1250.0,
+      250.0,
+      1000.0
+    ],
+    "confusion_score": 0.4642
+  },
+  "天線,偏見": {
+    "question_id": 38,
+    "correct_word": "天線",
+    "heard_word": "偏見",
+    "risky_frequencies": [
+      800.0,
+      500.0,
+      630.0,
+      315.0,
+      2500.0
+    ],
+    "confusion_score": 0.5541
+  },
+  "天線,低賤": {
+    "question_id": 38,
+    "correct_word": "天線",
+    "heard_word": "低賤",
+    "risky_frequencies": [
+      1600.0,
+      315.0,
+      3150.0,
+      6300.0,
+      1250.0
+    ],
+    "confusion_score": 0.5796
+  },
+  "歌星,孤星": {
+    "question_id": 39,
+    "correct_word": "歌星",
+    "heard_word": "孤星",
+    "risky_frequencies": [
+      1600.0,
+      4000.0,
+      250.0,
+      8000.0,
+      6300.0
+    ],
+    "confusion_score": 0.5202
+  },
+  "歌星,真心": {
+    "question_id": 39,
+    "correct_word": "歌星",
+    "heard_word": "真心",
+    "risky_frequencies": [
+      400.0,
+      315.0,
+      1250.0,
+      5000.0,
+      2500.0
+    ],
+    "confusion_score": 0.636
+  },
+  "歌星,甘心": {
+    "question_id": 39,
+    "correct_word": "歌星",
+    "heard_word": "甘心",
+    "risky_frequencies": [
+      3150.0,
+      6300.0,
+      315.0,
+      250.0,
+      5000.0
+    ],
+    "confusion_score": 0.6421
+  },
+  "孤星,歌星": {
+    "question_id": 39,
+    "correct_word": "孤星",
+    "heard_word": "歌星",
+    "risky_frequencies": [
+      1600.0,
+      4000.0,
+      250.0,
+      8000.0,
+      6300.0
+    ],
+    "confusion_score": 0.5202
+  },
+  "孤星,真心": {
+    "question_id": 39,
+    "correct_word": "孤星",
+    "heard_word": "真心",
+    "risky_frequencies": [
+      800.0,
+      8000.0,
+      6300.0,
+      2000.0,
+      250.0
+    ],
+    "confusion_score": 0.6519
+  },
+  "孤星,甘心": {
+    "question_id": 39,
+    "correct_word": "孤星",
+    "heard_word": "甘心",
+    "risky_frequencies": [
+      630.0,
+      800.0,
+      8000.0,
+      500.0,
+      6300.0
+    ],
+    "confusion_score": 0.5992
+  },
+  "真心,歌星": {
+    "question_id": 39,
+    "correct_word": "真心",
+    "heard_word": "歌星",
+    "risky_frequencies": [
+      400.0,
+      315.0,
+      1250.0,
+      5000.0,
+      2500.0
+    ],
+    "confusion_score": 0.636
+  },
+  "真心,孤星": {
+    "question_id": 39,
+    "correct_word": "真心",
+    "heard_word": "孤星",
+    "risky_frequencies": [
+      800.0,
+      8000.0,
+      6300.0,
+      2000.0,
+      250.0
+    ],
+    "confusion_score": 0.6519
+  },
+  "真心,甘心": {
+    "question_id": 39,
+    "correct_word": "真心",
+    "heard_word": "甘心",
+    "risky_frequencies": [
+      6300.0,
+      3150.0,
+      250.0,
+      800.0,
+      2000.0
+    ],
+    "confusion_score": 0.6393
+  },
+  "甘心,歌星": {
+    "question_id": 39,
+    "correct_word": "甘心",
+    "heard_word": "歌星",
+    "risky_frequencies": [
+      3150.0,
+      6300.0,
+      315.0,
+      250.0,
+      5000.0
+    ],
+    "confusion_score": 0.6421
+  },
+  "甘心,孤星": {
+    "question_id": 39,
+    "correct_word": "甘心",
+    "heard_word": "孤星",
+    "risky_frequencies": [
+      630.0,
+      800.0,
+      8000.0,
+      500.0,
+      6300.0
+    ],
+    "confusion_score": 0.5992
+  },
+  "甘心,真心": {
+    "question_id": 39,
+    "correct_word": "甘心",
+    "heard_word": "真心",
+    "risky_frequencies": [
+      6300.0,
+      3150.0,
+      250.0,
+      800.0,
+      2000.0
+    ],
+    "confusion_score": 0.6393
+  },
+  "辦法,燙髮": {
+    "question_id": 40,
+    "correct_word": "辦法",
+    "heard_word": "燙髮",
+    "risky_frequencies": [
+      2000.0,
+      315.0,
+      8000.0,
+      630.0,
+      5000.0
+    ],
+    "confusion_score": 0.4143
+  },
+  "辦法,看法": {
+    "question_id": 40,
+    "correct_word": "辦法",
+    "heard_word": "看法",
+    "risky_frequencies": [
+      630.0,
+      1600.0,
+      500.0,
+      315.0,
+      8000.0
+    ],
+    "confusion_score": 0.5632
+  },
+  "辦法,立法": {
+    "question_id": 40,
+    "correct_word": "辦法",
+    "heard_word": "立法",
+    "risky_frequencies": [
+      500.0,
+      5000.0,
+      6300.0,
+      8000.0,
+      2500.0
+    ],
+    "confusion_score": 0.6049
+  },
+  "燙髮,辦法": {
+    "question_id": 40,
+    "correct_word": "燙髮",
+    "heard_word": "辦法",
+    "risky_frequencies": [
+      2000.0,
+      315.0,
+      8000.0,
+      630.0,
+      5000.0
+    ],
+    "confusion_score": 0.4143
+  },
+  "燙髮,看法": {
+    "question_id": 40,
+    "correct_word": "燙髮",
+    "heard_word": "看法",
+    "risky_frequencies": [
+      2000.0,
+      5000.0,
+      6300.0,
+      315.0,
+      2500.0
+    ],
+    "confusion_score": 0.5702
+  },
+  "燙髮,立法": {
+    "question_id": 40,
+    "correct_word": "燙髮",
+    "heard_word": "立法",
+    "risky_frequencies": [
+      315.0,
+      400.0,
+      8000.0,
+      250.0,
+      3150.0
+    ],
+    "confusion_score": 0.6178
+  },
+  "看法,辦法": {
+    "question_id": 40,
+    "correct_word": "看法",
+    "heard_word": "辦法",
+    "risky_frequencies": [
+      630.0,
+      1600.0,
+      500.0,
+      315.0,
+      8000.0
+    ],
+    "confusion_score": 0.5632
+  },
+  "看法,燙髮": {
+    "question_id": 40,
+    "correct_word": "看法",
+    "heard_word": "燙髮",
+    "risky_frequencies": [
+      2000.0,
+      5000.0,
+      6300.0,
+      315.0,
+      2500.0
+    ],
+    "confusion_score": 0.5702
+  },
+  "看法,立法": {
+    "question_id": 40,
+    "correct_word": "看法",
+    "heard_word": "立法",
+    "risky_frequencies": [
+      4000.0,
+      500.0,
+      8000.0,
+      400.0,
+      315.0
+    ],
+    "confusion_score": 0.4887
+  },
+  "立法,辦法": {
+    "question_id": 40,
+    "correct_word": "立法",
+    "heard_word": "辦法",
+    "risky_frequencies": [
+      500.0,
+      5000.0,
+      6300.0,
+      8000.0,
+      2500.0
+    ],
+    "confusion_score": 0.6049
+  },
+  "立法,燙髮": {
+    "question_id": 40,
+    "correct_word": "立法",
+    "heard_word": "燙髮",
+    "risky_frequencies": [
+      315.0,
+      400.0,
+      8000.0,
+      250.0,
+      3150.0
+    ],
+    "confusion_score": 0.6178
+  },
+  "立法,看法": {
+    "question_id": 40,
+    "correct_word": "立法",
+    "heard_word": "看法",
+    "risky_frequencies": [
+      4000.0,
+      500.0,
+      8000.0,
+      400.0,
+      315.0
+    ],
+    "confusion_score": 0.4887
+  },
+  "浴室,軼事": {
+    "question_id": 41,
+    "correct_word": "浴室",
+    "heard_word": "軼事",
+    "risky_frequencies": [
+      2500.0,
+      1000.0,
+      400.0,
+      1250.0,
+      6300.0
+    ],
+    "confusion_score": 0.3981
+  },
+  "浴室,趣事": {
+    "question_id": 41,
+    "correct_word": "浴室",
+    "heard_word": "趣事",
+    "risky_frequencies": [
+      1250.0,
+      500.0,
+      1000.0,
+      400.0,
+      630.0
+    ],
+    "confusion_score": 0.4875
+  },
+  "浴室,立志": {
+    "question_id": 41,
+    "correct_word": "浴室",
+    "heard_word": "立志",
+    "risky_frequencies": [
+      5000.0,
+      800.0,
+      1000.0,
+      1600.0,
+      500.0
+    ],
+    "confusion_score": 0.6449
+  },
+  "軼事,浴室": {
+    "question_id": 41,
+    "correct_word": "軼事",
+    "heard_word": "浴室",
+    "risky_frequencies": [
+      2500.0,
+      1000.0,
+      400.0,
+      1250.0,
+      6300.0
+    ],
+    "confusion_score": 0.3981
+  },
+  "軼事,趣事": {
+    "question_id": 41,
+    "correct_word": "軼事",
+    "heard_word": "趣事",
+    "risky_frequencies": [
+      1000.0,
+      6300.0,
+      2000.0,
+      8000.0,
+      2500.0
+    ],
+    "confusion_score": 0.6061
+  },
+  "軼事,立志": {
+    "question_id": 41,
+    "correct_word": "軼事",
+    "heard_word": "立志",
+    "risky_frequencies": [
+      400.0,
+      630.0,
+      250.0,
+      315.0,
+      1000.0
+    ],
+    "confusion_score": 0.5087
+  },
+  "趣事,浴室": {
+    "question_id": 41,
+    "correct_word": "趣事",
+    "heard_word": "浴室",
+    "risky_frequencies": [
+      1250.0,
+      500.0,
+      1000.0,
+      400.0,
+      630.0
+    ],
+    "confusion_score": 0.4875
+  },
+  "趣事,軼事": {
+    "question_id": 41,
+    "correct_word": "趣事",
+    "heard_word": "軼事",
+    "risky_frequencies": [
+      1000.0,
+      6300.0,
+      2000.0,
+      8000.0,
+      2500.0
+    ],
+    "confusion_score": 0.6061
+  },
+  "趣事,立志": {
+    "question_id": 41,
+    "correct_word": "趣事",
+    "heard_word": "立志",
+    "risky_frequencies": [
+      1000.0,
+      500.0,
+      800.0,
+      1250.0,
+      5000.0
+    ],
+    "confusion_score": 0.5674
+  },
+  "立志,浴室": {
+    "question_id": 41,
+    "correct_word": "立志",
+    "heard_word": "浴室",
+    "risky_frequencies": [
+      5000.0,
+      800.0,
+      1000.0,
+      1600.0,
+      500.0
+    ],
+    "confusion_score": 0.6449
+  },
+  "立志,軼事": {
+    "question_id": 41,
+    "correct_word": "立志",
+    "heard_word": "軼事",
+    "risky_frequencies": [
+      400.0,
+      630.0,
+      250.0,
+      315.0,
+      1000.0
+    ],
+    "confusion_score": 0.5087
+  },
+  "立志,趣事": {
+    "question_id": 41,
+    "correct_word": "立志",
+    "heard_word": "趣事",
+    "risky_frequencies": [
+      1000.0,
+      500.0,
+      800.0,
+      1250.0,
+      5000.0
+    ],
+    "confusion_score": 0.5674
+  },
+  "草地,角力": {
+    "question_id": 42,
+    "correct_word": "草地",
+    "heard_word": "角力",
+    "risky_frequencies": [
+      8000.0,
+      1000.0,
+      2000.0,
+      4000.0,
+      630.0
+    ],
+    "confusion_score": 0.7085
+  },
+  "草地,沼地": {
+    "question_id": 42,
+    "correct_word": "草地",
+    "heard_word": "沼地",
+    "risky_frequencies": [
+      5000.0,
+      2000.0,
+      3150.0,
+      8000.0,
+      1600.0
+    ],
+    "confusion_score": 0.578
+  },
+  "草地,掃地": {
+    "question_id": 42,
+    "correct_word": "草地",
+    "heard_word": "掃地",
+    "risky_frequencies": [
+      3150.0,
+      5000.0,
+      4000.0,
+      400.0,
+      250.0
+    ],
+    "confusion_score": 0.5611
+  },
+  "角力,草地": {
+    "question_id": 42,
+    "correct_word": "角力",
+    "heard_word": "草地",
+    "risky_frequencies": [
+      8000.0,
+      1000.0,
+      2000.0,
+      4000.0,
+      630.0
+    ],
+    "confusion_score": 0.7085
+  },
+  "角力,沼地": {
+    "question_id": 42,
+    "correct_word": "角力",
+    "heard_word": "沼地",
+    "risky_frequencies": [
+      250.0,
+      1250.0,
+      6300.0,
+      2000.0,
+      315.0
+    ],
+    "confusion_score": 0.7654
+  },
+  "角力,掃地": {
+    "question_id": 42,
+    "correct_word": "角力",
+    "heard_word": "掃地",
+    "risky_frequencies": [
+      2000.0,
+      630.0,
+      4000.0,
+      1000.0,
+      1600.0
+    ],
+    "confusion_score": 0.703
+  },
+  "沼地,草地": {
+    "question_id": 42,
+    "correct_word": "沼地",
+    "heard_word": "草地",
+    "risky_frequencies": [
+      5000.0,
+      2000.0,
+      3150.0,
+      8000.0,
+      1600.0
+    ],
+    "confusion_score": 0.578
+  },
+  "沼地,角力": {
+    "question_id": 42,
+    "correct_word": "沼地",
+    "heard_word": "角力",
+    "risky_frequencies": [
+      250.0,
+      1250.0,
+      6300.0,
+      2000.0,
+      315.0
+    ],
+    "confusion_score": 0.7654
+  },
+  "沼地,掃地": {
+    "question_id": 42,
+    "correct_word": "沼地",
+    "heard_word": "掃地",
+    "risky_frequencies": [
+      1600.0,
+      5000.0,
+      2500.0,
+      630.0,
+      800.0
+    ],
+    "confusion_score": 0.7358
+  },
+  "掃地,草地": {
+    "question_id": 42,
+    "correct_word": "掃地",
+    "heard_word": "草地",
+    "risky_frequencies": [
+      3150.0,
+      5000.0,
+      4000.0,
+      400.0,
+      250.0
+    ],
+    "confusion_score": 0.5611
+  },
+  "掃地,角力": {
+    "question_id": 42,
+    "correct_word": "掃地",
+    "heard_word": "角力",
+    "risky_frequencies": [
+      2000.0,
+      630.0,
+      4000.0,
+      1000.0,
+      1600.0
+    ],
+    "confusion_score": 0.703
+  },
+  "掃地,沼地": {
+    "question_id": 42,
+    "correct_word": "掃地",
+    "heard_word": "沼地",
+    "risky_frequencies": [
+      1600.0,
+      5000.0,
+      2500.0,
+      630.0,
+      800.0
+    ],
+    "confusion_score": 0.7358
+  },
+  "早晨,吵人": {
+    "question_id": 43,
+    "correct_word": "早晨",
+    "heard_word": "吵人",
+    "risky_frequencies": [
+      2000.0,
+      1250.0,
+      630.0,
+      500.0,
+      1600.0
+    ],
+    "confusion_score": 0.5971
+  },
+  "早晨,澡盆": {
+    "question_id": 43,
+    "correct_word": "早晨",
+    "heard_word": "澡盆",
+    "risky_frequencies": [
+      800.0,
+      1000.0,
+      250.0,
+      315.0,
+      6300.0
+    ],
+    "confusion_score": 0.4345
+  },
+  "早晨,草繩": {
+    "question_id": 43,
+    "correct_word": "早晨",
+    "heard_word": "草繩",
+    "risky_frequencies": [
+      1000.0,
+      2000.0,
+      800.0,
+      2500.0,
+      250.0
+    ],
+    "confusion_score": 0.5193
+  },
+  "吵人,早晨": {
+    "question_id": 43,
+    "correct_word": "吵人",
+    "heard_word": "早晨",
+    "risky_frequencies": [
+      2000.0,
+      1250.0,
+      630.0,
+      500.0,
+      1600.0
+    ],
+    "confusion_score": 0.5971
+  },
+  "吵人,澡盆": {
+    "question_id": 43,
+    "correct_word": "吵人",
+    "heard_word": "澡盆",
+    "risky_frequencies": [
+      6300.0,
+      8000.0,
+      5000.0,
+      4000.0,
+      1250.0
+    ],
+    "confusion_score": 0.4651
+  },
+  "吵人,草繩": {
+    "question_id": 43,
+    "correct_word": "吵人",
+    "heard_word": "草繩",
+    "risky_frequencies": [
+      2000.0,
+      2500.0,
+      5000.0,
+      3150.0,
+      1250.0
+    ],
+    "confusion_score": 0.4829
+  },
+  "澡盆,早晨": {
+    "question_id": 43,
+    "correct_word": "澡盆",
+    "heard_word": "早晨",
+    "risky_frequencies": [
+      800.0,
+      1000.0,
+      250.0,
+      315.0,
+      6300.0
+    ],
+    "confusion_score": 0.4345
+  },
+  "澡盆,吵人": {
+    "question_id": 43,
+    "correct_word": "澡盆",
+    "heard_word": "吵人",
+    "risky_frequencies": [
+      6300.0,
+      8000.0,
+      5000.0,
+      4000.0,
+      1250.0
+    ],
+    "confusion_score": 0.4651
+  },
+  "澡盆,草繩": {
+    "question_id": 43,
+    "correct_word": "澡盆",
+    "heard_word": "草繩",
+    "risky_frequencies": [
+      630.0,
+      315.0,
+      500.0,
+      1250.0,
+      800.0
+    ],
+    "confusion_score": 0.5968
+  },
+  "草繩,早晨": {
+    "question_id": 43,
+    "correct_word": "草繩",
+    "heard_word": "早晨",
+    "risky_frequencies": [
+      1000.0,
+      2000.0,
+      800.0,
+      2500.0,
+      250.0
+    ],
+    "confusion_score": 0.5193
+  },
+  "草繩,吵人": {
+    "question_id": 43,
+    "correct_word": "草繩",
+    "heard_word": "吵人",
+    "risky_frequencies": [
+      2000.0,
+      2500.0,
+      5000.0,
+      3150.0,
+      1250.0
+    ],
+    "confusion_score": 0.4829
+  },
+  "草繩,澡盆": {
+    "question_id": 43,
+    "correct_word": "草繩",
+    "heard_word": "澡盆",
+    "risky_frequencies": [
+      630.0,
+      315.0,
+      500.0,
+      1250.0,
+      800.0
+    ],
+    "confusion_score": 0.5968
+  },
+  "月考,夜烤": {
+    "question_id": 44,
+    "correct_word": "月考",
+    "heard_word": "夜烤",
+    "risky_frequencies": [
+      1250.0,
+      1000.0,
+      2000.0,
+      630.0,
+      400.0
+    ],
+    "confusion_score": 0.6817
+  },
+  "月考,月老": {
+    "question_id": 44,
+    "correct_word": "月考",
+    "heard_word": "月老",
+    "risky_frequencies": [
+      1600.0,
+      2500.0,
+      1250.0,
+      2000.0,
+      8000.0
+    ],
+    "confusion_score": 0.6529
+  },
+  "月考,路考": {
+    "question_id": 44,
+    "correct_word": "月考",
+    "heard_word": "路考",
+    "risky_frequencies": [
+      1250.0,
+      8000.0,
+      1600.0,
+      4000.0,
+      6300.0
+    ],
+    "confusion_score": 0.5288
+  },
+  "夜烤,月考": {
+    "question_id": 44,
+    "correct_word": "夜烤",
+    "heard_word": "月考",
+    "risky_frequencies": [
+      1250.0,
+      1000.0,
+      2000.0,
+      630.0,
+      400.0
+    ],
+    "confusion_score": 0.6817
+  },
+  "夜烤,月老": {
+    "question_id": 44,
+    "correct_word": "夜烤",
+    "heard_word": "月老",
+    "risky_frequencies": [
+      8000.0,
+      1250.0,
+      2500.0,
+      4000.0,
+      1600.0
+    ],
+    "confusion_score": 0.6388
+  },
+  "夜烤,路考": {
+    "question_id": 44,
+    "correct_word": "夜烤",
+    "heard_word": "路考",
+    "risky_frequencies": [
+      1250.0,
+      1600.0,
+      8000.0,
+      6300.0,
+      500.0
+    ],
+    "confusion_score": 0.5939
+  },
+  "月老,月考": {
+    "question_id": 44,
+    "correct_word": "月老",
+    "heard_word": "月考",
+    "risky_frequencies": [
+      1600.0,
+      2500.0,
+      1250.0,
+      2000.0,
+      8000.0
+    ],
+    "confusion_score": 0.6529
+  },
+  "月老,夜烤": {
+    "question_id": 44,
+    "correct_word": "月老",
+    "heard_word": "夜烤",
+    "risky_frequencies": [
+      8000.0,
+      1250.0,
+      2500.0,
+      4000.0,
+      1600.0
+    ],
+    "confusion_score": 0.6388
+  },
+  "月老,路考": {
+    "question_id": 44,
+    "correct_word": "月老",
+    "heard_word": "路考",
+    "risky_frequencies": [
+      1250.0,
+      8000.0,
+      1000.0,
+      1600.0,
+      400.0
+    ],
+    "confusion_score": 0.4779
+  },
+  "路考,月考": {
+    "question_id": 44,
+    "correct_word": "路考",
+    "heard_word": "月考",
+    "risky_frequencies": [
+      1250.0,
+      8000.0,
+      1600.0,
+      4000.0,
+      6300.0
+    ],
+    "confusion_score": 0.5288
+  },
+  "路考,夜烤": {
+    "question_id": 44,
+    "correct_word": "路考",
+    "heard_word": "夜烤",
+    "risky_frequencies": [
+      1250.0,
+      1600.0,
+      8000.0,
+      6300.0,
+      500.0
+    ],
+    "confusion_score": 0.5939
+  },
+  "路考,月老": {
+    "question_id": 44,
+    "correct_word": "路考",
+    "heard_word": "月老",
+    "risky_frequencies": [
+      1250.0,
+      8000.0,
+      1000.0,
+      1600.0,
+      400.0
+    ],
+    "confusion_score": 0.4779
+  },
+  "脾氣,毒氣": {
+    "question_id": 45,
+    "correct_word": "脾氣",
+    "heard_word": "毒氣",
+    "risky_frequencies": [
+      315.0,
+      250.0,
+      2000.0,
+      800.0,
+      1600.0
+    ],
+    "confusion_score": 0.6325
+  },
+  "脾氣,名氣": {
+    "question_id": 45,
+    "correct_word": "脾氣",
+    "heard_word": "名氣",
+    "risky_frequencies": [
+      2500.0,
+      1000.0,
+      2000.0,
+      8000.0,
+      6300.0
+    ],
+    "confusion_score": 0.5603
+  },
+  "脾氣,迷信": {
+    "question_id": 45,
+    "correct_word": "脾氣",
+    "heard_word": "迷信",
+    "risky_frequencies": [
+      2500.0,
+      6300.0,
+      8000.0,
+      2000.0,
+      800.0
+    ],
+    "confusion_score": 0.5477
+  },
+  "毒氣,脾氣": {
+    "question_id": 45,
+    "correct_word": "毒氣",
+    "heard_word": "脾氣",
+    "risky_frequencies": [
+      315.0,
+      250.0,
+      2000.0,
+      800.0,
+      1600.0
+    ],
+    "confusion_score": 0.6325
+  },
+  "毒氣,名氣": {
+    "question_id": 45,
+    "correct_word": "毒氣",
+    "heard_word": "名氣",
+    "risky_frequencies": [
+      1600.0,
+      3150.0,
+      800.0,
+      500.0,
+      400.0
+    ],
+    "confusion_score": 0.5074
+  },
+  "毒氣,迷信": {
+    "question_id": 45,
+    "correct_word": "毒氣",
+    "heard_word": "迷信",
+    "risky_frequencies": [
+      800.0,
+      1000.0,
+      3150.0,
+      400.0,
+      500.0
+    ],
+    "confusion_score": 0.4988
+  },
+  "名氣,脾氣": {
+    "question_id": 45,
+    "correct_word": "名氣",
+    "heard_word": "脾氣",
+    "risky_frequencies": [
+      2500.0,
+      1000.0,
+      2000.0,
+      8000.0,
+      6300.0
+    ],
+    "confusion_score": 0.5603
+  },
+  "名氣,毒氣": {
+    "question_id": 45,
+    "correct_word": "名氣",
+    "heard_word": "毒氣",
+    "risky_frequencies": [
+      1600.0,
+      3150.0,
+      800.0,
+      500.0,
+      400.0
+    ],
+    "confusion_score": 0.5074
+  },
+  "名氣,迷信": {
+    "question_id": 45,
+    "correct_word": "名氣",
+    "heard_word": "迷信",
+    "risky_frequencies": [
+      2000.0,
+      400.0,
+      3150.0,
+      800.0,
+      2500.0
+    ],
+    "confusion_score": 0.5618
+  },
+  "迷信,脾氣": {
+    "question_id": 45,
+    "correct_word": "迷信",
+    "heard_word": "脾氣",
+    "risky_frequencies": [
+      2500.0,
+      6300.0,
+      8000.0,
+      2000.0,
+      800.0
+    ],
+    "confusion_score": 0.5477
+  },
+  "迷信,毒氣": {
+    "question_id": 45,
+    "correct_word": "迷信",
+    "heard_word": "毒氣",
+    "risky_frequencies": [
+      800.0,
+      1000.0,
+      3150.0,
+      400.0,
+      500.0
+    ],
+    "confusion_score": 0.4988
+  },
+  "迷信,名氣": {
+    "question_id": 45,
+    "correct_word": "迷信",
+    "heard_word": "名氣",
+    "risky_frequencies": [
+      2000.0,
+      400.0,
+      3150.0,
+      800.0,
+      2500.0
+    ],
+    "confusion_score": 0.5618
+  },
+  "公司,燈絲": {
+    "question_id": 46,
+    "correct_word": "公司",
+    "heard_word": "燈絲",
+    "risky_frequencies": [
+      500.0,
+      4000.0,
+      2500.0,
+      1600.0,
+      5000.0
+    ],
+    "confusion_score": 0.6584
+  },
+  "公司,風濕": {
+    "question_id": 46,
+    "correct_word": "公司",
+    "heard_word": "風濕",
+    "risky_frequencies": [
+      315.0,
+      6300.0,
+      800.0,
+      250.0,
+      8000.0
+    ],
+    "confusion_score": 0.6498
+  },
+  "公司,工資": {
+    "question_id": 46,
+    "correct_word": "公司",
+    "heard_word": "工資",
+    "risky_frequencies": [
+      2000.0,
+      5000.0,
+      500.0,
+      315.0,
+      2500.0
+    ],
+    "confusion_score": 0.5321
+  },
+  "燈絲,公司": {
+    "question_id": 46,
+    "correct_word": "燈絲",
+    "heard_word": "公司",
+    "risky_frequencies": [
+      500.0,
+      4000.0,
+      2500.0,
+      1600.0,
+      5000.0
+    ],
+    "confusion_score": 0.6584
+  },
+  "燈絲,風濕": {
+    "question_id": 46,
+    "correct_word": "燈絲",
+    "heard_word": "風濕",
+    "risky_frequencies": [
+      800.0,
+      8000.0,
+      250.0,
+      2000.0,
+      6300.0
+    ],
+    "confusion_score": 0.568
+  },
+  "燈絲,工資": {
+    "question_id": 46,
+    "correct_word": "燈絲",
+    "heard_word": "工資",
+    "risky_frequencies": [
+      800.0,
+      500.0,
+      630.0,
+      5000.0,
+      2500.0
+    ],
+    "confusion_score": 0.4682
+  },
+  "風濕,公司": {
+    "question_id": 46,
+    "correct_word": "風濕",
+    "heard_word": "公司",
+    "risky_frequencies": [
+      315.0,
+      6300.0,
+      800.0,
+      250.0,
+      8000.0
+    ],
+    "confusion_score": 0.6498
+  },
+  "風濕,燈絲": {
+    "question_id": 46,
+    "correct_word": "風濕",
+    "heard_word": "燈絲",
+    "risky_frequencies": [
+      800.0,
+      8000.0,
+      250.0,
+      2000.0,
+      6300.0
+    ],
+    "confusion_score": 0.568
+  },
+  "風濕,工資": {
+    "question_id": 46,
+    "correct_word": "風濕",
+    "heard_word": "工資",
+    "risky_frequencies": [
+      800.0,
+      315.0,
+      8000.0,
+      500.0,
+      250.0
+    ],
+    "confusion_score": 0.5937
+  },
+  "工資,公司": {
+    "question_id": 46,
+    "correct_word": "工資",
+    "heard_word": "公司",
+    "risky_frequencies": [
+      2000.0,
+      5000.0,
+      500.0,
+      315.0,
+      2500.0
+    ],
+    "confusion_score": 0.5321
+  },
+  "工資,燈絲": {
+    "question_id": 46,
+    "correct_word": "工資",
+    "heard_word": "燈絲",
+    "risky_frequencies": [
+      800.0,
+      500.0,
+      630.0,
+      5000.0,
+      2500.0
+    ],
+    "confusion_score": 0.4682
+  },
+  "工資,風濕": {
+    "question_id": 46,
+    "correct_word": "工資",
+    "heard_word": "風濕",
+    "risky_frequencies": [
+      800.0,
+      315.0,
+      8000.0,
+      500.0,
+      250.0
+    ],
+    "confusion_score": 0.5937
+  },
+  "馬路,跑步": {
+    "question_id": 47,
+    "correct_word": "馬路",
+    "heard_word": "跑步",
+    "risky_frequencies": [
+      6300.0,
+      5000.0,
+      3150.0,
+      8000.0,
+      2500.0
+    ],
+    "confusion_score": 0.5224
+  },
+  "馬路,馬力": {
+    "question_id": 47,
+    "correct_word": "馬路",
+    "heard_word": "馬力",
+    "risky_frequencies": [
+      250.0,
+      315.0,
+      2000.0,
+      6300.0,
+      400.0
+    ],
+    "confusion_score": 0.4555
+  },
+  "馬路,腳步": {
+    "question_id": 47,
+    "correct_word": "馬路",
+    "heard_word": "腳步",
+    "risky_frequencies": [
+      5000.0,
+      6300.0,
+      8000.0,
+      2500.0,
+      3150.0
+    ],
+    "confusion_score": 0.4791
+  },
+  "跑步,馬路": {
+    "question_id": 47,
+    "correct_word": "跑步",
+    "heard_word": "馬路",
+    "risky_frequencies": [
+      6300.0,
+      5000.0,
+      3150.0,
+      8000.0,
+      2500.0
+    ],
+    "confusion_score": 0.5224
+  },
+  "跑步,馬力": {
+    "question_id": 47,
+    "correct_word": "跑步",
+    "heard_word": "馬力",
+    "risky_frequencies": [
+      630.0,
+      800.0,
+      1250.0,
+      1000.0,
+      6300.0
+    ],
+    "confusion_score": 0.5133
+  },
+  "跑步,腳步": {
+    "question_id": 47,
+    "correct_word": "跑步",
+    "heard_word": "腳步",
+    "risky_frequencies": [
+      4000.0,
+      6300.0,
+      400.0,
+      3150.0,
+      1600.0
+    ],
+    "confusion_score": 0.6316
+  },
+  "馬力,馬路": {
+    "question_id": 47,
+    "correct_word": "馬力",
+    "heard_word": "馬路",
+    "risky_frequencies": [
+      250.0,
+      315.0,
+      2000.0,
+      6300.0,
+      400.0
+    ],
+    "confusion_score": 0.4555
+  },
+  "馬力,跑步": {
+    "question_id": 47,
+    "correct_word": "馬力",
+    "heard_word": "跑步",
+    "risky_frequencies": [
+      630.0,
+      800.0,
+      1250.0,
+      1000.0,
+      6300.0
+    ],
+    "confusion_score": 0.5133
+  },
+  "馬力,腳步": {
+    "question_id": 47,
+    "correct_word": "馬力",
+    "heard_word": "腳步",
+    "risky_frequencies": [
+      630.0,
+      800.0,
+      6300.0,
+      8000.0,
+      500.0
+    ],
+    "confusion_score": 0.4563
+  },
+  "腳步,馬路": {
+    "question_id": 47,
+    "correct_word": "腳步",
+    "heard_word": "馬路",
+    "risky_frequencies": [
+      5000.0,
+      6300.0,
+      8000.0,
+      2500.0,
+      3150.0
+    ],
+    "confusion_score": 0.4791
+  },
+  "腳步,跑步": {
+    "question_id": 47,
+    "correct_word": "腳步",
+    "heard_word": "跑步",
+    "risky_frequencies": [
+      4000.0,
+      6300.0,
+      400.0,
+      3150.0,
+      1600.0
+    ],
+    "confusion_score": 0.6316
+  },
+  "腳步,馬力": {
+    "question_id": 47,
+    "correct_word": "腳步",
+    "heard_word": "馬力",
+    "risky_frequencies": [
+      630.0,
+      800.0,
+      6300.0,
+      8000.0,
+      500.0
+    ],
+    "confusion_score": 0.4563
+  },
+  "游泳,球友": {
+    "question_id": 48,
+    "correct_word": "游泳",
+    "heard_word": "球友",
+    "risky_frequencies": [
+      315.0,
+      400.0,
+      250.0,
+      2000.0,
+      630.0
+    ],
+    "confusion_score": 0.3792
+  },
+  "游泳,擁有": {
+    "question_id": 48,
+    "correct_word": "游泳",
+    "heard_word": "擁有",
+    "risky_frequencies": [
+      6300.0,
+      8000.0,
+      3150.0,
+      2000.0,
+      5000.0
+    ],
+    "confusion_score": 0.528
+  },
+  "游泳,晨泳": {
+    "question_id": 48,
+    "correct_word": "游泳",
+    "heard_word": "晨泳",
+    "risky_frequencies": [
+      800.0,
+      315.0,
+      630.0,
+      400.0,
+      250.0
+    ],
+    "confusion_score": 0.573
+  },
+  "球友,游泳": {
+    "question_id": 48,
+    "correct_word": "球友",
+    "heard_word": "游泳",
+    "risky_frequencies": [
+      315.0,
+      400.0,
+      250.0,
+      2000.0,
+      630.0
+    ],
+    "confusion_score": 0.3792
+  },
+  "球友,擁有": {
+    "question_id": 48,
+    "correct_word": "球友",
+    "heard_word": "擁有",
+    "risky_frequencies": [
+      250.0,
+      400.0,
+      630.0,
+      315.0,
+      1250.0
+    ],
+    "confusion_score": 0.4265
+  },
+  "球友,晨泳": {
+    "question_id": 48,
+    "correct_word": "球友",
+    "heard_word": "晨泳",
+    "risky_frequencies": [
+      2000.0,
+      315.0,
+      5000.0,
+      2500.0,
+      400.0
+    ],
+    "confusion_score": 0.6078
+  },
+  "擁有,游泳": {
+    "question_id": 48,
+    "correct_word": "擁有",
+    "heard_word": "游泳",
+    "risky_frequencies": [
+      6300.0,
+      8000.0,
+      3150.0,
+      2000.0,
+      5000.0
+    ],
+    "confusion_score": 0.528
+  },
+  "擁有,球友": {
+    "question_id": 48,
+    "correct_word": "擁有",
+    "heard_word": "球友",
+    "risky_frequencies": [
+      250.0,
+      400.0,
+      630.0,
+      315.0,
+      1250.0
+    ],
+    "confusion_score": 0.4265
+  },
+  "擁有,晨泳": {
+    "question_id": 48,
+    "correct_word": "擁有",
+    "heard_word": "晨泳",
+    "risky_frequencies": [
+      1600.0,
+      1250.0,
+      500.0,
+      2500.0,
+      8000.0
+    ],
+    "confusion_score": 0.474
+  },
+  "晨泳,游泳": {
+    "question_id": 48,
+    "correct_word": "晨泳",
+    "heard_word": "游泳",
+    "risky_frequencies": [
+      800.0,
+      315.0,
+      630.0,
+      400.0,
+      250.0
+    ],
+    "confusion_score": 0.573
+  },
+  "晨泳,球友": {
+    "question_id": 48,
+    "correct_word": "晨泳",
+    "heard_word": "球友",
+    "risky_frequencies": [
+      2000.0,
+      315.0,
+      5000.0,
+      2500.0,
+      400.0
+    ],
+    "confusion_score": 0.6078
+  },
+  "晨泳,擁有": {
+    "question_id": 48,
+    "correct_word": "晨泳",
+    "heard_word": "擁有",
+    "risky_frequencies": [
+      1600.0,
+      1250.0,
+      500.0,
+      2500.0,
+      8000.0
+    ],
+    "confusion_score": 0.474
+  },
+  "長大,掌上": {
+    "question_id": 49,
+    "correct_word": "長大",
+    "heard_word": "掌上",
+    "risky_frequencies": [
+      800.0,
+      1000.0,
+      1600.0,
+      250.0,
+      315.0
+    ],
+    "confusion_score": 0.613
+  },
+  "長大,手上": {
+    "question_id": 49,
+    "correct_word": "長大",
+    "heard_word": "手上",
+    "risky_frequencies": [
+      2000.0,
+      400.0,
+      1000.0,
+      500.0,
+      630.0
+    ],
+    "confusion_score": 0.679
+  },
+  "長大,穩當": {
+    "question_id": 49,
+    "correct_word": "長大",
+    "heard_word": "穩當",
+    "risky_frequencies": [
+      250.0,
+      500.0,
+      5000.0,
+      8000.0,
+      1000.0
+    ],
+    "confusion_score": 0.4865
+  },
+  "掌上,長大": {
+    "question_id": 49,
+    "correct_word": "掌上",
+    "heard_word": "長大",
+    "risky_frequencies": [
+      800.0,
+      1000.0,
+      1600.0,
+      250.0,
+      315.0
+    ],
+    "confusion_score": 0.613
+  },
+  "掌上,手上": {
+    "question_id": 49,
+    "correct_word": "掌上",
+    "heard_word": "手上",
+    "risky_frequencies": [
+      2500.0,
+      1000.0,
+      630.0,
+      4000.0,
+      500.0
+    ],
+    "confusion_score": 0.5798
+  },
+  "掌上,穩當": {
+    "question_id": 49,
+    "correct_word": "掌上",
+    "heard_word": "穩當",
+    "risky_frequencies": [
+      1250.0,
+      250.0,
+      1000.0,
+      500.0,
+      630.0
+    ],
+    "confusion_score": 0.6127
+  },
+  "手上,長大": {
+    "question_id": 49,
+    "correct_word": "手上",
+    "heard_word": "長大",
+    "risky_frequencies": [
+      2000.0,
+      400.0,
+      1000.0,
+      500.0,
+      630.0
+    ],
+    "confusion_score": 0.679
+  },
+  "手上,掌上": {
+    "question_id": 49,
+    "correct_word": "手上",
+    "heard_word": "掌上",
+    "risky_frequencies": [
+      2500.0,
+      1000.0,
+      630.0,
+      4000.0,
+      500.0
+    ],
+    "confusion_score": 0.5798
+  },
+  "手上,穩當": {
+    "question_id": 49,
+    "correct_word": "手上",
+    "heard_word": "穩當",
+    "risky_frequencies": [
+      800.0,
+      500.0,
+      1250.0,
+      1600.0,
+      1000.0
+    ],
+    "confusion_score": 0.6069
+  },
+  "穩當,長大": {
+    "question_id": 49,
+    "correct_word": "穩當",
+    "heard_word": "長大",
+    "risky_frequencies": [
+      250.0,
+      500.0,
+      5000.0,
+      8000.0,
+      1000.0
+    ],
+    "confusion_score": 0.4865
+  },
+  "穩當,掌上": {
+    "question_id": 49,
+    "correct_word": "穩當",
+    "heard_word": "掌上",
+    "risky_frequencies": [
+      1250.0,
+      250.0,
+      1000.0,
+      500.0,
+      630.0
+    ],
+    "confusion_score": 0.6127
+  },
+  "穩當,手上": {
+    "question_id": 49,
+    "correct_word": "穩當",
+    "heard_word": "手上",
+    "risky_frequencies": [
+      800.0,
+      500.0,
+      1250.0,
+      1600.0,
+      1000.0
+    ],
+    "confusion_score": 0.6069
+  },
+  "希望,金礦": {
+    "question_id": 50,
+    "correct_word": "希望",
+    "heard_word": "金礦",
+    "risky_frequencies": [
+      2500.0,
+      800.0,
+      3150.0,
+      500.0,
+      315.0
+    ],
+    "confusion_score": 0.6599
+  },
+  "希望,聽話": {
+    "question_id": 50,
+    "correct_word": "希望",
+    "heard_word": "聽話",
+    "risky_frequencies": [
+      2500.0,
+      4000.0,
+      1000.0,
+      400.0,
+      3150.0
+    ],
+    "confusion_score": 0.4864
+  },
+  "希望,冰棒": {
+    "question_id": 50,
+    "correct_word": "希望",
+    "heard_word": "冰棒",
+    "risky_frequencies": [
+      400.0,
+      2000.0,
+      1250.0,
+      1600.0,
+      500.0
+    ],
+    "confusion_score": 0.6479
+  },
+  "金礦,希望": {
+    "question_id": 50,
+    "correct_word": "金礦",
+    "heard_word": "希望",
+    "risky_frequencies": [
+      2500.0,
+      800.0,
+      3150.0,
+      500.0,
+      315.0
+    ],
+    "confusion_score": 0.6599
+  },
+  "金礦,聽話": {
+    "question_id": 50,
+    "correct_word": "金礦",
+    "heard_word": "聽話",
+    "risky_frequencies": [
+      6300.0,
+      2500.0,
+      2000.0,
+      8000.0,
+      315.0
+    ],
+    "confusion_score": 0.5123
+  },
+  "金礦,冰棒": {
+    "question_id": 50,
+    "correct_word": "金礦",
+    "heard_word": "冰棒",
+    "risky_frequencies": [
+      1250.0,
+      500.0,
+      4000.0,
+      315.0,
+      8000.0
+    ],
+    "confusion_score": 0.6544
+  },
+  "聽話,希望": {
+    "question_id": 50,
+    "correct_word": "聽話",
+    "heard_word": "希望",
+    "risky_frequencies": [
+      2500.0,
+      4000.0,
+      1000.0,
+      400.0,
+      3150.0
+    ],
+    "confusion_score": 0.4864
+  },
+  "聽話,金礦": {
+    "question_id": 50,
+    "correct_word": "聽話",
+    "heard_word": "金礦",
+    "risky_frequencies": [
+      6300.0,
+      2500.0,
+      2000.0,
+      8000.0,
+      315.0
+    ],
+    "confusion_score": 0.5123
+  },
+  "聽話,冰棒": {
+    "question_id": 50,
+    "correct_word": "聽話",
+    "heard_word": "冰棒",
+    "risky_frequencies": [
+      8000.0,
+      315.0,
+      250.0,
+      3150.0,
+      2500.0
+    ],
+    "confusion_score": 0.5404
+  },
+  "冰棒,希望": {
+    "question_id": 50,
+    "correct_word": "冰棒",
+    "heard_word": "希望",
+    "risky_frequencies": [
+      400.0,
+      2000.0,
+      1250.0,
+      1600.0,
+      500.0
+    ],
+    "confusion_score": 0.6479
+  },
+  "冰棒,金礦": {
+    "question_id": 50,
+    "correct_word": "冰棒",
+    "heard_word": "金礦",
+    "risky_frequencies": [
+      1250.0,
+      500.0,
+      4000.0,
+      315.0,
+      8000.0
+    ],
+    "confusion_score": 0.6544
+  },
+  "冰棒,聽話": {
+    "question_id": 50,
+    "correct_word": "冰棒",
+    "heard_word": "聽話",
+    "risky_frequencies": [
+      8000.0,
+      315.0,
+      250.0,
+      3150.0,
+      2500.0
+    ],
+    "confusion_score": 0.5404
+  }
+}

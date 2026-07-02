@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    FileProvider path configuration for experiment WAV recordings.
+    Maps the App's external files directory to the 'experiment_recordings/' path,
+    allowing ExperimentViewModel to share WAV files via Intent.ACTION_SEND
+    without requiring MANAGE_EXTERNAL_STORAGE permission.
+
+    Usage: FileProvider.getUriForFile(context, "${packageName}.fileprovider", file)
+    File location: getExternalFilesDir(null)/experiment_recordings/*.wav
+-->
+<paths>
+    <external-files-path
+        name="experiment_recordings"
+        path="experiment_recordings/" />
+</paths>

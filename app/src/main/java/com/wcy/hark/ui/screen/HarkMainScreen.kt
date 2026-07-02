@@ -87,6 +87,7 @@ fun HarkMainScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .statusBarsPadding()
                 .verticalScroll(scrollState)
                 .padding(horizontal = 20.dp, vertical = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -228,26 +229,54 @@ fun HarkMainScreen(
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
                             ),
                             shape = RoundedCornerShape(16.dp)
                         ) {
                             Row(
-                                modifier = Modifier.padding(16.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.MusicNote,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(28.dp)
-                                )
-                                Text(
-                                    text = "正在處理手機影音音訊，麥克風已靜音",
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        fontWeight = FontWeight.Medium
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.MusicNote,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                    Column {
+                                        Text(
+                                            text = "手機影音助聽 (DSP)",
+                                            style = MaterialTheme.typography.bodyLarge.copy(
+                                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        )
+                                        Text(
+                                            text = if (viewModel.isSystemDspOn.value) "音訊處理中，懸浮球已啟用" else "未啟用，麥克風已靜音",
+                                            style = MaterialTheme.typography.bodySmall.copy(
+                                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                            )
+                                        )
+                                    }
+                                }
+                                Switch(
+                                    checked = viewModel.isSystemDspOn.value,
+                                    onCheckedChange = { enabled ->
+                                        viewModel.setSystemDspEnabled(enabled)
+                                    },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = MaterialTheme.colorScheme.primary,
+                                        checkedTrackColor = MaterialTheme.colorScheme.onPrimary,
+                                        uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                                        uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
                                     )
                                 )
                             }
@@ -312,25 +341,35 @@ private fun PowerCard(
     statusText: String,
     onToggle: (Boolean) -> Unit
 ) {
-    // Animated card background color
-    val cardColor by animateColorAsState(
-        targetValue = if (isOn) MaterialTheme.colorScheme.primaryContainer
-                      else MaterialTheme.colorScheme.surfaceVariant,
-        animationSpec = tween(durationMillis = 400),
-        label = "powerCardColor"
-    )
-    val textColor = if (isOn) MaterialTheme.colorScheme.onPrimaryContainer
-                   else MaterialTheme.colorScheme.onSurfaceVariant
+    val cardGradient = if (isOn) {
+        Brush.horizontalGradient(
+            colors = listOf(
+                MaterialTheme.colorScheme.primary,
+                Color(0xFF673AB7) // Premium violet/purple accent
+            )
+        )
+    } else {
+        Brush.horizontalGradient(
+            colors = listOf(
+                MaterialTheme.colorScheme.surfaceVariant,
+                MaterialTheme.colorScheme.surfaceVariant
+            )
+        )
+    }
+    
+    val textColor = if (isOn) MaterialTheme.colorScheme.onPrimary
+                    else MaterialTheme.colorScheme.onSurfaceVariant
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = cardColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .background(brush = cardGradient)
                 .padding(20.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
@@ -346,7 +385,7 @@ private fun PowerCard(
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = statusText,
-                    style = MaterialTheme.typography.bodySmall.copy(color = textColor.copy(alpha = 0.75f))
+                    style = MaterialTheme.typography.bodySmall.copy(color = textColor.copy(alpha = 0.85f))
                 )
             }
             Switch(
@@ -355,7 +394,7 @@ private fun PowerCard(
                 modifier = Modifier.scale(1.3f),
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = MaterialTheme.colorScheme.primary,
-                    checkedTrackColor = MaterialTheme.colorScheme.primaryContainer,
+                    checkedTrackColor = MaterialTheme.colorScheme.onPrimary,
                     uncheckedThumbColor = MaterialTheme.colorScheme.outline,
                     uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
                 )
@@ -532,7 +571,9 @@ private fun PresetsCard(
                         rowModes.forEach { (mode, label, icon) ->
                             val isSelected = situationalMode == mode
                             val isAutoActive = !isAutoLocked && isSelected // auto mode highlights this one
-                            val isDisabled = isAutoLocked
+                            // Buttons are disabled ONLY when auto-switching is ON (!isAutoLocked).
+                            // When auto is OFF (isAutoLocked=true), the user should freely pick a mode.
+                            val isDisabled = !isAutoLocked
 
                             // Border alpha: breathes when auto-selected
                             val borderAlpha = if (isAutoActive) breatheAlpha else 0f

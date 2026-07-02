@@ -153,6 +153,7 @@ void HarkAudioEngine::updateDSPParameters() {
   mTransientSuppressorR.setSampleRate(sampleRate);
   mOwnVoiceDetectorL.setSampleRate(sampleRate);
   mOwnVoiceDetectorR.setSampleRate(sampleRate);
+  recomputePrescriptionGains();
 }
 
 void HarkAudioEngine::recomputePrescriptionGains() {
@@ -230,7 +231,9 @@ bool HarkAudioEngine::isEngineRunning() const {
 }
 
 bool HarkAudioEngine::setupStreams() {
-  if (!mHeadphonesConnected.load(std::memory_order_relaxed)) {
+  // Allow stream setup without headphones only if academic experiment mode is active
+  if (!mHeadphonesConnected.load(std::memory_order_relaxed) &&
+      !mExperimentModeActive.load(std::memory_order_relaxed)) {
     LOGW("setupStreams blocked: headphones are not connected. Preventing phone "
          "speaker playback!");
     return false;
@@ -308,6 +311,12 @@ bool HarkAudioEngine::setupStreams() {
   mCountInputBurstsCushion.store(
       2, std::memory_order_relaxed); // 2-burst cushion (192 frames) for safety
   mCountCallbacksToDiscard.store(10, std::memory_order_relaxed);
+
+  // Reset calibration accumulator so onAudioReady can refill it on cold start.
+  // The buffer holds ~1 second of mono samples (48000 frames) used to perform
+  // a one-shot noise floor calibration after the Drain phase completes.
+  mCalibSampleCount.store(0, std::memory_order_relaxed);
+  mCalibDone.store(false, std::memory_order_relaxed);
 
   mDiagRawInputPeakLinear.store(0.0f, std::memory_order_relaxed);
   mDiagOutputPeakLinear.store(0.0f, std::memory_order_relaxed);
@@ -580,6 +589,93 @@ HarkAudioEngine::onAudioReady(oboe::AudioStream * /*stream*/, void *audioData,
   int32_t framesRead = 0;
   bool wouldBlock = false;
 
+  // =====================================================================
+  // EXPERIMENT SIGNAL GENERATOR — Early Return Path
+  // If any experiment signal is active, inject it directly into the output
+  // buffer and RETURN immediately, completely bypassing the mic input path
+  // and all DSP modules. This ensures:
+  //   1. The signal reaches the earphone without WDRC/EQ coloration.
+  //   2. Latency is identical to normal mode (same Oboe callback period).
+  //   3. CalibTone: fixed-frequency sine with precise phase accumulator.
+  //   4. LogChirp: log-swept sine (ANSI S3.22 swept pure tone for OSPL90).
+  //   5. PinkNoise: Voss-McCartney 8-octave pink noise.
+  // =====================================================================
+  bool expActive = mExperimentModeActive.load(std::memory_order_relaxed);
+  if (expActive) {
+    bool injectDsp = mInjectDspMode.load(std::memory_order_relaxed);
+    if (!injectDsp) {
+      if (mCalibToneEnabled.load(std::memory_order_relaxed)) {
+        float freq   = mCalibToneFreqHz.load(std::memory_order_relaxed);
+        float amp    = mCalibToneLevelLinear.load(std::memory_order_relaxed);
+        double phaseInc = 2.0 * M_PI * freq / sampleRate;
+        for (int i = 0; i < numFrames * CHANNEL_COUNT; i += CHANNEL_COUNT) {
+          float s = static_cast<float>(amp * std::sin(mCalibTonePhase));
+          buffer[i]     = s;
+          buffer[i + 1] = s;
+          mCalibTonePhase += phaseInc;
+          if (mCalibTonePhase >= 2.0 * M_PI) mCalibTonePhase -= 2.0 * M_PI;
+        }
+        return oboe::DataCallbackResult::Continue;
+      }
+
+      if (mLogChirpEnabled.load(std::memory_order_relaxed)) {
+        float f0       = mLogChirpStartHz.load(std::memory_order_relaxed);
+        float f1       = mLogChirpEndHz.load(std::memory_order_relaxed);
+        float T        = mLogChirpDurationSec.load(std::memory_order_relaxed);
+        float amp      = mLogChirpLevelLinear.load(std::memory_order_relaxed);
+        // Log-swept sine formula: phase(t) = 2π * K * f0 * (e^(t/K) - 1)
+        // where K = T / ln(f1/f0). Instantaneous frequency: f(t) = f0 * e^(t/K).
+        double dt = 1.0 / sampleRate;
+        for (int i = 0; i < numFrames * CHANNEL_COUNT; i += CHANNEL_COUNT) {
+          if (mLogChirpElapsedSec >= T) {
+            // Sweep finished — disable and output silence
+            mLogChirpEnabled.store(false, std::memory_order_relaxed);
+            buffer[i] = buffer[i + 1] = 0.0f;
+            continue;
+          }
+          float s = static_cast<float>(amp * std::sin(mLogChirpPhase));
+          buffer[i]     = s;
+          buffer[i + 1] = s;
+          // Advance phase: dφ/dt = 2π * f0 * e^(t/K)
+          double instFreq = f0 * std::exp(mLogChirpElapsedSec / mLogChirpK);
+          mLogChirpPhase    += 2.0 * M_PI * instFreq * dt;
+          mLogChirpElapsedSec += dt;
+          if (mLogChirpPhase >= 2.0 * M_PI) mLogChirpPhase -= 2.0 * M_PI;
+        }
+        return oboe::DataCallbackResult::Continue;
+      }
+
+      if (mPinkNoiseEnabled.load(std::memory_order_relaxed)) {
+        float amp = mPinkNoiseLevelLinear.load(std::memory_order_relaxed);
+        // Voss-McCartney algorithm: 8-octave pink noise
+        // Reference: "1/f noise" (pink noise) generation without FFT
+        for (int i = 0; i < numFrames * CHANNEL_COUNT; i += CHANNEL_COUNT) {
+          mPinkNoiseCounter++;
+          // Update running contributions based on lowest changed bit
+          int changed = __builtin_ctz(mPinkNoiseCounter == 0 ? 1 : mPinkNoiseCounter);
+          int layers  = std::min(changed, 7);
+          for (int k = 0; k <= layers; ++k) {
+            mPinkNoiseContrib[k] = (static_cast<float>(rand()) / 2147483647.0f) * 2.0f - 1.0f;
+          }
+          float s = 0.0f;
+          for (int k = 0; k < 8; ++k) s += mPinkNoiseContrib[k];
+          s = (s / 8.0f) * amp;
+          buffer[i]     = s;
+          buffer[i + 1] = s;
+        }
+        return oboe::DataCallbackResult::Continue;
+      }
+
+      // Output absolute silence in Experiment Mode when no active signal is playing
+      memset(buffer, 0, numFrames * CHANNEL_COUNT * sizeof(float));
+      return oboe::DataCallbackResult::Continue;
+    }
+  }
+
+  // =====================================================================
+  // Normal processing path starts below (mic capture + DSP chain)
+  // =====================================================================
+
   if (isMediaMode) {
     if (mMediaAudioQueue) {
       size_t floatsNeeded = numFrames * CHANNEL_COUNT;
@@ -611,10 +707,20 @@ HarkAudioEngine::onAudioReady(oboe::AudioStream * /*stream*/, void *audioData,
           break;
         }
       }
-      // Only decrement when we actually drain some frames (waiting for input
-      // stream to start)
+      // Decrement the counter on each callback to avoid endless startup mute state machine lock
+      mCountCallbacksToDrain.store(drainCount - 1, std::memory_order_relaxed);
       if (totalDrained > 0) {
-        mCountCallbacksToDrain.store(drainCount - 1, std::memory_order_relaxed);
+        // Accumulate drain-phase samples for the initial noise-floor calibration.
+        // We only bother filling up to kCalibBufSize samples.
+        int already = mCalibSampleCount.load(std::memory_order_relaxed);
+        int room = static_cast<int>(mCalibBuffer.size()) - already;
+        if (room > 0) {
+          int toCopy = std::min(totalDrained, room);
+          // tempBuf contains the most-recently drained frames; copy them.
+          // (They are real mic data — correct for noise floor estimation.)
+          std::copy(tempBuf, tempBuf + toCopy, mCalibBuffer.data() + already);
+          mCalibSampleCount.store(already + toCopy, std::memory_order_relaxed);
+        }
       }
       // Return silent frames during startup
       memset(buffer, 0, numFrames * sizeof(float));
@@ -643,8 +749,28 @@ HarkAudioEngine::onAudioReady(oboe::AudioStream * /*stream*/, void *audioData,
           if (framesRead == 0) {
             wouldBlock = true;
           }
-          if (discardCount > 0) {
-            // Phase 3: Discarding during stabilization
+        if (discardCount > 0) {
+            // Phase 3: Discarding during stabilization.
+            // During the FIRST discard callback, if we have enough calibration
+            // samples accumulated from the Drain phase, run a one-shot
+            // calibrateNoiseFloor() to set realistic per-band noise floors.
+            // This eliminates the ~60s cold-start convergence period that was
+            // causing the 'crackling / garbled' artefact on startup.
+            // Ref: NoiseSuppressor.calibrateNoiseFloor() – NoiseSuppressor.cpp
+            if (discardCount == mCountCallbacksToDiscardInit &&
+                !mCalibDone.load(std::memory_order_relaxed)) {
+              int accumCount = mCalibSampleCount.load(std::memory_order_relaxed);
+              if (accumCount > 0) {
+                std::lock_guard<std::mutex> lock(mDSPMutex);
+                mNoiseSuppressorL.calibrateNoiseFloor(
+                    mCalibBuffer.data(), accumCount);
+                mNoiseSuppressorR.calibrateNoiseFloor(
+                    mCalibBuffer.data(), accumCount);
+                mCalibDone.store(true, std::memory_order_relaxed);
+                LOGD("Auto noise-floor calibration complete: %d samples",
+                     accumCount);
+              }
+            }
             mCountCallbacksToDiscard.store(discardCount - 1,
                                            std::memory_order_relaxed);
             memset(buffer, 0, numFrames * sizeof(float));
@@ -654,12 +780,30 @@ HarkAudioEngine::onAudioReady(oboe::AudioStream * /*stream*/, void *audioData,
       }
     }
 
-    // Apply Input Gain Offset (Compensation)
+    // Apply Input Gain Offset (Compensation for mic sensitivity difference)
+    // Phone mic: +15dB compensation; Headset mic: 0dB (flat)
     float inputFactor = mInputGainFactor.load(std::memory_order_relaxed);
     if (inputFactor != 1.0f && framesRead > 0) {
       for (int i = 0; i < framesRead; ++i) {
         buffer[i] *= inputFactor;
       }
+    }
+
+    // === TAP POINT: Post-Input-Gain-Compensation ===
+    // Measures peak level AFTER the +15dB mic compensation, BEFORE DC Blocker.
+    // This is the "true" input signal entering the DSP chain, useful for
+    // verifying the compensation value is correctly set during calibration.
+    if (framesRead > 0) {
+      float postGainPeak = 0.0f;
+      for (int k = 0; k < framesRead; ++k) {
+        float val = fabsf(buffer[k]);
+        if (val > postGainPeak) postGainPeak = val;
+      }
+      auto curPostGainMax = mDiagPostInputGainPeakLinear.load(std::memory_order_relaxed);
+      while (postGainPeak > curPostGainMax &&
+             !mDiagPostInputGainPeakLinear.compare_exchange_weak(
+                 curPostGainMax, postGainPeak, std::memory_order_relaxed))
+        ;
     }
 
     // Silent padding
@@ -681,6 +825,21 @@ HarkAudioEngine::onAudioReady(oboe::AudioStream * /*stream*/, void *audioData,
            !mDiagRawInputPeakLinear.compare_exchange_weak(
                currentMax, localInputPeak, std::memory_order_relaxed))
       ;
+
+    // Inject experimental pure tone directly into the mono DSP input buffer if inject mode is active
+    if (mInjectDspMode.load(std::memory_order_relaxed) &&
+        mCalibToneEnabled.load(std::memory_order_relaxed)) {
+      float freq   = mCalibToneFreqHz.load(std::memory_order_relaxed);
+      float amp    = mCalibToneLevelLinear.load(std::memory_order_relaxed);
+      double phaseInc = 2.0 * M_PI * freq / sampleRate;
+      for (int i = 0; i < numFrames; ++i) {
+        float s = static_cast<float>(amp * std::sin(mCalibTonePhase));
+        buffer[i] = s;
+        mCalibTonePhase += phaseInc;
+        if (mCalibTonePhase >= 2.0 * M_PI) mCalibTonePhase -= 2.0 * M_PI;
+      }
+      framesRead = numFrames;
+    }
 
     // Mono to Stereo (Microphone input is Mono, duplicate to LR)
     for (int i = numFrames - 1; i >= 0; --i) {
@@ -894,7 +1053,41 @@ void HarkAudioEngine::logLatencyStatistics() {
 }
 
 void HarkAudioEngine::calibrateNoiseSuppressor() {
-  // Logic for noise floor calibration
+  // Manual noise-floor calibration: captures kCalibFrames mono samples from
+  // the current input stream (blocking read with 50 ms timeout) and calls
+  // NoiseSuppressor::calibrateNoiseFloor() to set realistic per-band noise
+  // floors immediately, without waiting for the slow exponential tracker
+  // (alpha=0.9999) to converge (~60 s).
+  //
+  // Should only be called when the engine is running and the environment is
+  // quiet. The function is intentionally non-real-time (it blocks briefly) and
+  // must NOT be called from the audio callback thread.
+  //
+  // Ref: NoiseSuppressor.calibrateNoiseFloor() — NoiseSuppressor.cpp
+  if (!mInputStream || !mIsRunning) {
+    LOGW("calibrateNoiseSuppressor: engine not running, skipping.");
+    return;
+  }
+
+  constexpr int kCalibFrames = 48000; // 1 second @ 48kHz
+  std::vector<float> buf(kCalibFrames, 0.0f);
+  int collected = 0;
+  while (collected < kCalibFrames) {
+    int want = std::min(512, kCalibFrames - collected);
+    auto res = mInputStream->read(buf.data() + collected, want, 50000000 /*50 ms*/);
+    if (!res || res.value() <= 0) break;
+    collected += res.value();
+  }
+
+  if (collected > 0) {
+    std::lock_guard<std::mutex> lock(mDSPMutex);
+    mNoiseSuppressorL.calibrateNoiseFloor(buf.data(), collected);
+    mNoiseSuppressorR.calibrateNoiseFloor(buf.data(), collected);
+    mCalibDone.store(true, std::memory_order_relaxed);
+    LOGD("Manual calibrateNoiseSuppressor complete: %d frames.", collected);
+  } else {
+    LOGW("calibrateNoiseSuppressor: no samples collected.");
+  }
 }
 
 void HarkAudioEngine::setBandQ(int bandIndex, float q_factor) {
@@ -1054,4 +1247,112 @@ void HarkAudioEngine::getDiagnosticMetrics(float *outMetrics) {
   } else {
     outMetrics[4] = 0.0f;
   }
+
+  // 6. Post-Input-Gain-Compensation Peak (dBFS) — NEW tap point
+  // Captures signal AFTER mic gain compensation (+15dB) and BEFORE DC Blocker.
+  // Useful for verifying the compensation offset is applied correctly.
+  float postGainLin =
+      mDiagPostInputGainPeakLinear.exchange(0.0f, std::memory_order_relaxed);
+  outMetrics[5] = (postGainLin > 1e-9f) ? 20.0f * log10f(postGainLin) : -120.0f;
+}
+
+
+// =============================================================================
+// Experiment Signal Generator Implementations
+// Reference: ISO 8253-1 (Pure Tone Audiometry), ANSI S3.22 (OSPL90 test method)
+// =============================================================================
+
+/**
+ * setCalibTone — Activate / update / deactivate the calibration sine tone.
+ * freqHz:    Centre frequency (one of 250/500/1000/2000/3000/4000/6000/8000 Hz)
+ * levelDbfs: Output level in dBFS (-40 to 0). Converted to linear amplitude.
+ * enabled:   true = inject signal, false = stop and reset phase.
+ */
+void HarkAudioEngine::setCalibTone(float freqHz, float levelDbfs, bool enabled) {
+  if (enabled) {
+    mCalibToneFreqHz.store(freqHz, std::memory_order_relaxed);
+    // Convert dBFS to linear amplitude: A = 10^(dBFS/20)
+    float amp = powf(10.0f, levelDbfs / 20.0f);
+    mCalibToneLevelLinear.store(amp, std::memory_order_relaxed);
+    mCalibTonePhase = 0.0; // reset phase for clean start
+    // Disable other generators when starting CalibTone
+    mLogChirpEnabled.store(false, std::memory_order_relaxed);
+    mPinkNoiseEnabled.store(false, std::memory_order_relaxed);
+  }
+  mCalibToneEnabled.store(enabled, std::memory_order_relaxed);
+}
+
+/**
+ * setLogChirp — Activate / update / deactivate the log-swept sine chirp.
+ * This implements ANSI S3.22 "swept pure tone" measurement signal.
+ * The instantaneous frequency increases exponentially from startHz to endHz
+ * over durationSec seconds.
+ *
+ * Phase formula: φ(t) = 2π * K * startHz * (e^(t/K) - 1)
+ * where K = durationSec / ln(endHz / startHz)
+ */
+void HarkAudioEngine::setLogChirp(float startHz, float endHz,
+                                   float durationSec, float levelDbfs,
+                                   bool enabled) {
+  if (enabled) {
+    // Guard against invalid ranges that could cause std::log(NaN) or divide-by-zero
+    if (startHz <= 1.0f) startHz = 20.0f;
+    if (endHz <= startHz) endHz = startHz + 100.0f;
+    if (durationSec <= 0.1f) durationSec = 1.0f;
+
+    mLogChirpStartHz.store(startHz, std::memory_order_relaxed);
+    mLogChirpEndHz.store(endHz, std::memory_order_relaxed);
+    mLogChirpDurationSec.store(durationSec, std::memory_order_relaxed);
+    float amp = powf(10.0f, levelDbfs / 20.0f);
+    mLogChirpLevelLinear.store(amp, std::memory_order_relaxed);
+    // Pre-compute chirp rate constant K
+    mLogChirpK          = static_cast<double>(durationSec) / std::log(endHz / startHz);
+    mLogChirpPhase      = 0.0;
+    mLogChirpElapsedSec = 0.0;
+    // Disable other generators
+    mCalibToneEnabled.store(false, std::memory_order_relaxed);
+    mPinkNoiseEnabled.store(false, std::memory_order_relaxed);
+  }
+  mLogChirpEnabled.store(enabled, std::memory_order_relaxed);
+}
+
+/**
+ * setPinkNoise — Activate / deactivate pink noise output.
+ * Uses the Voss-McCartney algorithm for efficient 1/f noise generation
+ * without FFT. Suitable as an alternative OSPL90 source.
+ * Reference: A. McCartney, "Generating Pink Noise" (ICMC 1996)
+ */
+void HarkAudioEngine::setPinkNoise(float levelDbfs, bool enabled) {
+  if (enabled) {
+    float amp = powf(10.0f, levelDbfs / 20.0f);
+    mPinkNoiseLevelLinear.store(amp, std::memory_order_relaxed);
+    // Reset Voss-McCartney state
+    std::fill(std::begin(mPinkNoiseContrib), std::end(mPinkNoiseContrib), 0.0f);
+    mPinkNoiseRunningSum = 0;
+    mPinkNoiseCounter    = 0;
+    // Disable other generators
+    mCalibToneEnabled.store(false, std::memory_order_relaxed);
+    mLogChirpEnabled.store(false, std::memory_order_relaxed);
+  }
+  mPinkNoiseEnabled.store(enabled, std::memory_order_relaxed);
+}
+
+/**
+ * setExperimentModeActive — Controls overall Academic Experiment Mode lifecycle.
+ * When active, the engine operates in a silent standby state and blocks regular
+ * hearing aid mic DSP output to eliminate feedback screeches and environment noise.
+ */
+void HarkAudioEngine::setExperimentModeActive(bool active) {
+  mExperimentModeActive.store(active, std::memory_order_relaxed);
+  if (!active) {
+    // Disable all generators when exiting experiment mode
+    mCalibToneEnabled.store(false, std::memory_order_relaxed);
+    mLogChirpEnabled.store(false, std::memory_order_relaxed);
+    mPinkNoiseEnabled.store(false, std::memory_order_relaxed);
+    mInjectDspMode.store(false, std::memory_order_relaxed);
+  }
+}
+
+void HarkAudioEngine::setInjectDspMode(bool inject) {
+  mInjectDspMode.store(inject, std::memory_order_relaxed);
 }

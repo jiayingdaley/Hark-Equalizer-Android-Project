@@ -48,6 +48,8 @@ class SelectEarActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_select_ear)
+        window.statusBarColor = android.graphics.Color.parseColor("#F5F7FA")
+        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = true
 
         leftButton = findViewById(R.id.button_left_ear)
         rightButton = findViewById(R.id.button_right_ear)
@@ -181,16 +183,12 @@ class SelectEarActivity : ComponentActivity() {
     private fun checkNoiseAndStartTest(ear: String) {
         stopRecording() // 停止噪音監測
 
-        val currentTime = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(Date())
-        val filename = "${currentTime}_PureTone_${ear}_EnvironmentalNoise.csv"
-        recordEnvironmentalNoise(filename, environmentalNoiseLevel)
-
         when {
             environmentalNoiseLevel < 30 -> {
                 AlertDialog.Builder(this)
                     .setMessage("🟢 Quiet Environment")
                     .setPositiveButton("OK") { dialog, which ->
-                        startPureToneTest(ear)
+                        startPureToneTest(ear, environmentalNoiseLevel)
                     }
                     .show()
             }
@@ -201,7 +199,7 @@ class SelectEarActivity : ComponentActivity() {
                         startRecording() // 跳回原頁面，重新監測
                     }
                     .setNegativeButton("Skip") { dialog, which ->
-                        startPureToneTest(ear)
+                        startPureToneTest(ear, environmentalNoiseLevel)
                     }
                     .show()
             }
@@ -212,32 +210,18 @@ class SelectEarActivity : ComponentActivity() {
                         startRecording() // 跳回原頁面，重新監測
                     }
                     .setNegativeButton("Skip") { dialog, which ->
-                        startPureToneTest(ear)
+                        startPureToneTest(ear, environmentalNoiseLevel)
                     }
                     .show()
             }
         }
     }
 
-    private fun startPureToneTest(ear: String) {
+    private fun startPureToneTest(ear: String, noiseLevel: Double) {
         val intent = Intent(this, PureToneTestActivity::class.java)
         intent.putExtra("TESTING_EAR", ear)
+        intent.putExtra("ENVIRONMENTAL_NOISE", noiseLevel)
         startActivity(intent)
-    }
-
-    private fun recordEnvironmentalNoise(filename: String, noiseLevel: Double) {
-        val baseDir = getExternalFilesDir(null)?.absolutePath
-        val filePath = "$baseDir/$filename"
-        try {
-            FileWriter(filePath).use { writer ->
-                writer.append("Timestamp,Environmental Noise (dB SPL)\n")
-                val currentTime = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
-                writer.append("$currentTime,$noiseLevel\n")
-                Log.d("SelectEarActivity", "Environmental noise recorded to: $filePath")
-            }
-        } catch (e: IOException) {
-            Log.e("SelectEarActivity", "Error writing environmental noise to CSV: ${e.message}")
-        }
     }
 
     override fun onDestroy() {

@@ -95,6 +95,12 @@
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
 
         <activity
+            android:name=".audiometry.TestHistoryActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.Hark" />
+
+        <activity
             android:name=".audiometry.SpeechAudiometryExplanationActivity"
             android:exported="false"
             android:screenOrientation="portrait"
@@ -122,6 +128,19 @@
                 <action android:name="android.media.action.CLOSE_AUDIO_EFFECT_CONTROL_SESSION" />
             </intent-filter>
         </receiver>
+
+        <!-- FileProvider for sharing experiment WAV recordings via Share Sheet.
+             Required by ExperimentViewModel.getShareUri().
+             Authority: com.wcy.hark.fileprovider -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_provider_paths" />
+        </provider>
 
     </application>
 

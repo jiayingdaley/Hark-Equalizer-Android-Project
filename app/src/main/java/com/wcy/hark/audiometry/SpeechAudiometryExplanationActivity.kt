@@ -6,12 +6,17 @@ import android.os.Bundle
 import android.widget.Button
 import androidx.appcompat.app.AppCompatActivity
 
-class SpeechAudiometryExplanationActivity : AppCompatActivity(), DialogNavCallback { // 在這裡加上 ", DialogNavCallback"
+class SpeechAudiometryExplanationActivity : AppCompatActivity(), DialogNavCallback {
+
+    private lateinit var switchApplyDspPrep: android.widget.Switch
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_speech_audiometry_explanation)
+        window.statusBarColor = android.graphics.Color.parseColor("#F5F7FA")
+        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = true
 
+        switchApplyDspPrep = findViewById(R.id.switchApplyDspPrep)
         val buttonStartVolumeAdjustment: Button = findViewById(R.id.buttonStartVolumeAdjustment)
 
         buttonStartVolumeAdjustment.setOnClickListener {
@@ -33,7 +38,9 @@ class SpeechAudiometryExplanationActivity : AppCompatActivity(), DialogNavCallba
 
     override fun onStartSrtTestFromInstructions() {
         // 從 TestInstructionsDialogFragment 的 "Start Test" 呼叫，啟動 SRT 測試 Activity
-        val intent = Intent(this, SRTTestActivity::class.java) // 假設 SRTTestActivity 已/將被建立
+        val intent = Intent(this, SRTTestActivity::class.java).apply {
+            putExtra("EXTRA_APPLY_DSP", switchApplyDspPrep.isChecked)
+        }
         startActivity(intent)
         // 你可以考慮在這裡 finish() 這個 SpeechAudiometryExplanationActivity，如果後續流程不需要再回到它
         // finish()

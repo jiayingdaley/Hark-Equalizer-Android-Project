@@ -1,8 +1,7 @@
 package com.wcy.hark.audiometry
-import com.wcy.hark.audiometry.sqlite.SRTResultContract
 import com.wcy.hark.R
 
-
+import com.wcy.hark.audiometry.sqlite.SRTResultContract
 import android.content.ContentValues
 import android.content.Intent
 import android.media.AudioAttributes
@@ -37,6 +36,7 @@ class SRTTestActivity : AppCompatActivity() {
     private lateinit var buttonPauseResume: Button
     private lateinit var buttonEndEarly: Button
     private lateinit var progressBarAudioLoading: ProgressBar
+    private lateinit var textViewDspStatus: TextView
 
     private lateinit var wordProvider: WordProvider
     private var allQuestions: List<WordQuestion> = listOf()
@@ -56,6 +56,7 @@ class SRTTestActivity : AppCompatActivity() {
     private lateinit var dbHelper: SRTResultDbHelper
     private var currentSessionId: Long = -1
     private val answeredRecords: MutableList<SRTTestRecord> = mutableListOf()
+    private var subjectName: String = "未填寫"
 
     companion object {
         const val TOTAL_QUESTIONS_TO_ASK = 25
@@ -65,6 +66,22 @@ class SRTTestActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_srt_test)
+        window.statusBarColor = android.graphics.Color.parseColor("#F5F7FA")
+        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = true
+
+        // --- Critical isolation step (KNOWN-ISSUE-004 fix) ---
+        // Instead of stopping the engine (which requires the user to re-enable manually),
+        // we mute the output and enable bypass mode so the Oboe engine keeps running silently.
+        // This way the Service stays alive and the engine resumes automatically when the test ends.
+        // Ref: KNOWN-ISSUE-004, HarkAudioBridge.setMuted() / setBypassMode()
+        try {
+            com.wcy.hark.audio.bridge.HarkAudioBridge.setMuted(true)
+            com.wcy.hark.audio.bridge.HarkAudioBridge.setBypassMode(true)
+            com.wcy.hark.audio.manager.SystemDspManager.setEnabled(false)
+            Log.d(TAG, "Engine muted and bypassed for clean test isolation (service stays alive).")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to mute engine (acceptable if not running): ${e.message}")
+        }
 
         // Initialize UI
         textViewQuestionCount = findViewById(R.id.textViewQuestionCount)
@@ -78,6 +95,11 @@ class SRTTestActivity : AppCompatActivity() {
         buttonPauseResume = findViewById(R.id.buttonPauseResume)
         buttonEndEarly = findViewById(R.id.buttonEndEarly)
         progressBarAudioLoading = findViewById(R.id.progressBarAudioLoading)
+        textViewDspStatus = findViewById(R.id.textViewDspStatus)
+
+        // Read DSP preference from the explanation screen; update status badge (read-only)
+        val applyDsp = intent.getBooleanExtra("EXTRA_APPLY_DSP", true)
+        updateDspStatusBadge(applyDsp)
 
         // Initialize helpers
         wordProvider = WordProvider(this)
@@ -85,7 +107,57 @@ class SRTTestActivity : AppCompatActivity() {
         currentSessionId = System.currentTimeMillis() // Use timestamp as session ID
 
         setupButtonListeners()
-        loadTestData()
+        showSubjectNameInputDialog()
+    }
+
+    private fun showSubjectNameInputDialog() {
+        val input = android.widget.EditText(this).apply {
+            hint = "請輸入姓名"
+            setSingleLine(true)
+            val paddingPx = (16 * resources.displayMetrics.density).toInt()
+            setPadding(paddingPx, paddingPx, paddingPx, paddingPx)
+        }
+        
+        val container = android.widget.FrameLayout(this).apply {
+            addView(input, android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                leftMargin = (24 * resources.displayMetrics.density).toInt()
+                rightMargin = (24 * resources.displayMetrics.density).toInt()
+                topMargin = (8 * resources.displayMetrics.density).toInt()
+                bottomMargin = (8 * resources.displayMetrics.density).toInt()
+            })
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("語詞測驗登錄")
+            .setMessage("請輸入受試者姓名（可不填）：")
+            .setView(container)
+            .setPositiveButton("開始測驗") { _, _ ->
+                val enteredName = input.text.toString().trim()
+                subjectName = if (enteredName.isEmpty()) "未填寫" else enteredName
+                loadTestData()
+            }
+            .setCancelable(false)
+            .show()
+    }
+
+    /**
+     * Updates the DSP status badge colour and text.
+     * Green  = DSP 已套用 (applied)
+     * Gray   = DSP 未套用 (not applied)
+     */
+    private fun updateDspStatusBadge(isApplied: Boolean) {
+        if (isApplied) {
+            textViewDspStatus.text = "● DSP 助聽補償 已套用"
+            textViewDspStatus.setTextColor(android.graphics.Color.parseColor("#2E7D32")) // dark green
+            textViewDspStatus.setBackgroundResource(android.R.color.transparent)
+        } else {
+            textViewDspStatus.text = "○ DSP 助聽補償 未套用"
+            textViewDspStatus.setTextColor(android.graphics.Color.parseColor("#757575")) // gray
+            textViewDspStatus.setBackgroundResource(android.R.color.transparent)
+        }
     }
 
     private fun setupButtonListeners() {
@@ -188,6 +260,17 @@ class SRTTestActivity : AppCompatActivity() {
                     .setUsage(AudioAttributes.USAGE_MEDIA)
                     .build()
             )
+            // Apply per-session DSP EQ only when the user chose to enable it before the test.
+            // The DSP state is fixed for the entire session (read from intent, shown as badge).
+            val applyDsp = intent.getBooleanExtra("EXTRA_APPLY_DSP", true)
+            if (applyDsp) {
+                try {
+                    com.wcy.hark.audio.manager.SystemDspManager.attachToSession(audioSessionId, forceEnabled = true)
+                    Log.d(TAG, "Attached DSP to media player session: $audioSessionId")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to attach DSP: ${e.message}")
+                }
+            }
             try {
                 val afd = resources.openRawResourceFd(resId)
                 setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
@@ -345,14 +428,16 @@ class SRTTestActivity : AppCompatActivity() {
 
         // For this iteration, we will save the records here before going to result.
         // This might make ResultActivity simpler.
-        saveTestSessionAndRecords(currentSessionId, accuracy, answeredRecords)
+        val audioManager = getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
+        val currentVolume = audioManager.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)
+        saveTestSessionAndRecords(currentSessionId, accuracy, answeredRecords, currentVolume)
 
 
         startActivity(intent)
         finish() // Finish this test activity
     }
 
-    private fun saveTestSessionAndRecords(sessionId: Long, accuracy: Double, records: List<SRTTestRecord>) {
+    private fun saveTestSessionAndRecords(sessionId: Long, accuracy: Double, records: List<SRTTestRecord>, phoneVolume: Int) {
         val db = dbHelper.writableDatabase
         db.beginTransaction()
         try {
@@ -362,6 +447,8 @@ class SRTTestActivity : AppCompatActivity() {
                 put(SRTResultContract.TestSessionEntry.COLUMN_NAME_TEST_TIMESTAMP, System.currentTimeMillis())
                 put(SRTResultContract.TestSessionEntry.COLUMN_NAME_OVERALL_ACCURACY, accuracy)
                 put(SRTResultContract.TestSessionEntry.COLUMN_NAME_TOTAL_QUESTIONS_ANSWERED, records.size)
+                put(SRTResultContract.TestSessionEntry.COLUMN_NAME_PHONE_VOLUME, phoneVolume)
+                put(SRTResultContract.TestSessionEntry.COLUMN_NAME_SUBJECT_NAME, subjectName)
             }
             val newSessionRowId = db.insert(SRTResultContract.TestSessionEntry.TABLE_NAME, null, sessionValues)
             Log.d(TAG, "Inserted session with ID: $newSessionRowId, accuracy: $accuracy")
@@ -390,8 +477,15 @@ class SRTTestActivity : AppCompatActivity() {
 
 
     private fun releaseMediaPlayer() {
-        mediaPlayer?.stop()
-        mediaPlayer?.release()
+        mediaPlayer?.let { mp ->
+            try {
+                com.wcy.hark.audio.manager.SystemDspManager.detachFromSession(mp.audioSessionId)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error detaching DSP: ${e.message}")
+            }
+            mp.stop()
+            mp.release()
+        }
         mediaPlayer = null
     }
 
@@ -420,7 +514,16 @@ class SRTTestActivity : AppCompatActivity() {
         // Ensure all resources are released
         audioPlaybackRunnable?.let { handler.removeCallbacks(it) }
         releaseMediaPlayer()
-        // dbHelper.close() // dbHelper is an application-wide singleton or managed by lifecycle. No need to close here normally.
+        // Restore the DSP engine to normal operation when leaving the test.
+        // This is the counterpart to the mute/bypass we applied in onCreate.
+        // Ref: KNOWN-ISSUE-004 fix — engine stays alive during test
+        try {
+            com.wcy.hark.audio.bridge.HarkAudioBridge.setBypassMode(false)
+            com.wcy.hark.audio.bridge.HarkAudioBridge.setMuted(false)
+            Log.d(TAG, "DSP engine restored to normal operation after test.")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to restore engine state (may not have been running): ${e.message}")
+        }
         super.onDestroy()
     }
 }

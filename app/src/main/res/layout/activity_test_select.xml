@@ -4,6 +4,8 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
+    android:background="#F5F7FA"
     tools:context=".TestSelectActivity">
 
     <TextView
@@ -35,7 +37,7 @@
     <Button
         android:id="@+id/button_speech_audiometry"
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
+        android:layout_height="75dp"
         android:layout_marginStart="64dp"
         android:layout_marginTop="28dp"
         android:layout_marginEnd="64dp"
@@ -46,5 +48,19 @@
         app:layout_constraintHorizontal_bias="0.0"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/button_pure_tone_test" />
+
+    <Button
+        android:id="@+id/button_view_history"
+        android:layout_width="0dp"
+        android:layout_height="75dp"
+        android:layout_marginStart="64dp"
+        android:layout_marginTop="28dp"
+        android:layout_marginEnd="64dp"
+        android:backgroundTint="#673AB7"
+        android:text="@string/testSelect_button_ViewHistory"
+        android:textSize="24sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/button_speech_audiometry" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

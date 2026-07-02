@@ -1,0 +1,83 @@
+{
+  "_comment": "Earphone ETSPL (Equivalent Threshold Sound Pressure Level) correction table. Values represent the dB difference between the measured SPL output of this earphone (using a HATS or coupler) and the standard reference threshold at that frequency. Operator should measure each earphone with an external sound level meter and update via the Calibration Test screen.",
+  "Philips TAE2146": {
+    "250": 0.0,
+    "500": 0.0,
+    "1000": 0.0,
+    "2000": 0.0,
+    "3000": 0.0,
+    "4000": 0.0,
+    "6000": 0.0,
+    "8000": 0.0
+  },
+  "Apple EarPods (Type-C)": {
+    "250": 0.0,
+    "500": 0.0,
+    "1000": 0.0,
+    "2000": 0.0,
+    "3000": 0.0,
+    "4000": 0.0,
+    "6000": 0.0,
+    "8000": 0.0
+  },
+  "SENNHEISER HD 400U": {
+    "250": 0.0,
+    "500": 0.0,
+    "1000": 0.0,
+    "2000": 0.0,
+    "3000": 0.0,
+    "4000": 0.0,
+    "6000": 0.0,
+    "8000": 0.0
+  },
+  "JBL Tune 310C": {
+    "250": 0.0,
+    "500": 0.0,
+    "1000": 0.0,
+    "2000": 0.0,
+    "3000": 0.0,
+    "4000": 0.0,
+    "6000": 0.0,
+    "8000": 0.0
+  },
+  "AirPods Pro 2": {
+    "250": 0.0,
+    "500": 0.0,
+    "1000": 0.0,
+    "2000": 0.0,
+    "3000": 0.0,
+    "4000": 0.0,
+    "6000": 0.0,
+    "8000": 0.0
+  },
+  "ATH-CKS330NC": {
+    "250": 0.0,
+    "500": 0.0,
+    "1000": 0.0,
+    "2000": 0.0,
+    "3000": 0.0,
+    "4000": 0.0,
+    "6000": 0.0,
+    "8000": 0.0
+  },
+  "SONY WH-1000XM6": {
+    "250": 0.0,
+    "500": 0.0,
+    "1000": 0.0,
+    "2000": 0.0,
+    "3000": 0.0,
+    "4000": 0.0,
+    "6000": 0.0,
+    "8000": 0.0
+  },
+  "其他": {
+    "250": 0.0,
+    "500": 0.0,
+    "1000": 0.0,
+    "2000": 0.0,
+    "3000": 0.0,
+    "4000": 0.0,
+    "6000": 0.0,
+    "8000": 0.0
+  }
+}

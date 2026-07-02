@@ -122,6 +122,11 @@ float BiquadFilter::process(float in) {
     double in_d = (double)in;
     double out = b0 * in_d + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
     
+    // NaN and inf sanitization: prevent IIR filter feedback loop from exploding
+    if (std::isnan(out) || std::isinf(out)) {
+        out = 0.0;
+    }
+
     // 防止 denormal 數字導致的效能崩潰 (在更新狀態前處理)
     if (std::abs(out) < 1.17549435e-38) {
         out = 0.0;

@@ -4,20 +4,27 @@ import android.content.Context
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlin.math.log10
 import com.wcy.hark.audio.bridge.HarkAudioBridge
 import com.wcy.hark.audio.router.MediaSessionObserver
 
 /**
  * SceneManager: The intelligent hub for situational mode switching.
- * 
+ *
  * Responsibilities:
  * 1. Periodic environmental analysis (using DSP spectral data).
  * 2. Media session monitoring (via MediaSessionObserver).
  * 3. Handling Manual Override (lock mode).
- * 4. Cross-fading between modes.
+ *
+ * Lifecycle:
+ * The caller (HarkAudioService) provides an external [scope] tied to the Service's lifecycle.
+ * This ensures all launched coroutines are cancelled when the Service is destroyed,
+ * preventing orphaned coroutines calling JNI after engine teardown (KNOWN-ISSUE-007 fix).
+ * Ref: SceneManager coroutine lifecycle alignment — .ai_collaboration/llm_bug_knowledge.md
  */
-class SceneManager(private val context: Context) {
+class SceneManager(
+    private val context: Context,
+    private val scope: CoroutineScope  // Must be the Service's scope, not a self-owned one
+) {
 
     enum class Mode(val id: Int) {
         TRANSPARENCY(0),
@@ -34,15 +41,14 @@ class SceneManager(private val context: Context) {
     val isAutoLocked: StateFlow<Boolean> = _isAutoLocked
 
     private var autoJob: Job? = null
-    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
-    
+
     private val mediaObserver = MediaSessionObserver(context) { isPlaying ->
         if (!isAutoLocked.value) {
             if (isPlaying) {
                 applyMode(Mode.CINEMA)
             } else {
                 // Return to auto-analysis if music stops
-                runAutoAnalysis()
+                startAutoAnalysis()
             }
         }
     }
@@ -55,7 +61,7 @@ class SceneManager(private val context: Context) {
     fun stop() {
         mediaObserver.stop()
         autoJob?.cancel()
-        scope.cancel()
+        // Note: we do NOT cancel the external scope here — the caller (HarkAudioService) owns it
     }
 
     /**

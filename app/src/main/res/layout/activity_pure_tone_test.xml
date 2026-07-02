@@ -5,6 +5,8 @@
     android:id="@+id/main_constraint_layout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
+    android:background="#F5F7FA"
     tools:context=".PureToneTestActivity">
 
     <TextView

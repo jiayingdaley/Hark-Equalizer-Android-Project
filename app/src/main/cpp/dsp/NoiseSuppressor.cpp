@@ -43,8 +43,21 @@ float NoiseSuppressor::process(float sample) {
         float bandSignal = mAnalysisFilters[i].process(filteredSample);
         float absSignal = fabsf(bandSignal);
 
+        // NaN and inf sanitization for signal input
+        if (std::isnan(absSignal) || std::isinf(absSignal)) {
+            absSignal = 0.0f;
+        }
+
         // 能量追蹤平滑化
         mSignalEnergy[i] = mAlphaSignal * mSignalEnergy[i] + (1.0f - mAlphaSignal) * absSignal;
+        
+        // Sanitize signal energy state
+        if (std::isnan(mSignalEnergy[i]) || std::isinf(mSignalEnergy[i])) {
+            mSignalEnergy[i] = HarkDspConfig::NS_NOISE_FLOOR_INIT;
+        }
+        if (std::isnan(mNoiseFloor[i]) || std::isinf(mNoiseFloor[i])) {
+            mNoiseFloor[i] = HarkDspConfig::NS_NOISE_FLOOR_INIT;
+        }
 
         // SNR 計算 (加入 Offset 防止除以零)
         float snr = mSignalEnergy[i] / (mNoiseFloor[i] + 0.00001f);
@@ -55,7 +68,7 @@ float NoiseSuppressor::process(float sample) {
         float gainFloor = HarkDspConfig::NS_GAIN_FLOOR_MID;
         
         if (snr < HarkDspConfig::NS_SNR_LOW_THRESH) {
-            // 低信噪比 (純噪音區)：增強抑制並降低底限至 -26dB
+            // 低信噪比 (純噪音區)：增強抑制並降低底限
             suppressionFactor = HarkDspConfig::NS_SUPPRESSION_LOW;
             gainFloor = HarkDspConfig::NS_GAIN_FLOOR_LOW;
         } else if (snr > HarkDspConfig::NS_SNR_HIGH_THRESH) {
@@ -74,10 +87,15 @@ float NoiseSuppressor::process(float sample) {
   
         // 增益平滑
         mBandGains[i] = mAlphaGain * mBandGains[i] + (1.0f - mAlphaGain) * targetGain;
+        if (std::isnan(mBandGains[i]) || std::isinf(mBandGains[i])) {
+            mBandGains[i] = 1.0f;
+        }
 
         // 背景噪音地板追蹤：使用極慢速度 (0.9999) 防止追蹤到語音或產生調變雜訊
         if (mSignalEnergy[i] < mNoiseFloor[i] * HarkDspConfig::NS_NOISE_FLOOR_UPDATE_RATIO) {
             mNoiseFloor[i] = mAlphaNoise * mNoiseFloor[i] + (1.0f - mAlphaNoise) * mSignalEnergy[i];
+            // 防止長期在極端安靜環境下噪音地板降為零而引發除以零或發散
+            mNoiseFloor[i] = std::max(mNoiseFloor[i], 1e-6f);
         }
 
         // 權重分配：中頻語音段 (1k-3k) 權重更高
@@ -87,6 +105,9 @@ float NoiseSuppressor::process(float sample) {
     }
 
     float finalGain = weightedGain / totalWeight;
+    if (std::isnan(finalGain) || std::isinf(finalGain)) {
+        finalGain = 1.0f; // 回退為不降噪，避免沒聲音
+    }
 
     // 輸出處理後的訊號
     return filteredSample * finalGain;

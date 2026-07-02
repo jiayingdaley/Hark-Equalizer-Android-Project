@@ -22,6 +22,8 @@ class SRTTestResultActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_srt_test_result)
+        window.statusBarColor = android.graphics.Color.parseColor("#F5F7FA")
+        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = true
 
         // 初始化 UI 元件
         textViewCorrectCountValue = findViewById(R.id.textViewCorrectCountValue) // 新增

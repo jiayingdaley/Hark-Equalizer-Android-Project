@@ -4,12 +4,13 @@ import com.wcy.hark.R
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 
-
 class AudiogramActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_audiogram)
+        window.statusBarColor = android.graphics.Color.WHITE
+        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = true
 
         supportActionBar?.title = "Pure-Tone Test Result"
 

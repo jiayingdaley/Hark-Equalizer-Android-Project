@@ -1,4 +1,5 @@
 package com.wcy.hark.audiometry
+import com.wcy.hark.R
 
 import android.content.Context
 import android.graphics.Canvas
@@ -12,17 +13,17 @@ import androidx.core.content.ContextCompat
 
 class AudiogramView(context: Context, attrs: AttributeSet? = null) : View(context, attrs) {
 
-    // Include frequencies from standard audiogram testing (evenly spaced log-scale grids)
-    private val axisFrequencies = listOf(125, 250, 500, 1000, 2000, 4000, 8000)
+    // Include all frequencies from your test
+    private val frequencies = listOf(250, 500, 1000, 2000, 3000, 4000, 6000, 8000)
     private val hearingLevels = (-10..120 step 10).toList()
     private var leftEarResults: Map<Int, Int?> = emptyMap()
     private var rightEarResults: Map<Int, Int?> = emptyMap()
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val textColor = Color.BLACK
     private val gridColor = Color.LTGRAY
-    private val leftEarColor = Color.BLUE
-    private val rightEarColor = Color.RED
-    private val symbolSize = 45f
+    private val leftEarColor = ContextCompat.getColor(context, android.R.color.holo_blue_light)
+    private val rightEarColor = ContextCompat.getColor(context, android.R.color.holo_red_light)
+    private val symbolSize = 20f
     private val padding = 100f // Increased padding for better visibility
 
     fun setResults(leftEar: Map<Int, Int?>, rightEar: Map<Int, Int?>) {
@@ -60,15 +61,18 @@ class AudiogramView(context: Context, attrs: AttributeSet? = null) : View(contex
         paint.textSize = 24f
 
         // Draw vertical lines (frequencies)
+        val availableWidth = width - 2 * padding
+        val frequencySpacing = availableWidth / (frequencies.size - 1)
+
         paint.textAlign = Paint.Align.CENTER
-        for (freq in axisFrequencies) {
-            val x = mapFrequencyToX(freq, width)
+        for (i in frequencies.indices) {
+            val x = padding + i * frequencySpacing
             canvas.drawLine(x, padding, x, height - padding, paint)
 
-            // Format frequencies for display (e.g., 1000 -> 1k, 1500 -> 1.5k)
+            // Format frequencies for display (e.g., 1000 -> 1k)
             val freqText = when {
-                freq >= 1000 -> if (freq % 1000 == 0) "${freq/1000}k" else "${freq/1000f}k"
-                else -> "$freq"
+                frequencies[i] >= 1000 -> "${frequencies[i]/1000}k"
+                else -> "${frequencies[i]}"
             }
             canvas.drawText(freqText, x, height - padding + 30f, paint)
         }
@@ -91,8 +95,8 @@ class AudiogramView(context: Context, attrs: AttributeSet? = null) : View(contex
         canvas.drawRect(padding, y0dB, width - padding, y25dB, paint)
 
         // Draw results
-        drawEarResults(canvas, leftEarResults, leftEarColor, "X", width, height)
-        drawEarResults(canvas, rightEarResults, rightEarColor, "O", width, height)
+        drawEarResults(canvas, leftEarResults, leftEarColor, "X", width, height, frequencySpacing)
+        drawEarResults(canvas, rightEarResults, rightEarColor, "O", width, height, frequencySpacing)
 
         // Draw legend
         paint.textSize = 30f
@@ -117,42 +121,44 @@ class AudiogramView(context: Context, attrs: AttributeSet? = null) : View(contex
         color: Int,
         symbol: String,
         width: Float,
-        height: Float
+        height: Float,
+        frequencySpacing: Float
     ) {
         paint.color = color
-        paint.style = Paint.Style.FILL
-        paint.strokeWidth = 6f // 加粗線條
-        paint.textAlign = Paint.Align.CENTER
-        // 將文字加粗稍微調整
-        paint.textSize = symbolSize
-        paint.isFakeBoldText = true
+        paint.strokeCap = Paint.Cap.ROUND // Smooth line joints
 
-        // First pass: Draw points
+        // First pass: Draw points (Geometric circles and crosses centered at exact X, Y)
         val points = mutableListOf<Pair<Float, Float>>()
 
-        // Sort tested frequencies for line drawing connection
-        val testedFrequencies = results.keys.sorted()
-
-        for (frequency in testedFrequencies) {
+        for (frequency in frequencies) {
             val level = results[frequency]
             if (level != null && level != -1) {
-                val x = mapFrequencyToX(frequency, width)
+                val index = frequencies.indexOf(frequency)
+                val x = padding + index * frequencySpacing
                 val y = mapHearingLevelToY(level, height)
 
-                // Draw symbol
-                canvas.drawText(symbol, x, y + (symbolSize / 3f), paint) // 微調 Y 座標置中
                 points.add(Pair(x, y))
+
+                // Draw clinical symbols using precise geometry rather than text baseline
+                paint.style = Paint.Style.STROKE
+                paint.strokeWidth = 5f
+                if (symbol == "O") {
+                    // Right Ear: Red open circle
+                    canvas.drawCircle(x, y, 12f, paint)
+                } else {
+                    // Left Ear: Blue cross (X)
+                    canvas.drawLine(x - 12f, y - 12f, x + 12f, y + 12f, paint)
+                    canvas.drawLine(x - 12f, y + 12f, x + 12f, y - 12f, paint)
+                }
 
                 Log.d("AudiogramView", "$symbol at Freq: $frequency Hz, Level: $level dB, X: $x, Y: $y")
             }
         }
 
-        // 恢復正常文字設定，避免影響其他圖表元素
-        paint.isFakeBoldText = false
-
-        // Second pass: Connect points with lines
+        // Second pass: Connect points with thick path lines (strokeWidth = 6f)
         if (points.size > 1) {
             paint.style = Paint.Style.STROKE
+            paint.strokeWidth = 6f
             val path = Path()
             path.moveTo(points[0].first, points[0].second)
 
@@ -173,13 +179,5 @@ class AudiogramView(context: Context, attrs: AttributeSet? = null) : View(contex
         // Calculate position - note we don't apply the yAxisShift anymore
         // since we want accurate positioning
         return padding + ((level - minLevel) / levelRange.toFloat()) * availableHeight
-    }
-
-    private fun mapFrequencyToX(frequency: Int, width: Float): Float {
-        val minFreq = 125f
-        val maxFreq = 8000f
-        val availableWidth = width - 2 * padding
-        val logRatio = kotlin.math.log2(frequency.toFloat() / minFreq) / kotlin.math.log2(maxFreq / minFreq)
-        return padding + logRatio * availableWidth
     }
 }

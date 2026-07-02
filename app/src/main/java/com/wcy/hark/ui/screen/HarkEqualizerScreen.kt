@@ -16,13 +16,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.widget.Toast
 import com.wcy.hark.ui.components.EqualizerCurveDisplay
 import com.wcy.hark.ui.viewmodel.EqViewModel
 import com.wcy.hark.ui.viewmodel.EarType
+import com.wcy.hark.ui.viewmodel.AudioSourceMode
 
 /**
  * HarkEqualizerScreen — 畫面 2 (EQUALIZER)
@@ -70,12 +73,26 @@ fun HarkEqualizerScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = "等化器微調",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.ExtraBold
+                    Column {
+                        Text(
+                            text = "等化器微調",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.ExtraBold
+                            )
                         )
-                    )
+                        val modeText = if (viewModel.currentSourceMode.value == AudioSourceMode.MICROPHONE) {
+                            "目前模式：環境助聽 (麥克風)"
+                        } else {
+                            "目前模式：手機影音 (內部音訊)"
+                        }
+                        Text(
+                            text = modeText,
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Medium
+                            )
+                        )
+                    }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -184,14 +201,40 @@ fun HarkEqualizerScreen(
             }
 
             // ── 3. Sliders & +/- Adjustments Scroll List ──────────────────
-            Text(
-                text = "頻段增益微調 (dB)",
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                ),
-                modifier = Modifier.padding(top = 4.dp, start = 4.dp)
-            )
+            val context = LocalContext.current
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "頻段增益微調 (dB)",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+                Button(
+                    onClick = {
+                        viewModel.applyDslV5Fitting()
+                        Toast.makeText(context, "已成功套用聽力圖補償 (DSL v5)", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    ),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    modifier = Modifier.height(34.dp)
+                ) {
+                    Text(
+                        text = "套用聽力圖 (DSL v5)",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                    )
+                }
+            }
 
             Column(
                 modifier = Modifier

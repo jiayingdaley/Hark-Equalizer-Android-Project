@@ -40,7 +40,7 @@ object SystemDspManager {
     /**
      * Attaches DynamicsProcessing to a specific audio session.
      */
-    fun attachToSession(sessionId: Int) {
+    fun attachToSession(sessionId: Int, forceEnabled: Boolean = false) {
         if (activeEffects.containsKey(sessionId)) return
 
         try {
@@ -58,7 +58,7 @@ object SystemDspManager {
 
             val config = builder.build()
             val dp = DynamicsProcessing(0, sessionId, config)
-            dp.enabled = _isEnabledFlow.value
+            dp.enabled = if (forceEnabled) true else _isEnabledFlow.value
 
             // Setup 16-Band Pre-EQ (Left: channel 0, Right: channel 1)
             for (i in 0 until 16) {

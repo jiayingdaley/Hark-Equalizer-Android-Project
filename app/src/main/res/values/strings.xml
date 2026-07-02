@@ -31,6 +31,7 @@
     <string name="testSelect_title">選擇測試項目</string>
     <string name="testSelect_button_PureToneTest">純音聽力測試</string>
     <string name="testSelect_button_SpeechAudiometry">語音辨識閾值測試</string>
+    <string name="testSelect_button_ViewHistory">查看歷史紀錄</string>
 
     <!-- ── 聽力測試 — 耳別選擇 (SelectEarActivity) ── -->
     <string name="selectEar_title">選擇測試耳別</string>

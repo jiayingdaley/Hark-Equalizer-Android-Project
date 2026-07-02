@@ -212,11 +212,13 @@ Java_com_wcy_hark_audio_bridge_HarkAudioBridge_setStreamOverrides(
 extern "C" JNIEXPORT jfloatArray JNICALL
 Java_com_wcy_hark_audio_bridge_HarkAudioBridge_getDiagnosticMetrics(
         JNIEnv *env, jobject /* this */) {
-    jfloatArray result = env->NewFloatArray(5);
+    // Array size is 6: [rawInputPeak, outputPeak, wouldBlockRate,
+    //                   inputXRuns, outputXRuns, postInputGainPeak]
+    jfloatArray result = env->NewFloatArray(6);
     if (result == nullptr) return nullptr;
-    float metrics[5];
+    float metrics[6];
     engine.getDiagnosticMetrics(metrics);
-    env->SetFloatArrayRegion(result, 0, 5, metrics);
+    env->SetFloatArrayRegion(result, 0, 6, metrics);
     return result;
 }
 
@@ -273,4 +275,63 @@ Java_com_wcy_hark_audio_bridge_HarkAudioBridge_isTransientSuppressorEnabled(JNIE
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_wcy_hark_audio_bridge_HarkAudioBridge_isOwnVoiceDetectorEnabled(JNIEnv *env, jobject /* this */) {
     return (jboolean) engine.isOwnVoiceDetectorEnabled();
+}
+
+// =============================================================================
+// Experiment Signal Generator JNI Bindings
+// These functions control the three signal generator modes added to
+// HarkAudioEngine for academic measurement purposes.
+// =============================================================================
+
+/**
+ * setCalibTone — Start or stop a fixed-frequency calibration sine tone.
+ * freqHz:    Target frequency in Hz (250/500/1000/2000/3000/4000/6000/8000).
+ * levelDbfs: Output amplitude in dBFS (range: -40 to 0).
+ * enabled:   true = generate, false = stop.
+ */
+extern "C" JNIEXPORT void JNICALL
+Java_com_wcy_hark_audio_bridge_HarkAudioBridge_setCalibTone(
+        JNIEnv *env, jobject /* this */,
+        jfloat freqHz, jfloat levelDbfs, jboolean enabled) {
+    engine.setCalibTone(freqHz, levelDbfs, (bool)enabled);
+}
+
+/**
+ * setLogChirp — Start or stop a log-swept sine chirp (ANSI S3.22 OSPL90).
+ * startHz:     Start frequency (Hz), typically 250.
+ * endHz:       End frequency (Hz), typically 8000.
+ * durationSec: Total sweep duration in seconds (10–60).
+ * levelDbfs:   Output amplitude in dBFS.
+ * enabled:     true = start sweep from beginning, false = stop.
+ */
+extern "C" JNIEXPORT void JNICALL
+Java_com_wcy_hark_audio_bridge_HarkAudioBridge_setLogChirp(
+        JNIEnv *env, jobject /* this */,
+        jfloat startHz, jfloat endHz, jfloat durationSec,
+        jfloat levelDbfs, jboolean enabled) {
+    engine.setLogChirp(startHz, endHz, durationSec, levelDbfs, (bool)enabled);
+}
+
+/**
+ * setPinkNoise — Start or stop pink noise output.
+ * levelDbfs: Output amplitude in dBFS.
+ * enabled:   true = generate, false = stop.
+ */
+extern "C" JNIEXPORT void JNICALL
+Java_com_wcy_hark_audio_bridge_HarkAudioBridge_setPinkNoise(
+        JNIEnv *env, jobject /* this */,
+        jfloat levelDbfs, jboolean enabled) {
+    engine.setPinkNoise(levelDbfs, (bool)enabled);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_wcy_hark_audio_bridge_HarkAudioBridge_setExperimentModeActive(
+        JNIEnv *env, jobject /* this */, jboolean active) {
+    engine.setExperimentModeActive((bool)active);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_wcy_hark_audio_bridge_HarkAudioBridge_setInjectDspMode(
+        JNIEnv *env, jobject /* this */, jboolean inject) {
+    engine.setInjectDspMode((bool)inject);
 }

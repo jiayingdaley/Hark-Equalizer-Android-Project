@@ -8,7 +8,7 @@ class SRTResultDbHelper(context: Context) :
     SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
 
     companion object {
-        const val DATABASE_VERSION = 1 // Increment if schema changes
+        const val DATABASE_VERSION = 4 // Bumped from 2 -> 4 to migrate test_sessions and experiment_log
         const val DATABASE_NAME = "SRTResults.db"
     }
 
@@ -18,12 +18,23 @@ class SRTResultDbHelper(context: Context) :
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        // This database is only a cache for online data, so its upgrade policy is
-        // to simply to discard the data and start over.
-        // You might want a different policy for real user data.
-        db.execSQL(SRTResultContract.SQL_DELETE_SRT_RECORDS_TABLE)
-        db.execSQL(SRTResultContract.SQL_DELETE_TEST_SESSIONS_TABLE)
-        onCreate(db)
+        // Non-destructive migration to preserve clinical testing results
+        if (oldVersion < 3) {
+            try {
+                // Ensure experiment_log table exists (added in version 3)
+                db.execSQL("CREATE TABLE IF NOT EXISTS experiment_log (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, test_type TEXT, earphone TEXT, dsp_bypass TEXT, params TEXT, note TEXT)")
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        if (oldVersion < 4) {
+            try {
+                // Add subject_name column to test_sessions table (added in version 4)
+                db.execSQL("ALTER TABLE test_sessions ADD COLUMN subject_name TEXT")
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 
     override fun onDowngrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {

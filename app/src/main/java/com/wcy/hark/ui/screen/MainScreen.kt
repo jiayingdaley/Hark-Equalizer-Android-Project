@@ -25,6 +25,9 @@ import com.wcy.hark.ui.viewmodel.AudioSourceMode
 import com.wcy.hark.audio.manager.SceneManager
 import com.wcy.hark.ui.components.EqualizerCurveDisplay
 import com.wcy.hark.ui.components.SystemVolumeSlider
+import com.wcy.hark.data.experiment.EarphoneCalibrationRepository
+import com.wcy.hark.data.experiment.ExperimentLogRepository
+import com.wcy.hark.ui.viewmodel.ExperimentViewModel
 
 object EqUiConstants {
     val BAND_CONTAINER_WIDTH: Dp = 70.dp
@@ -58,10 +61,26 @@ fun HarkAppScreen(
 
     var currentScreen by remember { mutableStateOf("main") }
 
-    if (currentScreen == "dsp_test") {
+    // Initialise ExperimentViewModel with its required repositories
+    val experimentViewModel = remember {
+        val appContext = context.applicationContext
+        ExperimentViewModel(
+            appContext = appContext,
+            calibRepo = EarphoneCalibrationRepository(appContext),
+            logRepo = ExperimentLogRepository(appContext)
+        )
+    }
+
+    if (currentScreen == "calibration_test") {
+        CalibrationTestScreen(
+            viewModel = experimentViewModel,
+            onBack    = { currentScreen = "dsp_test" }
+        )
+    } else if (currentScreen == "dsp_test") {
         DspTestScreen(
-            viewModel = viewModel,
-            onBack = { currentScreen = "main" }
+            viewModel           = viewModel,
+            onBack              = { currentScreen = "main" },
+            onNavigateToCalib   = { currentScreen = "calibration_test" }
         )
     } else {
         // --- Layout ---

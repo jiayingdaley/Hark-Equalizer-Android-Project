@@ -53,7 +53,63 @@ object HarkAudioBridge {
     external fun setWdrcExpanderThreshold(thresholdDb: Float)
     external fun setLimiterParameters(thresholdDb: Float, releaseMs: Float)
     external fun setStreamOverrides(sharingMode: Int, inputPreset: Int)
+
+    /**
+     * Returns 6-element FloatArray:
+     * [0] Raw mic input peak (dBFS)
+     * [1] Output peak (dBFS)
+     * [2] WouldBlock rate (%)
+     * [3] Input XRuns (count)
+     * [4] Output XRuns (count)
+     * [5] Post-InputGain-Compensation peak (dBFS)  ← NEW tap point
+     */
     external fun getDiagnosticMetrics(): FloatArray
+
+    // --- Experiment Signal Generators ---
+    // These inject signals directly in the Oboe audio callback, bypassing
+    // all DSP modules for accurate acoustic measurement.
+
+    /**
+     * Activate / update / stop a fixed-frequency calibration sine tone.
+     * While active, the engine outputs ONLY this tone (mic is silenced).
+     * @param freqHz     Tone frequency (250/500/1000/2000/3000/4000/6000/8000 Hz)
+     * @param levelDbfs  Output amplitude (-40 to 0 dBFS)
+     * @param enabled    true = start/update, false = stop
+     */
+    external fun setCalibTone(freqHz: Float, levelDbfs: Float, enabled: Boolean)
+
+    /**
+     * Start or stop a log-swept sine chirp (ANSI S3.22 swept pure tone).
+     * Frequency increases exponentially from startHz to endHz over durationSec.
+     * @param startHz     Sweep start frequency (Hz), typically 250
+     * @param endHz       Sweep end frequency (Hz), typically 8000
+     * @param durationSec Total sweep duration in seconds (10–60)
+     * @param levelDbfs   Output amplitude (-40 to 0 dBFS)
+     * @param enabled     true = start from beginning, false = stop
+     */
+    external fun setLogChirp(
+        startHz: Float, endHz: Float,
+        durationSec: Float, levelDbfs: Float,
+        enabled: Boolean
+    )
+
+    /**
+     * Start or stop pink noise output (optional OSPL90 source).
+     * Uses Voss-McCartney 8-octave algorithm.
+     * @param levelDbfs Output amplitude (-40 to 0 dBFS)
+     * @param enabled   true = generate, false = stop
+     */
+    external fun setPinkNoise(levelDbfs: Float, enabled: Boolean)
+
+    /**
+     * Controls the overall academic experiment mode active state in the engine.
+     */
+    external fun setExperimentModeActive(active: Boolean)
+
+    /**
+     * Set to true to inject calibration signals into the DSP pipeline instead of bypassing it.
+     */
+    external fun setInjectDspMode(inject: Boolean)
 
     // --- State Inspection Getters ---
     external fun isNoiseReductionEnabled(): Boolean

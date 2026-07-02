@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -56,4 +57,45 @@ class EqSettingsRepository(private val context: Context) {
             }
         }
     }
+
+    private fun getAudiogramThresholdKey(ear: String, frequency: Int) = intPreferencesKey("audiogram_${ear}_$frequency")
+
+    suspend fun saveAudiogramThreshold(ear: String, frequency: Int, threshold: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[getAudiogramThresholdKey(ear, frequency)] = threshold
+        }
+    }
+
+    fun getAudiogramThresholdFlow(ear: String, frequency: Int): Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[getAudiogramThresholdKey(ear, frequency)] ?: -1
+    }
+
+    private val calibrationOffsetKey = floatPreferencesKey("audiogram_calibration_offset")
+
+    suspend fun saveCalibrationOffset(offset: Float) {
+        context.dataStore.edit { preferences ->
+            preferences[calibrationOffsetKey] = offset
+        }
+    }
+
+    fun getCalibrationOffsetFlow(): Flow<Float> = context.dataStore.data.map { preferences ->
+        preferences[calibrationOffsetKey] ?: 0f
+    }
+
+    // ── Hearing Aid Enabled State ──────────────────────────────────────────────
+    // Persists the user's last intent (ON/OFF) so the app restores its state
+    // after being killed by the system and relaunched (KNOWN-ISSUE-006 fix).
+    private val hearingAidEnabledKey = booleanPreferencesKey("is_hearing_aid_enabled")
+
+    suspend fun saveHearingAidEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[hearingAidEnabledKey] = enabled
+        }
+    }
+
+    fun getHearingAidEnabledFlow(): Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[hearingAidEnabledKey] ?: false
+    }
 }
+
+

@@ -223,8 +223,29 @@ public:
   void setStreamOverrides(int sharingMode, int inputPreset);
   void getStreamOverrides(int &sharingMode, int &inputPreset) const;
 
+  // getDiagnosticMetrics now returns 6 metrics (index 5 = post-input-gain level)
   void getDiagnosticMetrics(float *outMetrics);
   void resetAudioChannels();
+
+  // --- Experiment Signal Generators API ---
+  // These generators inject a signal directly in onAudioReady(), completely
+  // bypassing the DSP chain for accurate acoustic measurement.
+  //
+  // CalibTone: Fixed-frequency sine wave for earphone calibration.
+  // LogChirp:  Log-swept sine (20Hz-10kHz) for OSPL90 measurement per ANSI S3.22.
+  // PinkNoise: Band-limited pink noise as an optional OSPL90 source.
+  void setCalibTone(float freqHz, float levelDbfs, bool enabled);
+  void setLogChirp(float startHz, float endHz, float durationSec, float levelDbfs, bool enabled);
+  void setPinkNoise(float levelDbfs, bool enabled);
+  void setExperimentModeActive(bool active);
+  bool isExperimentModeActive() const { return mExperimentModeActive.load(std::memory_order_relaxed); }
+  void setInjectDspMode(bool inject);
+  bool isInjectDspMode() const { return mInjectDspMode.load(std::memory_order_relaxed); }
+  bool isExperimentSignalActive() const {
+    return mCalibToneEnabled.load(std::memory_order_relaxed) ||
+           mLogChirpEnabled.load(std::memory_order_relaxed) ||
+           mPinkNoiseEnabled.load(std::memory_order_relaxed);
+  }
   void setIsBluetoothInput(bool isBluetooth) { mIsBluetoothInput.store(isBluetooth, std::memory_order_relaxed); }
   void setHeadphonesConnected(bool connected) { mHeadphonesConnected.store(connected, std::memory_order_relaxed); }
 
@@ -270,13 +291,55 @@ private:
   // Diagnostics registers (Lock-Free)
   std::atomic<float> mDiagRawInputPeakLinear{0.0f};
   std::atomic<float> mDiagOutputPeakLinear{0.0f};
+  // New tap point: captures signal level AFTER input gain compensation,
+  // BEFORE DC Blocker - useful for verifying compensation is applied correctly.
+  std::atomic<float> mDiagPostInputGainPeakLinear{0.0f};
   std::atomic<int> mDiagWouldBlockCount{0};
   std::atomic<int> mDiagCallbackCount{0};
   std::atomic<int> mDiagInputXRunCount{0};
   std::atomic<int> mDiagOutputXRunCount{0};
 
+  // --- Experiment Signal Generator State ---
+  std::atomic<bool>  mExperimentModeActive{false};
+  std::atomic<bool>  mInjectDspMode{false};
+  // CalibTone: fixed-frequency sine for earphone calibration
+  std::atomic<bool>  mCalibToneEnabled{false};
+  std::atomic<float> mCalibToneFreqHz{1000.0f};
+  std::atomic<float> mCalibToneLevelLinear{0.1f}; // linear amplitude
+  double mCalibTonePhase{0.0};  // phase accumulator, accessed only in audio thread
+
+  // LogChirp: log-swept sine for OSPL90 (ANSI S3.22 swept pure tone)
+  std::atomic<bool>  mLogChirpEnabled{false};
+  std::atomic<float> mLogChirpStartHz{250.0f};
+  std::atomic<float> mLogChirpEndHz{8000.0f};
+  std::atomic<float> mLogChirpDurationSec{30.0f};
+  std::atomic<float> mLogChirpLevelLinear{0.1f};
+  double mLogChirpPhase{0.0};   // phase accumulator
+  double mLogChirpK{0.0};       // chirp rate constant K = T / ln(f1/f0)
+  double mLogChirpElapsedSec{0.0}; // elapsed time in chirp sweep
+
+  // PinkNoise: optional OSPL90 source
+  std::atomic<bool>  mPinkNoiseEnabled{false};
+  std::atomic<float> mPinkNoiseLevelLinear{0.1f};
+  // Voss-McCartney pink noise state (8 octave contributions)
+  float mPinkNoiseContrib[8]{0.0f};
+  uint32_t mPinkNoiseRunningSum{0};
+  uint32_t mPinkNoiseCounter{0};
+
   // Full-Duplex synchronization states
   std::atomic<int> mCountCallbacksToDrain{0};
   std::atomic<int> mCountInputBurstsCushion{0};
   std::atomic<int> mCountCallbacksToDiscard{0};
+
+  // Startup noise-floor calibration (auto-triggered during Drain phase).
+  // mCalibBuffer holds up to ~1 s of mono mic samples (48000 frames @ 48kHz).
+  // mCalibSampleCount tracks how many samples have been written so far.
+  // mCalibDone prevents repeated calibrations on the same engine start.
+  // mCountCallbacksToDiscardInit is the initial discard count stored at
+  // setupStreams() time so onAudioReady can detect the FIRST discard callback.
+  static constexpr int kCalibBufSize = 48000; // 1 s @ 48 kHz mono
+  static constexpr int mCountCallbacksToDiscardInit = 10;
+  std::vector<float> mCalibBuffer = std::vector<float>(kCalibBufSize, 0.0f);
+  std::atomic<int>  mCalibSampleCount{0};
+  std::atomic<bool> mCalibDone{false};
 };

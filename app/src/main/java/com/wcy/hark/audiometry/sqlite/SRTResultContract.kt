@@ -12,6 +12,8 @@ object SRTResultContract {
         const val COLUMN_NAME_TEST_TIMESTAMP = "test_timestamp"
         const val COLUMN_NAME_OVERALL_ACCURACY = "overall_accuracy"
         const val COLUMN_NAME_TOTAL_QUESTIONS_ANSWERED = "total_questions_answered"
+        const val COLUMN_NAME_PHONE_VOLUME = "phone_volume"
+        const val COLUMN_NAME_SUBJECT_NAME = "subject_name"
     }
 
     // Table for individual question records within a session
@@ -34,7 +36,9 @@ object SRTResultContract {
                 TestSessionEntry.COLUMN_NAME_SESSION_ID + " INTEGER PRIMARY KEY," +
                 TestSessionEntry.COLUMN_NAME_TEST_TIMESTAMP + " INTEGER," +
                 TestSessionEntry.COLUMN_NAME_OVERALL_ACCURACY + " REAL," +
-                TestSessionEntry.COLUMN_NAME_TOTAL_QUESTIONS_ANSWERED + " INTEGER)"
+                TestSessionEntry.COLUMN_NAME_TOTAL_QUESTIONS_ANSWERED + " INTEGER," +
+                TestSessionEntry.COLUMN_NAME_PHONE_VOLUME + " INTEGER," +
+                TestSessionEntry.COLUMN_NAME_SUBJECT_NAME + " TEXT)"
 
     const val SQL_CREATE_SRT_RECORDS_TABLE =
         "CREATE TABLE " + SRTRecordEntry.TABLE_NAME + " (" +

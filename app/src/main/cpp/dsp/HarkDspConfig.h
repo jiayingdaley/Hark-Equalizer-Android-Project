@@ -125,9 +125,9 @@ namespace HarkDspConfig {
   constexpr float NS_SUPPRESSION_LOW  = 4.0f;   // 高雜訊抑制因子
   constexpr float NS_SUPPRESSION_MID  = 2.0f;   // 中等抑制因子（預設）
   constexpr float NS_SUPPRESSION_HIGH = 1.0f;   // 清晰語音抑制因子（最輕）
-  constexpr float NS_GAIN_FLOOR_LOW   = 0.05f;  // 高雜訊時增益底限（-26dB）
-  constexpr float NS_GAIN_FLOOR_MID   = 0.10f;  // 中等增益底限
-  constexpr float NS_GAIN_FLOOR_HIGH  = 0.20f;  // 清晰語音增益底限（-14dB）
+  constexpr float NS_GAIN_FLOOR_LOW   = 0.25f;  // 高雜訊時增益底限（-12dB，原 0.05f）
+  constexpr float NS_GAIN_FLOOR_MID   = 0.35f;  // 中等增益底限（-9.1dB，原 0.10f）
+  constexpr float NS_GAIN_FLOOR_HIGH  = 0.50f;  // 清晰語音增益底限（-6.0dB，原 0.20f）
   // 噪音地板追蹤觸發比值（能量低於地板1.5倍才更新）
   constexpr float NS_NOISE_FLOOR_UPDATE_RATIO = 1.5f;
   // 頻帶權重（中頻語音段 1k-3k 更重要）
