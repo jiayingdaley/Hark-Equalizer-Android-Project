@@ -912,12 +912,6 @@ HarkAudioEngine::onAudioReady(oboe::AudioStream * /*stream*/, void *audioData,
     float sL = buffer[i];
     float sR = buffer[i + 1];
 
-    // Transient Suppressor (Impulse Noise suppression at the very input)
-    if (mTransientSuppressorEnabled.load(std::memory_order_relaxed)) {
-      sL = mTransientSuppressorL.process(sL);
-      sR = mTransientSuppressorR.process(sR);
-    }
-
     // [0] Simple DC Blocker to prevent IIR instability
     if (mDcBlockerEnabled.load(std::memory_order_relaxed)) {
       float curInL = sL;
@@ -928,6 +922,12 @@ HarkAudioEngine::onAudioReady(oboe::AudioStream * /*stream*/, void *audioData,
       mDcLastInR = curInR;
       mDcLastOutL = sL;
       mDcLastOutR = sR;
+    }
+
+    // Transient Suppressor (Impulse Noise suppression after DC Blocker)
+    if (mTransientSuppressorEnabled.load(std::memory_order_relaxed)) {
+      sL = mTransientSuppressorL.process(sL);
+      sR = mTransientSuppressorR.process(sR);
     }
 
     // [1] Noise Suppressor

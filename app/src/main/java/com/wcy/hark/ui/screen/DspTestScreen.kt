@@ -201,9 +201,9 @@ fun SignalChainFlowchart(
             ) {
                 FlowBlock("輸入", true)
                 FlowArrow()
-                FlowBlock("脈衝降噪", transientSuppressor)
-                FlowArrow()
                 FlowBlock("DC濾除", dcBlocker)
+                FlowArrow()
+                FlowBlock("脈衝降噪", transientSuppressor)
                 FlowArrow()
                 FlowBlock("降噪", noiseReduction)
             }
@@ -381,11 +381,11 @@ fun BypassControlsCard(
             Text("訊號處理模組旁路開關 (Bypass)", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFFA0A5B5))
             Spacer(modifier = Modifier.height(12.dp))
 
-            BypassSwitchRow("時域脈衝抑制 (Transient Suppressor)", transientSuppressor) { viewModel.setTestTransientSuppressorEnabled(it) }
-            BypassSwitchRow("自我語音堵耳管理 (Own Voice Detector)", ownVoiceDetector) { viewModel.setTestOwnVoiceDetectorEnabled(it) }
             BypassSwitchRow("直流偏壓濾除 (DC Blocker)", dcBlocker) { viewModel.setTestDcBlockerEnabled(it) }
+            BypassSwitchRow("時域脈衝抑制 (Transient Suppressor)", transientSuppressor) { viewModel.setTestTransientSuppressorEnabled(it) }
             BypassSwitchRow("背景降噪 (Noise Suppressor)", noiseReduction) { viewModel.setTestNoiseReductionEnabled(it) }
             BypassSwitchRow("多頻段分頻與動態壓縮 (Crossover / WDRC)", crossoverWdrc) { viewModel.setTestCrossoverWdrcEnabled(it) }
+            BypassSwitchRow("自我語音堵耳管理 (Own Voice Detector)", ownVoiceDetector) { viewModel.setTestOwnVoiceDetectorEnabled(it) }
             BypassSwitchRow("最大輸出限制器 (MPO Limiter)", limiter) { viewModel.setTestLimiterEnabled(it) }
         }
     }
