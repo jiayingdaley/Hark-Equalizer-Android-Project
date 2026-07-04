@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -95,6 +96,48 @@ class EqSettingsRepository(private val context: Context) {
 
     fun getHearingAidEnabledFlow(): Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[hearingAidEnabledKey] ?: false
+    }
+
+    // ── App Mode (User / Experiment) ──────────────────────────────────────────
+    // false = 使用者模式（簡潔介面）；true = 實驗模式（研究人員全功能介面）
+    private val appExperimentModeKey = booleanPreferencesKey("app_experiment_mode")
+
+    suspend fun saveExperimentMode(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[appExperimentModeKey] = enabled
+        }
+    }
+
+    fun getExperimentModeFlow(): Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[appExperimentModeKey] ?: false
+    }
+
+    // ── Selected Earphone Model ───────────────────────────────────────────────
+    // Single source of truth for the earphone model used by both the experiment
+    // panel and the pure-tone test (calibration table lookup).
+    private val selectedEarphoneKey = stringPreferencesKey("selected_earphone_model")
+
+    suspend fun saveSelectedEarphone(model: String) {
+        context.dataStore.edit { preferences ->
+            preferences[selectedEarphoneKey] = model
+        }
+    }
+
+    fun getSelectedEarphoneFlow(): Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[selectedEarphoneKey] ?: "其他"
+    }
+
+    // ── Last Subject Name (prefill convenience) ───────────────────────────────
+    private val subjectNameKey = stringPreferencesKey("last_subject_name")
+
+    suspend fun saveLastSubjectName(name: String) {
+        context.dataStore.edit { preferences ->
+            preferences[subjectNameKey] = name
+        }
+    }
+
+    fun getLastSubjectNameFlow(): Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[subjectNameKey] ?: ""
     }
 }
 

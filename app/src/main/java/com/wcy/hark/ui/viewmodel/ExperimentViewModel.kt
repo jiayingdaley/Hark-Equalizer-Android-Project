@@ -72,14 +72,17 @@ class ExperimentViewModel(
     val calibLevelDbfs   = mutableStateOf(-20.0f)
     val calibToneRunning = mutableStateOf(false)
 
-    /** Selected earphone model (drives ETSPL lookup). */
+    /** Selected earphone model (drives calibration table lookup). */
     val selectedEarphone = mutableStateOf("ATH-CKS330NC")
 
-    /** ETSPL correction value for the current model + frequency. */
-    val calibCorrectionDb = mutableStateOf(0.0f)
+    /** Measured SPL at refDbfs for the current model + frequency (null = 未校準). */
+    val calibMeasuredDbSpl = mutableStateOf<Float?>(null)
 
-    /** Estimated output relative to baseline (signalDbfs + correction). */
-    val estimatedOutputDbhl = mutableStateOf(-20.0f)
+    /** Estimated output in dBHL at the current dBFS (null = 未校準，無絕對基準). */
+    val estimatedOutputDbhl = mutableStateOf<Float?>(null)
+
+    /** One-shot user-facing message (permission errors, engine-not-running, etc.). */
+    val userMessage = mutableStateOf<String?>(null)
 
     /** List of available earphone models from JSON. */
     val earphoneModels = mutableStateOf<List<String>>(emptyList())
@@ -148,37 +151,45 @@ class ExperimentViewModel(
     // 2. Calibration Tone Control
     // =========================================================================
 
-    /** Updates the ETSPL correction value and estimated dBHL for the current selection. */
+    /** Refreshes the measured SPL and estimated dBHL for the current selection. */
     fun updateCalibCorrection() {
         viewModelScope.launch(Dispatchers.IO) {
             val freq   = calibFreqHz.value.toInt()
             val model  = selectedEarphone.value
-            val corr   = calibRepo.getCorrection(model, freq)
-            val estDbhl= calibRepo.estimateOutputDbhl(model, freq, calibLevelDbfs.value)
-            calibCorrectionDb.value   = corr
-            estimatedOutputDbhl.value = estDbhl
+            calibMeasuredDbSpl.value  = calibRepo.getCalibration(model, freq)?.measuredDbSpl
+            estimatedOutputDbhl.value = calibRepo.estimateOutputDbhl(model, freq, calibLevelDbfs.value)
         }
     }
 
     /** Starts or stops the calibration tone. */
     fun setCalibTone(enabled: Boolean) {
+        if (enabled && !ensureEngineRunning()) return
         calibToneRunning.value = enabled
         HarkAudioBridge.setCalibTone(calibFreqHz.value, calibLevelDbfs.value, enabled)
         updateCalibCorrection()
     }
 
-    /** Saves a new correction value measured by external sound level meter. */
+    /**
+     * Saves a measurement from an external sound level meter: the tone was played
+     * at calibLevelDbfs, and the meter read [measuredSpl] dBSPL.
+     */
     fun saveCalibCorrection(measuredSpl: Float) {
         viewModelScope.launch(Dispatchers.IO) {
-            val freq   = calibFreqHz.value.toInt()
-            val model  = selectedEarphone.value
-            // correction = measuredSpl - (signalDbfs_nominal + deviceOffset)
-            // For simplicity, store the raw correction relative to current level.
-            // Researcher interprets as: calibRate[Hz] = measuredSpl - calibLevelDbfs
-            val correction = measuredSpl - calibLevelDbfs.value
-            calibRepo.saveCorrection(model, freq, correction)
-            calibCorrectionDb.value   = correction
-            estimatedOutputDbhl.value = calibLevelDbfs.value + correction
+            val freq  = calibFreqHz.value.toInt()
+            val model = selectedEarphone.value
+            calibRepo.saveMeasurement(model, freq, calibLevelDbfs.value, measuredSpl)
+            calibMeasuredDbSpl.value  = measuredSpl
+            estimatedOutputDbhl.value = calibRepo.estimateOutputDbhl(model, freq, calibLevelDbfs.value)
+        }
+    }
+
+    /** Guard: experiment signal paths need the Oboe engine running. */
+    private fun ensureEngineRunning(): Boolean {
+        return if (HarkAudioBridge.isEngineActuallyRunning()) {
+            true
+        } else {
+            userMessage.value = "DSP 引擎未運行，請先進入實驗面板啟動引擎 (DSP engine is not running)"
+            false
         }
     }
 
@@ -193,6 +204,14 @@ class ExperimentViewModel(
      */
     fun startRecording(useHeadsetMic: Boolean) {
         if (dualMicState.value != RecordingState.IDLE) return
+
+        if (androidx.core.content.ContextCompat.checkSelfPermission(
+                appContext, android.Manifest.permission.RECORD_AUDIO
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            userMessage.value = "需要麥克風權限才能錄音，請至系統設定授權 (RECORD_AUDIO permission required)"
+            return
+        }
 
         dualMicState.value = if (useHeadsetMic) RecordingState.RECORDING_HEADSET
                              else               RecordingState.RECORDING_PHONE
@@ -209,45 +228,68 @@ class ExperimentViewModel(
         val label       = if (useHeadsetMic) "HeadsetMic" else "PhoneMic"
 
         recordingJob = viewModelScope.launch(Dispatchers.IO) {
-            val recorder = AudioRecord(audioSource, sampleRate, channels, encoding, bufSize)
-            val pcmData  = mutableListOf<Short>()
-            val buffer   = ShortArray(bufSize / 2)
-            recorder.startRecording()
-
-            val startTime = System.currentTimeMillis()
-            while (System.currentTimeMillis() - startTime < durationMs) {
-                val read = recorder.read(buffer, 0, buffer.size)
-                if (read > 0) {
-                    for (i in 0 until read) pcmData.add(buffer[i])
+            var recorder: AudioRecord? = null
+            try {
+                recorder = try {
+                    AudioRecord(audioSource, sampleRate, channels, encoding, bufSize)
+                } catch (e: SecurityException) {
+                    null
                 }
-                recordingProgressMs.value = System.currentTimeMillis() - startTime
-                delay(20)
+                if (recorder == null || recorder.state != AudioRecord.STATE_INITIALIZED) {
+                    userMessage.value = "麥克風初始化失敗，請確認裝置與音源可用 (AudioRecord init failed)"
+                    dualMicState.value = RecordingState.IDLE
+                    return@launch
+                }
+
+                // Preallocated PCM buffer — avoids ~480k boxed Shorts over 10 s @ 48 kHz
+                val pcmData = ShortArray((sampleRate * durationMs / 1000L).toInt())
+                var written = 0
+                val buffer  = ShortArray(bufSize / 2)
+                recorder.startRecording()
+
+                val startTime = System.currentTimeMillis()
+                while (System.currentTimeMillis() - startTime < durationMs && written < pcmData.size) {
+                    val read = recorder.read(buffer, 0, buffer.size)
+                    if (read > 0) {
+                        val n = minOf(read, pcmData.size - written)
+                        System.arraycopy(buffer, 0, pcmData, written, n)
+                        written += n
+                    }
+                    recordingProgressMs.value = System.currentTimeMillis() - startTime
+                }
+
+                // Write WAV file to external files dir
+                val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+                val dir = File(appContext.getExternalFilesDir(null), "experiment_recordings")
+                dir.mkdirs()
+                val wavFile = File(dir, "${timestamp}_${label}.wav")
+                writeWav(wavFile, pcmData.copyOf(written), sampleRate, 1)
+                lastRecordingFile.value = wavFile
+                dualMicState.value = RecordingState.DONE
+
+                // Log experiment session
+                logRepo.insertLog(ExperimentLog(
+                    timestamp = timestamp,
+                    testType  = "DUAL_MIC",
+                    earphone  = selectedEarphone.value,
+                    dspBypass = "{}",
+                    params    = JSONObject().apply {
+                        put("source", label)
+                        put("durationMs", durationMs)
+                        put("sampleRate", sampleRate)
+                        put("file", wavFile.name)
+                    }.toString()
+                ))
+            } finally {
+                try {
+                    recorder?.let {
+                        if (it.recordingState == AudioRecord.RECORDSTATE_RECORDING) it.stop()
+                        it.release()
+                    }
+                } catch (e: Exception) {
+                    // release best-effort
+                }
             }
-            recorder.stop()
-            recorder.release()
-
-            // Write WAV file to external files dir
-            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-            val dir = File(appContext.getExternalFilesDir(null), "experiment_recordings")
-            dir.mkdirs()
-            val wavFile = File(dir, "${timestamp}_${label}.wav")
-            writeWav(wavFile, pcmData.toShortArray(), sampleRate, 1)
-            lastRecordingFile.value = wavFile
-            dualMicState.value = RecordingState.DONE
-
-            // Log experiment session
-            logRepo.insertLog(ExperimentLog(
-                timestamp = timestamp,
-                testType  = "DUAL_MIC",
-                earphone  = selectedEarphone.value,
-                dspBypass = "{}",
-                params    = JSONObject().apply {
-                    put("source", label)
-                    put("durationMs", durationMs)
-                    put("sampleRate", sampleRate)
-                    put("file", wavFile.name)
-                }.toString()
-            ))
         }
     }
 
@@ -268,6 +310,7 @@ class ExperimentViewModel(
      */
     fun startWdrcSweep() {
         if (wdrcSweepState.value != WdrcSweepState.IDLE) return
+        if (!ensureEngineRunning()) return
         wdrcSweepState.value    = WdrcSweepState.SETTLING
         wdrcCurrentStepIdx.value = 0
 
@@ -335,6 +378,7 @@ class ExperimentViewModel(
      */
     fun startBurst() {
         if (burstRunning.value) return
+        if (!ensureEngineRunning()) return
         burstRunning.value    = true
         burstCurrentRep.value = 0
 
@@ -411,6 +455,7 @@ class ExperimentViewModel(
      */
     fun startOspl90() {
         if (ospl90State.value != Ospl90State.IDLE) return
+        if (!ensureEngineRunning()) return
         ospl90State.value = Ospl90State.SWEEPING
         ospl90CurrentFreqHz.value = 250.0f
 

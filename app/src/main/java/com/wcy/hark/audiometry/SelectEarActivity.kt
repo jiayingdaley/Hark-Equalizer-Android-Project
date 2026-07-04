@@ -58,10 +58,10 @@ class SelectEarActivity : ComponentActivity() {
         noiseScaleBar = findViewById(R.id.noise_scale_bar)
         noiseIndicator = findViewById(R.id.noise_indicator)
 
-        // 設定按鈕顏色
-        leftButton.setBackgroundColor(Color.rgb(80, 101, 236)) // R80 G101 B236
+        // 設定按鈕顏色（聽力學慣例：左耳藍、右耳紅）；用 tint 保留圓角背景
+        leftButton.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.rgb(33, 102, 204))
         leftButton.setTextColor(Color.WHITE)
-        rightButton.setBackgroundColor(Color.rgb(202, 108, 48)) // R202 G108 B48
+        rightButton.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.rgb(211, 47, 47))
         rightButton.setTextColor(Color.WHITE)
 
         // 檢查麥克風權限
@@ -86,7 +86,7 @@ class SelectEarActivity : ComponentActivity() {
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 startRecording()
             } else {
-                // TODO: 處理權限被拒絕的情況
+                showPermissionDeniedDialog()
             }
         }
     }
@@ -122,10 +122,34 @@ class SelectEarActivity : ComponentActivity() {
                 Log.e("SelectEarActivity", "IllegalArgumentException: ${e.message}")
             }
         } else {
-            // 權限尚未授予，可能需要再次請求或告知使用者
             Log.w("SelectEarActivity", "Audio recording permission not granted")
-            // 可以顯示訊息告知使用者需要麥克風權限才能進行環境噪音測試
+            showPermissionDeniedDialog()
         }
+    }
+
+    /**
+     * 麥克風權限被拒：噪音檢測無法進行，但純音測驗本身不需要麥克風，
+     * 因此允許使用者「略過噪音檢測」繼續測驗（噪音記為未量測）。
+     */
+    private fun showPermissionDeniedDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("需要麥克風權限")
+            .setMessage("環境噪音檢測需要麥克風權限。您可以前往設定開啟權限，" +
+                        "或略過噪音檢測直接進行測驗（結果將標記為噪音未量測）。")
+            .setPositiveButton("前往設定") { _, _ ->
+                val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = android.net.Uri.parse("package:$packageName")
+                }
+                startActivity(intent)
+            }
+            .setNeutralButton("略過噪音檢測") { _, _ ->
+                environmentalNoiseLevel = 0.0
+                noiseTextView.text = "噪音未量測"
+                noiseLevelText.text = "噪音未量測"
+            }
+            .setNegativeButton("離開") { _, _ -> finish() }
+            .setCancelable(false)
+            .show()
     }
 
     private fun stopRecording() {

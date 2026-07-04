@@ -39,8 +39,8 @@ import com.wcy.hark.ui.viewmodel.EqViewModel
  *
  * 採用清晰、大字體、高對比的卡片式版面，符合 PureToneEqualizer 的設計風格。
  * 包含三層動態級聯顯示/隱藏邏輯：
- *   Level 1: 助聽總開關（控制所有功能的可見性）
- *   Level 2: 音源選擇 Tab（環境助聽 vs 手機影音）
+ *   Level 1: 輔助聽力總開關（控制所有功能的可見性）
+ *   Level 2: 音源選擇 Tab（環境輔聽 vs 手機影音）
  *   Level 3: 自動切換模式（停用手動 Preset，顯示呼吸燈動畫）
  *
  * Navigation:
@@ -60,10 +60,15 @@ fun HarkMainScreen(
     onEngineStateChange: (Boolean) -> Unit,
     onSourceModeChanged: (AudioSourceMode) -> Unit,
     onNavigateToEq: () -> Unit,
-    onNavigateToDebug: () -> Unit
+    onNavigateToDebug: () -> Unit,
+    isExperimentMode: Boolean = false,
+    onToggleExperimentMode: (Boolean) -> Unit = {},
+    onNavigateToExperiment: () -> Unit = {},
+    onNavigateToEarphoneCalib: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
+    var showExperimentConfirm by remember { mutableStateOf(false) }
 
     // ── State reads from ViewModel ─────────────────────────────────────────
     val situationalMode by viewModel.situationalMode
@@ -71,13 +76,20 @@ fun HarkMainScreen(
     val sourceMode       = viewModel.currentSourceMode.value
     val statusText      by viewModel.statusText
 
-    // Background gradient for premium look
-    val bgGradient = Brush.verticalGradient(
-        colors = listOf(
-            MaterialTheme.colorScheme.background,
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+    // Background gradient — 使用者模式採亮色調（與聽力檢測介面 #F5F7FA 一致），
+    // 實驗模式維持系統主題
+    val bgGradient = if (!isExperimentMode) {
+        Brush.verticalGradient(
+            colors = listOf(Color(0xFFF5F7FA), Color(0xFFE9F0F8))
         )
-    )
+    } else {
+        Brush.verticalGradient(
+            colors = listOf(
+                MaterialTheme.colorScheme.background,
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+            )
+        )
+    }
 
     Box(
         modifier = Modifier
@@ -93,24 +105,69 @@ fun HarkMainScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
 
-            // ── App Title ──────────────────────────────────────────────────
-            Text(
-                text = "Hark",
-                style = MaterialTheme.typography.displaySmall.copy(
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.primary
+            // ── App Title + 模式切換 ────────────────────────────────────────
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        text = "Hark",
+                        style = MaterialTheme.typography.displaySmall.copy(
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    )
+                    Text(
+                        text = "智慧輔助聽力",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        modifier = Modifier.offset(y = (-8).dp)
+                    )
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "實驗模式",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = if (isExperimentMode) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    )
+                    Switch(
+                        checked = isExperimentMode,
+                        onCheckedChange = { enabled ->
+                            if (enabled) showExperimentConfirm = true
+                            else onToggleExperimentMode(false)
+                        }
+                    )
+                }
+            }
+
+            // 進入實驗模式前的確認（避免一般使用者誤觸）
+            if (showExperimentConfirm) {
+                AlertDialog(
+                    onDismissRequest = { showExperimentConfirm = false },
+                    title = { Text("進入實驗模式 Experiment Mode") },
+                    text = {
+                        Text("實驗模式提供研究人員專用的校準與量測工具，" +
+                             "產生的測試訊號可能音量較大。確定要切換嗎？")
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            showExperimentConfirm = false
+                            onToggleExperimentMode(true)
+                        }) { Text("確定切換") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showExperimentConfirm = false }) { Text("取消") }
+                    }
                 )
-            )
-            Text(
-                text = "智慧助聽器",
-                style = MaterialTheme.typography.titleMedium.copy(
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                ),
-                modifier = Modifier.offset(y = (-8).dp)
-            )
+            }
 
             // ────────────────────────────────────────────────────────────────
-            // LEVEL 1: 助聽總開關 (Power Card)
+            // LEVEL 1: 輔助聽力總開關 (Power Card)
             // ────────────────────────────────────────────────────────────────
             PowerCard(
                 isOn = isEngineOn,
@@ -134,7 +191,7 @@ fun HarkMainScreen(
                     shape = RoundedCornerShape(16.dp)
                 ) {
                     Text(
-                        text = "環境助聽已暫停，請開啟上方開關開始使用",
+                        text = "環境輔聽已暫停，請開啟上方開關開始使用",
                         style = MaterialTheme.typography.bodyMedium.copy(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             lineHeight = 22.sp
@@ -158,7 +215,7 @@ fun HarkMainScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
 
                     // Source Mode Tab
-                    val tabs = listOf("環境助聽（麥克風）", "手機影音（內部音訊）")
+                    val tabs = listOf("環境輔聽（麥克風）", "手機影音（內部音訊）")
                     val selectedTabIndex = if (sourceMode == AudioSourceMode.MICROPHONE) 0 else 1
 
                     Card(
@@ -253,7 +310,7 @@ fun HarkMainScreen(
                                     )
                                     Column {
                                         Text(
-                                            text = "手機影音助聽 (DSP)",
+                                            text = "手機影音輔聽 (DSP)",
                                             style = MaterialTheme.typography.bodyLarge.copy(
                                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                                                 fontWeight = FontWeight.Bold
@@ -285,16 +342,6 @@ fun HarkMainScreen(
 
                     // ── Volume & Balance (always visible when engine ON) ───
                     VolumeBalanceCard(audioManager = audioManager)
-
-                    // ── Navigate to Equalizer ──────────────────────────────
-                    LargeNavCard(
-                        label = "等化器微調",
-                        sublabel = "EQUALIZER",
-                        icon = Icons.Default.Tune,
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        onClick = onNavigateToEq
-                    )
                 }
             }
 
@@ -302,6 +349,16 @@ fun HarkMainScreen(
             // Bottom Nav Cards (always visible regardless of power state)
             // ─────────────────────────────────────────────────────────────────
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            // 等化器隨時可調（不需先開啟輔助聽力）
+            LargeNavCard(
+                label = "等化器微調",
+                sublabel = "EQUALIZER",
+                icon = Icons.Default.Tune,
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                onClick = onNavigateToEq
+            )
 
             LargeNavCard(
                 label = "聽力檢測",
@@ -314,14 +371,43 @@ fun HarkMainScreen(
                 }
             )
 
-            LargeNavCard(
-                label = "原 Hark 測試介面",
-                sublabel = "HARK TEST PANEL",
-                icon = Icons.Default.BugReport,
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                onClick = onNavigateToDebug
-            )
+            // ── 實驗工具區（僅實驗模式顯示）──────────────────────────────
+            if (isExperimentMode) {
+                Text(
+                    text = "實驗工具 Experiment Tools",
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                )
+
+                LargeNavCard(
+                    label = "學術實驗面板",
+                    sublabel = "MEASUREMENT PANEL",
+                    icon = Icons.Default.Science,
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    onClick = onNavigateToExperiment
+                )
+
+                LargeNavCard(
+                    label = "耳機校準",
+                    sublabel = "EARPHONE CALIBRATION",
+                    icon = Icons.Default.Tune,
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    onClick = onNavigateToEarphoneCalib
+                )
+
+                LargeNavCard(
+                    label = "實驗調試面板",
+                    sublabel = "HARK TEST PANEL",
+                    icon = Icons.Default.BugReport,
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    onClick = onNavigateToDebug
+                )
+            }
 
             // Bottom padding for scroll
             Spacer(modifier = Modifier.height(24.dp))
@@ -332,7 +418,7 @@ fun HarkMainScreen(
 // ─── Sub-Components ──────────────────────────────────────────────────────────
 
 /**
- * PowerCard — 助聽總開關大卡片
+ * PowerCard — 輔助聽力總開關大卡片
  * High-contrast card with a large Switch to match PureToneEqualizer style.
  */
 @Composable
@@ -376,7 +462,7 @@ private fun PowerCard(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = if (isOn) "助聽已啟用" else "助聽已暫停",
+                    text = if (isOn) "輔助聽力已啟用" else "輔助聽力已暫停",
                     style = MaterialTheme.typography.headlineSmall.copy(
                         fontWeight = FontWeight.ExtraBold,
                         color = textColor

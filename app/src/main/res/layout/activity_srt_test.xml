@@ -72,7 +72,8 @@
             android:layout_gravity="fill_horizontal"
             android:minHeight="100dp"
             android:textSize="22sp"
-            tools:text="選項一" />
+            tools:text="選項一"
+        android:background="@drawable/rounded_button" />
 
         <Button
             android:id="@+id/buttonOption2"
@@ -83,7 +84,8 @@
             android:layout_gravity="fill_horizontal"
             android:minHeight="100dp"
             android:textSize="22sp"
-            tools:text="選項二" />
+            tools:text="選項二"
+        android:background="@drawable/rounded_button" />
 
         <Button
             android:id="@+id/buttonOption3"
@@ -94,7 +96,8 @@
             android:layout_gravity="fill_horizontal"
             android:minHeight="100dp"
             android:textSize="22sp"
-            tools:text="選項三" />
+            tools:text="選項三"
+        android:background="@drawable/rounded_button" />
 
         <Button
             android:id="@+id/buttonOption4"
@@ -105,7 +108,8 @@
             android:layout_gravity="fill_horizontal"
             android:minHeight="100dp"
             android:textSize="22sp"
-            tools:text="選項四" />
+            tools:text="選項四"
+        android:background="@drawable/rounded_button" />
     </GridLayout>
 
     <Button
@@ -117,7 +121,8 @@
         android:layout_marginTop="24dp"
         app:layout_constraintTop_toBottomOf="@id/gridLayoutOptions"
         app:layout_constraintStart_toStartOf="@id/gridLayoutOptions"
-        app:layout_constraintEnd_toEndOf="@id/gridLayoutOptions" />
+        app:layout_constraintEnd_toEndOf="@id/gridLayoutOptions"
+        android:background="@drawable/rounded_button" />
 
     <LinearLayout
         android:id="@+id/linearLayoutControls"
@@ -136,7 +141,8 @@
             android:layout_weight="1"
             android:text="暫停"
             android:textSize="16sp"
-            android:layout_marginEnd="8dp"/>
+            android:layout_marginEnd="8dp"
+        android:background="@drawable/rounded_button"/>
 
         <Button
             android:id="@+id/buttonEndEarly"
@@ -147,7 +153,8 @@
             android:textSize="16sp"
             android:backgroundTint="@android:color/holo_red_light"
             android:textColor="@android:color/white"
-            android:layout_marginStart="8dp"/>
+            android:layout_marginStart="8dp"
+        android:background="@drawable/rounded_button"/>
     </LinearLayout>
 
     <ProgressBar

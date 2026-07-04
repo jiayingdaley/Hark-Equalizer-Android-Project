@@ -2,10 +2,10 @@
     <string name="app_name">Hark</string>
 
     <!-- ── 主控畫面 (HarkMainScreen / PSAP) ── -->
-    <string name="main_power_on">助聽已啟用</string>
-    <string name="main_power_off">助聽已暫停</string>
-    <string name="main_hint_power_off">環境助聽已暫停，請開啟上方開關開始使用</string>
-    <string name="main_tab_microphone">環境助聽（麥克風）</string>
+    <string name="main_power_on">輔助聽力已啟用</string>
+    <string name="main_power_off">輔助聽力已暫停</string>
+    <string name="main_hint_power_off">環境輔聽已暫停，請開啟上方開關開始使用</string>
+    <string name="main_tab_microphone">環境輔聽（麥克風）</string>
     <string name="main_tab_internal_media">手機影音（內部音訊）</string>
     <string name="main_banner_internal_media">正在處理手機影音音訊，麥克風已靜音</string>
     <string name="main_mode_omnidirectional">全向</string>

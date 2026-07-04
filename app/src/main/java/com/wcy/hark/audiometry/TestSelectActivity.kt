@@ -28,9 +28,9 @@ class TestSelectActivity : ComponentActivity() {
         val pureToneTestButton = findViewById<Button>(R.id.button_pure_tone_test)
         val speechAudiometryButton = findViewById<Button>(R.id.button_speech_audiometry)
 
-        // 設定 "Pure-Tone Test" 按鈕的樣式和點擊事件
+        // 設定 "Pure-Tone Test" 按鈕的樣式和點擊事件（tint 保留圓角背景）
         pureToneTestButton.apply {
-            setBackgroundColor(Color.rgb(70, 147, 211)) // R70 G147 B211
+            backgroundTintList = android.content.res.ColorStateList.valueOf(Color.rgb(70, 147, 211))
             setTextColor(Color.WHITE)
             setOnClickListener {
                 val intent = Intent(this@TestSelectActivity, SelectEarActivity::class.java)
@@ -40,7 +40,7 @@ class TestSelectActivity : ComponentActivity() {
 
         // 設定 "Speech Audiometry" 按鈕的樣式和點擊事件
         speechAudiometryButton.apply {
-            setBackgroundColor(Color.rgb(234, 135, 69)) // R234 G135 B69
+            backgroundTintList = android.content.res.ColorStateList.valueOf(Color.rgb(234, 135, 69))
             setTextColor(Color.WHITE)
             setOnClickListener {
                 val intent = Intent(this@TestSelectActivity, SpeechAudiometryExplanationActivity::class.java)
@@ -48,9 +48,17 @@ class TestSelectActivity : ComponentActivity() {
             }
         }
 
+        // 噪音下語詞測驗 (SSN speech-in-noise)
+        findViewById<Button>(R.id.button_ssn_test).apply {
+            setTextColor(Color.WHITE)
+            setOnClickListener {
+                startActivity(Intent(this@TestSelectActivity, SSNTestActivity::class.java))
+            }
+        }
+
         // 設定 "View History" 按鈕的樣式和點擊事件
         findViewById<Button>(R.id.button_view_history).apply {
-            setBackgroundColor(Color.rgb(103, 58, 183)) // Purple Accent (#673AB7)
+            backgroundTintList = android.content.res.ColorStateList.valueOf(Color.rgb(103, 58, 183))
             setTextColor(Color.WHITE)
             setOnClickListener {
                 val intent = Intent(this@TestSelectActivity, TestHistoryActivity::class.java)

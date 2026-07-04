@@ -1,8 +1,25 @@
-# Hark — 專業助聽器音訊等化器與 DSP 引擎
+# Hark — 智慧輔助聽力 App 與 DSP 引擎
 
-Hark 是一款專為**輕中度聽損者**設計的高階 Android 助聽應用程式。  
-結合實時音訊 DSP（C++ + Oboe）與現代 Android 開發範式（Jetpack Compose + MVVM），  
-目標是提供低延遲、高保真且符合 FDA OTC 助聽器安全標準的聽力輔助體驗。
+Hark 是一款專為**輕中度聽損者**設計的 Android 輔助聽力應用程式，
+結合實時音訊 DSP（C++ + Oboe）、完整的聽力檢測套件與研究用校正實驗工具，
+採用現代 Android 開發範式（Jetpack Compose + MVVM）。
+
+---
+
+## 功能總覽
+
+**雙介面模式**（主畫面右上角切換，DataStore 持久化）：
+
+| | 使用者模式（亮色、簡潔） | 實驗模式（研究人員） |
+|---|---|---|
+| 輔助聽力 | 環境輔聽（麥克風）/ 手機影音（媒體 DSP）、16 段 EQ（拖曳附頻率預覽音） | 同左 + DSP 調試面板（模組 bypass、參數微調） |
+| 聽力檢測 | 純音聽閾（Hughson-Westlake）、中文語詞辨識、噪音下語詞（SSN）、歷史紀錄（可刪除，含警示） | 同左 + 聽力圖 dB FS 顯示切換、自訂 SNR 條件 |
+| 校正 | 沿用已存的耳機校正表 | 逐頻率耳機校準（dBFS→dBSPL→RETSPL→dB HL）、學術實驗面板（校正音 / WDRC I/O 掃頻 / Tone Burst / OSPL90 / 雙麥錄音） |
+
+圖表遵循聽力學慣例：右耳 ○ 紅、左耳 × 藍；聽力圖為對數頻率軸（125 Hz–8 kHz）
++ 反向 dB HL 軸；SSN 結果為 Psychometric Function（辨識率 % vs SNR，內插
+SRT50）。皆為英文標軸的論文級圖表。SSN 噪音的產生方法見
+[docs/SSN_GENERATION.md](docs/SSN_GENERATION.md)。
 
 ---
 
@@ -117,31 +134,41 @@ Hark/
 │   │   │
 │   │   ├── java/com/wcy/hark/
 │   │   │   ├── HarkApplication.kt       # Application：Timber 初始化、Repository DI
-│   │   │   ├── MainActivity.kt          # 權限、音訊裝置偵測、引擎生命週期
-│   │   │   ├── EqViewModel.kt           # ViewModel：EQ 狀態、DSP 診斷輪詢、持久化
+│   │   │   ├── MainActivity.kt          # 導航狀態機、雙模式（使用者/實驗）、權限、引擎生命週期
 │   │   │   │
 │   │   │   ├── audio/
-│   │   │   │   ├── HarkAudioBridge.kt   # JNI object：所有 native external fun 宣告
-│   │   │   │   ├── HarkAudioService.kt  # 前景服務：保持引擎在背景運行
-│   │   │   │   ├── SceneManager.kt      # 情境模式智慧切換（Auto / Manual）
-│   │   │   │   ├── MediaSessionObserver.kt  # 監聽媒體播放狀態（驅動 CINEMA 模式）
-│   │   │   │   ├── HarkNotificationListener.kt  # NotificationListenerService
-│   │   │   │   ├── SystemDspManager.kt  # 對外部 AudioSession 掛載 DynamicsProcessing
-│   │   │   │   ├── FloatingEqService.kt # 浮動 EQ 服務（手機媒體模式）
-│   │   │   │   └── AudioEffectReceiver.kt   # 廣播接收器：OPEN/CLOSE_AUDIO_EFFECT
+│   │   │   │   ├── bridge/HarkAudioBridge.kt    # JNI object：所有 native external fun 宣告
+│   │   │   │   ├── service/                     # HarkAudioService（前景服務）、FloatingEqService、通知監聽
+│   │   │   │   ├── router/                      # 音訊路由、SCO 狀態機、音量同步
+│   │   │   │   └── manager/                     # SystemDspManager（媒體 DSP）、SceneManager（情境模式）
+│   │   │   │
+│   │   │   ├── audiometry/              # 聽力檢測套件（View/XML）
+│   │   │   │   ├── TestSelectActivity.kt        # 測驗選單（純音 / 語詞 / SSN / 歷史）
+│   │   │   │   ├── SelectEarActivity.kt         # 選耳 + 環境噪音檢測
+│   │   │   │   ├── PureToneTestActivity.kt      # Hughson-Westlake 純音聽閾測驗
+│   │   │   │   ├── AudiometricToneGenerator.kt  # 共用純音源（測驗/校準/EQ 預覽同一路徑）
+│   │   │   │   ├── AudiogramActivity/View.kt    # 論文級聽力圖（dB HL / dB FS 切換）
+│   │   │   │   ├── SRTTestActivity.kt           # 中文語詞辨識測驗
+│   │   │   │   ├── SSNTestActivity.kt           # 噪音下語詞測驗（SSN）
+│   │   │   │   ├── SsnAudioMixer.kt             # 樣本級 SNR 混音器
+│   │   │   │   ├── PsychometricView.kt          # 辨識率 % vs SNR 曲線（SRT50）
+│   │   │   │   ├── TestHistoryActivity.kt       # 歷史紀錄（三分頁、詳情彈窗、刪除、錯題分析）
+│   │   │   │   └── sqlite/                      # SRT/SSN 結果資料庫（SRTResults.db）
 │   │   │   │
 │   │   │   ├── data/
-│   │   │   │   └── EqSettingsRepository.kt  # DataStore：16 段 EQ 增益持久化
+│   │   │   │   ├── EqSettingsRepository.kt      # DataStore：EQ 增益、模式、耳機型號、使用者名稱
+│   │   │   │   └── experiment/                  # EarphoneCalibrationRepository（逐頻率校正表 v2 + RETSPL）、實驗 log
 │   │   │   │
 │   │   │   └── ui/
 │   │   │       ├── screen/
-│   │   │       │   ├── MainScreen.kt    # 主畫面：EQ、情境模式、收音來源切換
-│   │   │       │   └── DspTestScreen.kt # DSP 除錯面板：各模組 bypass、診斷儀表
-│   │   │       ├── components/
-│   │   │       │   ├── EqualizerCurveDisplay.kt  # 可拖曳 EQ 曲線 Canvas
-│   │   │       │   └── SystemVolumeSlider.kt     # 系統音量滑桿整合
-│   │   │       └── theme/
-│   │   │           ├── Color.kt / Theme.kt / Type.kt  # Material 3 設計系統
+│   │   │       │   ├── HarkMainScreen.kt        # 主畫面（雙模式、實驗工具區）
+│   │   │       │   ├── HarkEqualizerScreen.kt   # 16 段 EQ（右紅左藍、頻率預覽音）
+│   │   │       │   ├── EarphoneCalibrationScreen.kt  # 逐頻率耳機校準（實驗模式）
+│   │   │       │   ├── CalibrationTestScreen.kt # 學術實驗面板（六項量測）
+│   │   │       │   ├── MainScreen.kt / DspTestScreen.kt  # 實驗調試面板
+│   │   │       ├── viewmodel/                   # EqViewModel、ExperimentViewModel
+│   │   │       ├── components/                  # EQ 曲線 Canvas、系統音量滑桿
+│   │   │       └── theme/                       # Material 3 設計系統
 │   │   │
 │   │   └── res/                         # 圖示、字串資源
 │   │
@@ -153,23 +180,21 @@ Hark/
 ├── build.gradle.kts                     # 根 Gradle
 ├── settings.gradle.kts
 │
-├── docs/                                # 設計文件與分析報告
-│   ├── AUDIO_ARCHITECTURE.md            # 音訊架構總覽
-│   ├── API_REFERENCE.md                 # JNI 函式簽名完整參考
-│   ├── DSP_PARAMETERS_AUDIT.md          # WDRC / Limiter 參數數學推導
-│   └── whitebox_test/                   # 白箱測試報告與圖表
-│       └── DSP_WHITEBOX_TEST_REPORT.md
+├── docs/                                # 設計文件與分析報告（索引見 docs/README.md）
+│   ├── README.md                        # 文件索引（建議從這裡開始）
+│   ├── architecture/AUDIO_ARCHITECTURE.md   # 音訊架構總覽
+│   ├── api/API_REFERENCE.md             # JNI 函式簽名完整參考
+│   ├── dsp/DSP_PARAMETERS_AUDIT.md      # WDRC / Limiter 參數數學推導
+│   ├── SSN_GENERATION.md                # Speech-shaped noise 產生方法（論文方法參考）
+│   ├── UI_SYSTEM_GUIDE.md               # UI 系統與畫面導覽
+│   ├── figures/                         # 信號鏈 / LR4 / WDRC 圖
+│   └── whitebox_test/DSP_WHITEBOX_TEST_REPORT.md  # 白箱測試報告
 │
-└── tests/
-    └── dsp_whitebox/                    # Python 離線 DSP 白箱測試腳本
-        ├── run_all_tests.py             # 一鍵執行所有測試
-        ├── test_signal_chain.py         # 信號鏈端對端測試
-        ├── test_lr4_crossover.py        # LR4 分頻器頻率響應驗證
-        ├── test_dynamics_processor.py   # WDRC 壓縮特性曲線測試
-        ├── test_noise_suppressor.py     # 降噪 SNR 改善量測
-        ├── test_biquad_filter.py        # Biquad 濾波器特性驗證
-        ├── test_filterbank_8band.py     # 8 頻段濾波器組驗證
-        └── evaluate_system_performance.py  # 系統整體效能評估
+└── tests/                               # Python 離線測試（說明見 tests/README.md）
+    ├── run_all_tests.py                 # 一鍵執行所有測試
+    ├── whitebox/                        # DSP 白箱測試（LR4、WDRC、降噪、信號鏈…）
+    ├── unit/                            # 單元測試
+    └── field_performance/               # 實地效能量測
 ```
 
 ---
@@ -245,20 +270,20 @@ Speaker Output (Bluetooth A2DP / BLE / Wired / USB, Stereo 48 kHz)
 - **實作路徑**：[PureToneTestActivity.kt](file:///Users/shrruei/Desktop/Gemini%20CLI/Hark/app/src/main/java/com/wcy/hark/audiometry/PureToneTestActivity.kt)
 - **臨床標準狀態機**：
   - **動態起始音量**：測試頻率順序為 `1000 Hz → 2000 Hz → 4000 Hz → 8000 Hz → 1000 Hz (重測) → 500 Hz → 250 Hz`。首個測試頻率（1000 Hz）預設為 40 dB HL，後續各頻率的起始分貝會基於前一頻率的聽閾值自動計算（`前一頻率聽閾 - 10 dB`），縮短測試耗時。
-  - **升 5 降 10 策略**：當受試者點擊「聽到」按鈕時，音量立刻降低 10 dB，並切換至下降階段（Descending）；若沒聽到或倒數結束，音量調高 5 dB，並切換至上升階段（Ascending）。
-  - **2-out-of-3 臨床閾值判定**：在**上升階段（Ascending）中**，同一個分貝音量必須被受試者成功反應 **2 次**，方可被認定為該頻率之聽力閾值。若點擊聽到但未滿 2 次，系統會降低 10 dB並繼續重試。
+  - **升 5 降 10 策略**：當使用者點擊「聽到」按鈕時，音量立刻降低 10 dB，並切換至下降階段（Descending）；若沒聽到或倒數結束，音量調高 5 dB，並切換至上升階段（Ascending）。
+  - **2-out-of-3 臨床閾值判定**：在**上升階段（Ascending）中**，同一個分貝音量必須被使用者成功反應 **2 次**，方可被認定為該頻率之聽力閾值。若點擊聽到但未滿 2 次，系統會降低 10 dB並繼續重試。
   - **1000 Hz 重測信度驗證**：在完成 8000 Hz 測試後，系統會再次對 1000 Hz 進行第二次測試。結束時比對兩次聽閾差值，若 `|第一次 - 第二次| >= 10 dB`，則將此測驗 Session 標記為 `Reliability Warning`（信度較低），並持久化寫入 CSV 與資料庫。
 
 ### 2. 測試期間聲學安全牆與防干擾機制
 - **音量安全鎖定**：純音測試對話框彈出後，系統會自動備份使用者當前音量。測試進行期間，App 會強制將 `STREAM_MUSIC` 鎖定在 100%（以確保測試音效檔符合校準基準聲壓），並在 Activity `onDestroy` 時自動恢復使用者原始音量。
-- **物理按鍵攔截**：重寫了 `onKeyDown()` 事件，當偵測到實體音量加/減按鍵時（`KEYCODE_VOLUME_UP/DOWN`）予以攔截並吞除事件，防止受試者在測試中誤觸音量鍵破壞聲學基準，且不會彈出系統音量 HUD。
+- **物理按鍵攔截**：重寫了 `onKeyDown()` 事件，當偵測到實體音量加/減按鍵時（`KEYCODE_VOLUME_UP/DOWN`）予以攔截並吞除事件，防止使用者在測試中誤觸音量鍵破壞聲學基準，且不會彈出系統音量 HUD。
 - **獨佔式 AudioFocus 抗干擾**：每次撥放純音測試音軌時，App 會向系統申請 `AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE` 獨佔焦點。若被外界搶佔焦點（如來電、社群軟體通知音），測試會自動觸發 `pauseTest()` 暫停，避免外部干擾影響檢測精準度。
 
 ### 3. 語音語詞聽閾測試 (Speech Reception Threshold - SRT)
 - **實作路徑**：[SRTTestActivity.kt](file:///Users/shrruei/Desktop/Gemini%20CLI/Hark/app/src/main/java/com/wcy/hark/audiometry/SRTTestActivity.kt)
 - **測試流程**：
   - 專門為聽損輔助設計的 25 題單音節/雙音節測試（配有 4 選 1 自適應按鈕與「聽不清楚」選項）。
-  - 測試前先引導受試者進行環境背景噪音檢測（SelectEarActivity），若噪音 > 50 dB SPL 則提出警告。
+  - 測試前先引導使用者進行環境背景噪音檢測（SelectEarActivity），若噪音 > 50 dB SPL 則提出警告。
   - **DSP 保護隔離**：進入語詞與純音測試時，系統會自動將前景服務中運行的背景降噪與增益引擎進行 Bypass 或 Mute（靜音）處理，避免 App 自身的輔聽增益與測試音頻產生連鎖反饋與干擾。
 
 ### 4. 客製化聽力圖渲染系統 (Audiogram Custom Canvas)
@@ -397,12 +422,16 @@ python test_noise_suppressor.py    # 降噪 SNR 量測
 
 ## 深入文件
 
+完整索引見 [docs/README.md](docs/README.md)。
+
 | 文件 | 說明 |
 |------|------|
-| [AUDIO_ARCHITECTURE.md](docs/AUDIO_ARCHITECTURE.md) | 音訊架構總覽與設計決策 |
-| [API_REFERENCE.md](docs/API_REFERENCE.md) | 完整 JNI 函式簽名與 Kotlin 呼叫範例 |
-| [DSP_PARAMETERS_AUDIT.md](docs/DSP_PARAMETERS_AUDIT.md) | WDRC / Limiter 參數數學推導與校準記錄 |
+| [AUDIO_ARCHITECTURE.md](docs/architecture/AUDIO_ARCHITECTURE.md) | 音訊架構總覽與設計決策 |
+| [API_REFERENCE.md](docs/api/API_REFERENCE.md) | 完整 JNI 函式簽名與 Kotlin 呼叫範例 |
+| [DSP_PARAMETERS_AUDIT.md](docs/dsp/DSP_PARAMETERS_AUDIT.md) | WDRC / Limiter 參數數學推導與校準記錄 |
 | [DSP_WHITEBOX_TEST_REPORT.md](docs/whitebox_test/DSP_WHITEBOX_TEST_REPORT.md) | 白箱測試結果報告 |
+| [SSN_GENERATION.md](docs/SSN_GENERATION.md) | Speech-shaped noise 產生方法與 SNR 混音（論文方法段落參考） |
+| [UI_SYSTEM_GUIDE.md](docs/UI_SYSTEM_GUIDE.md) | UI 系統與畫面導覽 |
 
 ---
 

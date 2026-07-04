@@ -61,6 +61,37 @@ fun HarkEqualizerScreen(
 
     val scrollState = rememberScrollState()
 
+    // ── 頻率預覽音（逼逼聲）────────────────────────────────────────────
+    // 調整時按著會播該頻率的脈衝音；放開後播一聲反映最終增益的長音。
+    val toneGen = remember { com.wcy.hark.audiometry.AudiometricToneGenerator() }
+    var previewingBand by remember { mutableStateOf(-1) }
+    var previewingLevel by remember { mutableStateOf(Float.NaN) }
+    DisposableEffect(Unit) {
+        onDispose { toneGen.release() }
+    }
+    val previewEar = when (currentEar) {
+        EarType.LEFT -> com.wcy.hark.audiometry.AudiometricToneGenerator.Ear.LEFT
+        EarType.RIGHT -> com.wcy.hark.audiometry.AudiometricToneGenerator.Ear.RIGHT
+        EarType.BOTH -> com.wcy.hark.audiometry.AudiometricToneGenerator.Ear.BOTH
+    }
+    // 基準電平 −35 dBFS；預覽音即時反映目前增益（±15 dB 內不會削波）。
+    // 拖曳中以 1 dB 解析度更新，避免每個觸控事件都重建緩衝。
+    val previewBaseDbfs = -35f
+    fun startBandPreview(bandIndex: Int, freq: Int, gainDb: Float) {
+        val level = (previewBaseDbfs + kotlin.math.round(gainDb)).coerceAtMost(0f)
+        if (previewingBand != bandIndex || level != previewingLevel) {
+            previewingBand = bandIndex
+            previewingLevel = level
+            toneGen.play(freq, level, previewEar, pulsed = true, durationSec = 1.0f, loop = true)
+        }
+    }
+    fun endBandPreview(freq: Int, gainDb: Float) {
+        previewingBand = -1
+        previewingLevel = Float.NaN
+        toneGen.play(freq, (previewBaseDbfs + gainDb).coerceAtMost(0f), previewEar,
+                     pulsed = false, durationSec = 0.8f)
+    }
+
     // Gradient background matching Hark theme
     val backgroundGradient = Brush.verticalGradient(
         colors = listOf(
@@ -81,7 +112,7 @@ fun HarkEqualizerScreen(
                             )
                         )
                         val modeText = if (viewModel.currentSourceMode.value == AudioSourceMode.MICROPHONE) {
-                            "目前模式：環境助聽 (麥克風)"
+                            "目前模式：環境輔聽 (麥克風)"
                         } else {
                             "目前模式：手機影音 (內部音訊)"
                         }
@@ -269,7 +300,7 @@ fun HarkEqualizerScreen(
                                     fontSize = 15.sp,
                                     color = MaterialTheme.colorScheme.onSurface
                                 ),
-                                modifier = Modifier.width(65.dp)
+                                modifier = Modifier.width(48.dp)
                             )
 
                             // Decrease button
@@ -277,8 +308,9 @@ fun HarkEqualizerScreen(
                                 onClick = {
                                     val newVal = (gainVal - 0.5f).coerceIn(EqViewModel.MIN_GAIN_DB, EqViewModel.MAX_GAIN_DB)
                                     viewModel.updateBandGain(currentEar, index, newVal)
+                                    endBandPreview(freq, newVal)
                                 },
-                                modifier = Modifier.size(36.dp)
+                                modifier = Modifier.size(30.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Remove,
@@ -287,16 +319,20 @@ fun HarkEqualizerScreen(
                                 )
                             }
 
-                            // Slider
+                            // Slider（拖曳時播該頻率脈衝音，放開播最終增益長音）
                             Slider(
                                 value = gainVal,
                                 onValueChange = { newVal ->
+                                    startBandPreview(index, freq, newVal)
                                     viewModel.updateBandGain(currentEar, index, newVal)
+                                },
+                                onValueChangeFinished = {
+                                    endBandPreview(freq, activeBandGains[index].value)
                                 },
                                 valueRange = EqViewModel.MIN_GAIN_DB..EqViewModel.MAX_GAIN_DB,
                                 modifier = Modifier
                                     .weight(1f)
-                                    .padding(horizontal = 8.dp),
+                                    .padding(horizontal = 2.dp),
                                 colors = SliderDefaults.colors(
                                     thumbColor = themeColorAnimated,
                                     activeTrackColor = themeColorAnimated,
@@ -309,8 +345,9 @@ fun HarkEqualizerScreen(
                                 onClick = {
                                     val newVal = (gainVal + 0.5f).coerceIn(EqViewModel.MIN_GAIN_DB, EqViewModel.MAX_GAIN_DB)
                                     viewModel.updateBandGain(currentEar, index, newVal)
+                                    endBandPreview(freq, newVal)
                                 },
-                                modifier = Modifier.size(36.dp)
+                                modifier = Modifier.size(30.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Add,
@@ -328,7 +365,7 @@ fun HarkEqualizerScreen(
                                     color = if (gainVal != 0f) themeColorAnimated else MaterialTheme.colorScheme.onSurfaceVariant
                                 ),
                                 modifier = Modifier
-                                    .width(55.dp),
+                                    .width(44.dp),
                                 textAlign = TextAlign.End
                             )
                         }

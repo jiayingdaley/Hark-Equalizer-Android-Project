@@ -1,8 +1,17 @@
 package com.wcy.hark.audiometry
 import com.wcy.hark.R
+import com.wcy.hark.HarkApplication
 
 import android.os.Bundle
+import android.widget.Button
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import com.wcy.hark.data.experiment.EarphoneCalibrationRepository
+import com.wcy.hark.data.experiment.FreqCalibration
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class AudiogramActivity : AppCompatActivity() {
 
@@ -19,5 +28,39 @@ class AudiogramActivity : AppCompatActivity() {
 
         val audiogramView = findViewById<AudiogramView>(R.id.audiogram_view)
         audiogramView.setResults(leftEarResults, rightEarResults)
+
+        val toggleButton = findViewById<Button>(R.id.button_toggle_unit)
+        toggleButton.visibility = android.view.View.GONE
+
+        // Experiment mode: allow switching to dB FS display using the earphone
+        // calibration table (dbfs = refDbfs + (dBHL + RETSPL) − measuredDbSpl).
+        val repository = (application as HarkApplication).eqSettingsRepository
+        lifecycleScope.launch {
+            val isExperiment = repository.getExperimentModeFlow().first()
+            if (!isExperiment) return@launch
+
+            val model = repository.getSelectedEarphoneFlow().first()
+            val calibRepo = EarphoneCalibrationRepository(this@AudiogramActivity)
+            val table: Map<Int, FreqCalibration> =
+                withContext(Dispatchers.IO) { calibRepo.getAllCalibrations(model) }
+
+            audiogramView.setDbfsConverter { freqHz, dbHl ->
+                // Calibrated conversion; fallback to the same relative mapping the
+                // tone playback uses when the earphone is uncalibrated (100 dB HL = 0 dBFS),
+                // so dB FS mode always shows the data points.
+                calibRepo.dbfsForTargetDbhl(table, freqHz, dbHl.toFloat())
+                    ?: (dbHl.toFloat() - 100f)
+            }
+
+            var showDbfs = false
+            toggleButton.visibility = android.view.View.VISIBLE
+            toggleButton.text = "顯示 dB FS (Show dB FS)"
+            toggleButton.setOnClickListener {
+                showDbfs = !showDbfs
+                audiogramView.setDisplayDbfs(showDbfs)
+                toggleButton.text = if (showDbfs) "顯示 dB HL (Show dB HL)"
+                                    else "顯示 dB FS (Show dB FS)"
+            }
+        }
     }
 }

@@ -33,7 +33,8 @@
         app:layout_constraintEnd_toStartOf="@+id/button_right_ear"
         app:layout_constraintHorizontal_chainStyle="spread"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/textView_select_ear_title" />
+        app:layout_constraintTop_toBottomOf="@+id/textView_select_ear_title"
+        android:background="@drawable/rounded_button" />
 
     <Button
         android:id="@+id/button_right_ear"
@@ -47,7 +48,8 @@
         android:textSize="36sp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toEndOf="@+id/button_left_ear"
-        app:layout_constraintTop_toBottomOf="@+id/textView_select_ear_title" />
+        app:layout_constraintTop_toBottomOf="@+id/textView_select_ear_title"
+        android:background="@drawable/rounded_button" />
 
     <TextView
         android:id="@+id/textView_check_noise"

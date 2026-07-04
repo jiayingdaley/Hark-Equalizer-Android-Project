@@ -31,10 +31,16 @@ import com.wcy.hark.audio.manager.SystemDspManager
 import com.wcy.hark.ui.viewmodel.EqViewModel
 import com.wcy.hark.ui.viewmodel.EqViewModelFactory
 import com.wcy.hark.ui.viewmodel.AudioSourceMode
+import com.wcy.hark.data.experiment.EarphoneCalibrationRepository
+import com.wcy.hark.data.experiment.ExperimentLogRepository
+import com.wcy.hark.ui.screen.CalibrationTestScreen
+import com.wcy.hark.ui.screen.EarphoneCalibrationScreen
 import com.wcy.hark.ui.screen.HarkMainScreen
 import com.wcy.hark.ui.screen.HarkEqualizerScreen
 import com.wcy.hark.ui.screen.HarkAppScreen
 import com.wcy.hark.ui.theme.HarkTheme
+import com.wcy.hark.ui.viewmodel.ExperimentViewModel
+import com.wcy.hark.ui.viewmodel.ExperimentViewModelFactory
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -56,10 +62,23 @@ class MainActivity : ComponentActivity() {
     private var isEngineRunningByUserIntent by mutableStateOf(false)
 
     // ── Screen Navigation State Machine ──────────────────────────────────────
-    // "main"      → HarkMainScreen (PSAP 主控制面板, default)
-    // "equalizer" → HarkEqualizerScreen (EQUALIZER 等化器微調)
-    // "debug"     → HarkAppScreen (實驗調試面板, original UI)
+    // "main"           → HarkMainScreen (主控制面板, default)
+    // "equalizer"      → HarkEqualizerScreen (EQUALIZER 等化器微調)
+    // "debug"          → HarkAppScreen (實驗調試面板, original UI)
+    // "experiment"     → CalibrationTestScreen (學術實驗面板, experiment mode only)
+    // "earphone_calib" → EarphoneCalibrationScreen (逐頻率耳機校準, experiment mode only)
     private var currentScreen by mutableStateOf("main")
+
+    // App-level mode: false = 使用者模式, true = 實驗模式 (persisted in DataStore)
+    private var isExperimentMode by mutableStateOf(false)
+
+    private val experimentViewModel: ExperimentViewModel by viewModels {
+        ExperimentViewModelFactory(
+            applicationContext,
+            EarphoneCalibrationRepository(applicationContext),
+            ExperimentLogRepository(applicationContext)
+        )
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -131,6 +150,18 @@ class MainActivity : ComponentActivity() {
             viewModel.isMicrophonePermissionGranted.value = true
         }
 
+        // Observe app mode (User / Experiment) so toggles propagate from anywhere
+        lifecycleScope.launch {
+            (application as HarkApplication).eqSettingsRepository
+                .getExperimentModeFlow().collect { enabled ->
+                    isExperimentMode = enabled
+                    // Leaving experiment mode while on an experiment screen → go home
+                    if (!enabled && (currentScreen == "experiment" || currentScreen == "earphone_calib")) {
+                        currentScreen = "main"
+                    }
+                }
+        }
+
         // Observe SystemDspManager enabled flow to reactively update overlay window and DSP state
         lifecycleScope.launch {
             SystemDspManager.isEnabledFlow.collect { enabled ->
@@ -140,13 +171,31 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            HarkTheme {
+            // 使用者模式固定亮色主題（亮背景 + 深色文字，與聽力檢測介面一致）；
+            // 實驗模式跟隨系統
+            HarkTheme(darkTheme = if (isExperimentMode) androidx.compose.foundation.isSystemInDarkTheme() else false) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     when (currentScreen) {
                         "equalizer" -> {
                             // Screen 2: EQUALIZER — 等化器微調
                             HarkEqualizerScreen(
                                 viewModel = viewModel,
+                                onBack = { currentScreen = "main" }
+                            )
+                        }
+                        "experiment" -> {
+                            // 學術實驗面板 (top-level in experiment mode)
+                            CalibrationTestScreen(
+                                viewModel = experimentViewModel,
+                                onBack = { currentScreen = "main" },
+                                onOpenEarphoneCalib = { currentScreen = "earphone_calib" }
+                            )
+                        }
+                        "earphone_calib" -> {
+                            // 逐頻率耳機校準畫面
+                            EarphoneCalibrationScreen(
+                                viewModel = experimentViewModel,
+                                repository = (application as HarkApplication).eqSettingsRepository,
                                 onBack = { currentScreen = "main" }
                             )
                         }
@@ -197,7 +246,16 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onSourceModeChanged = handleSourceModeChanged(),
                                 onNavigateToEq = { currentScreen = "equalizer" },
-                                onNavigateToDebug = { currentScreen = "debug" }
+                                onNavigateToDebug = { currentScreen = "debug" },
+                                isExperimentMode = isExperimentMode,
+                                onToggleExperimentMode = { enabled ->
+                                    lifecycleScope.launch {
+                                        (application as HarkApplication).eqSettingsRepository
+                                            .saveExperimentMode(enabled)
+                                    }
+                                },
+                                onNavigateToExperiment = { currentScreen = "experiment" },
+                                onNavigateToEarphoneCalib = { currentScreen = "earphone_calib" }
                             )
                         }
                     }

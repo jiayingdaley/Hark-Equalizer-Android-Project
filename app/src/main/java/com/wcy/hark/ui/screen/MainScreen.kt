@@ -111,7 +111,7 @@ fun HarkAppScreen(
                 )
             }
             // --- Top Level Mode Selection ---
-            val tabs = listOf("環境助聽 (麥克風)", "手機影音 (內部音訊)")
+            val tabs = listOf("環境輔聽 (麥克風)", "手機影音 (內部音訊)")
             val selectedTabIndex = if (viewModel.currentSourceMode.value == AudioSourceMode.MICROPHONE) 0 else 1
             
             TabRow(selectedTabIndex = selectedTabIndex, modifier = Modifier.padding(bottom = 16.dp)) {

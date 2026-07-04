@@ -32,7 +32,8 @@
         android:textSize="24sp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/textView_test_select_title" />
+        app:layout_constraintTop_toBottomOf="@+id/textView_test_select_title"
+        android:background="@drawable/rounded_button" />
 
     <Button
         android:id="@+id/button_speech_audiometry"
@@ -47,7 +48,23 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.0"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/button_pure_tone_test" />
+        app:layout_constraintTop_toBottomOf="@+id/button_pure_tone_test"
+        android:background="@drawable/rounded_button" />
+
+    <Button
+        android:id="@+id/button_ssn_test"
+        android:layout_width="0dp"
+        android:layout_height="75dp"
+        android:layout_marginStart="64dp"
+        android:layout_marginTop="28dp"
+        android:layout_marginEnd="64dp"
+        android:backgroundTint="#00897B"
+        android:text="噪音下語詞測驗"
+        android:textSize="24sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/button_speech_audiometry"
+        android:background="@drawable/rounded_button" />
 
     <Button
         android:id="@+id/button_view_history"
@@ -61,6 +78,7 @@
         android:textSize="24sp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/button_speech_audiometry" />
+        app:layout_constraintTop_toBottomOf="@+id/button_ssn_test"
+        android:background="@drawable/rounded_button" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

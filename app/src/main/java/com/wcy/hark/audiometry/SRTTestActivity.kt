@@ -132,7 +132,7 @@ class SRTTestActivity : AppCompatActivity() {
 
         AlertDialog.Builder(this)
             .setTitle("語詞測驗登錄")
-            .setMessage("請輸入受試者姓名（可不填）：")
+            .setMessage("請輸入使用者姓名（可不填）：")
             .setView(container)
             .setPositiveButton("開始測驗") { _, _ ->
                 val enteredName = input.text.toString().trim()
@@ -150,11 +150,11 @@ class SRTTestActivity : AppCompatActivity() {
      */
     private fun updateDspStatusBadge(isApplied: Boolean) {
         if (isApplied) {
-            textViewDspStatus.text = "● DSP 助聽補償 已套用"
+            textViewDspStatus.text = "● DSP 聽力補償 已套用"
             textViewDspStatus.setTextColor(android.graphics.Color.parseColor("#2E7D32")) // dark green
             textViewDspStatus.setBackgroundResource(android.R.color.transparent)
         } else {
-            textViewDspStatus.text = "○ DSP 助聽補償 未套用"
+            textViewDspStatus.text = "○ DSP 聽力補償 未套用"
             textViewDspStatus.setTextColor(android.graphics.Color.parseColor("#757575")) // gray
             textViewDspStatus.setBackgroundResource(android.R.color.transparent)
         }
@@ -475,6 +475,16 @@ class SRTTestActivity : AppCompatActivity() {
         }
     }
 
+
+    // 測驗中鎖定音量鍵，維持說明頁調好的舒適音量
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+        if (!isTestOver &&
+            (keyCode == android.view.KeyEvent.KEYCODE_VOLUME_UP ||
+             keyCode == android.view.KeyEvent.KEYCODE_VOLUME_DOWN)) {
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
 
     private fun releaseMediaPlayer() {
         mediaPlayer?.let { mp ->

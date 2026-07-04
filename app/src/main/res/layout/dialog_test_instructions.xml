@@ -53,6 +53,7 @@
         android:layout_height="wrap_content"
         android:text="Start Test"
         android:textSize="18sp"
-        android:layout_gravity="center_horizontal"/>
+        android:layout_gravity="center_horizontal"
+        android:background="@drawable/rounded_button"/>
 
 </LinearLayout>

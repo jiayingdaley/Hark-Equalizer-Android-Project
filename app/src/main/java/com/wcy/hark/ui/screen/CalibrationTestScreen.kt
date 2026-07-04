@@ -54,9 +54,20 @@ private val Divider     = Color(0xFF2C2F3C)
 @Composable
 fun CalibrationTestScreen(
     viewModel: ExperimentViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onOpenEarphoneCalib: (() -> Unit)? = null
 ) {
     val scrollState = rememberScrollState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Surface one-shot ViewModel messages (permission / engine guards) as snackbars
+    val userMessage by viewModel.userMessage
+    LaunchedEffect(userMessage) {
+        userMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.userMessage.value = null
+        }
+    }
 
     DisposableEffect(Unit) {
         // 1. Record the original engine state before entering experiment mode
@@ -101,6 +112,7 @@ fun CalibrationTestScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF12131A))
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = BgPage
     ) { padding ->
         Column(
@@ -117,8 +129,8 @@ fun CalibrationTestScreen(
             // Card 1: Post-InputGain tap point monitor
             PostInputGainCard(viewModel)
 
-            // Card 2: Calibration tone + ETSPL table
-            CalibrationSignalCard(viewModel)
+            // Card 2: Calibration tone + measured calibration readout
+            CalibrationSignalCard(viewModel, onOpenEarphoneCalib)
 
             // Card 3: Dual-mic recording + share
             DualMicRecordCard(viewModel)
@@ -181,13 +193,13 @@ private fun PostInputGainCard(vm: ExperimentViewModel) {
 // =============================================================================
 
 @Composable
-private fun CalibrationSignalCard(vm: ExperimentViewModel) {
+private fun CalibrationSignalCard(vm: ExperimentViewModel, onOpenEarphoneCalib: (() -> Unit)?) {
     val freqHz      by vm.calibFreqHz
     val levelDbfs   by vm.calibLevelDbfs
     val running     by vm.calibToneRunning
     val models      by vm.earphoneModels
     val selModel    by vm.selectedEarphone
-    val correction  by vm.calibCorrectionDb
+    val measuredSpl by vm.calibMeasuredDbSpl
     val estDbhl     by vm.estimatedOutputDbhl
 
     var showWriteField by remember { mutableStateOf(false) }
@@ -244,9 +256,25 @@ private fun CalibrationSignalCard(vm: ExperimentViewModel) {
 
         Spacer(Modifier.height(10.dp))
 
-        // ── ETSPL readout ──
-        ExInfoRow("ETSPL 校正值", "${String.format("%+.1f", correction)} dB", AccentBlue)
-        ExInfoRow("預估輸出 (相對基準)", "${String.format("%+.1f", estDbhl)} dBHL(est.)", AccentAmber)
+        // ── Measured calibration readout ──
+        ExInfoRow(
+            "實測 SPL Measured SPL @refDbfs",
+            measuredSpl?.let { "${String.format("%.1f", it)} dBSPL" } ?: "未校準 Uncalibrated",
+            if (measuredSpl != null) AccentBlue else AccentRed
+        )
+        ExInfoRow(
+            "預估輸出 Est. Output",
+            estDbhl?.let { "${String.format("%+.1f", it)} dB HL" } ?: "— (需先校準 needs calibration)",
+            AccentAmber
+        )
+
+        if (onOpenEarphoneCalib != null) {
+            TextButton(onClick = onOpenEarphoneCalib) {
+                Icon(Icons.Default.Tune, null, tint = AccentGreen, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("開啟逐頻率耳機校準 Per-frequency Calibration", color = AccentGreen, fontSize = 12.sp)
+            }
+        }
 
         Spacer(Modifier.height(12.dp))
 

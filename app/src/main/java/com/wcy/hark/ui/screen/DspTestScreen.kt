@@ -140,38 +140,7 @@ fun DspTestScreen(
             // Section 6: Hardware Troubleshooting Guide (硬體除錯指南)
             TroubleshootingGuideCard()
 
-            // ─── Entry to Researcher Experiment Mode ─────────────────────
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1C24)),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(Modifier.padding(16.dp)) {
-                    Text(
-                        "🔬 學術實驗測試模式",
-                        fontSize = 13.sp, fontWeight = FontWeight.Bold,
-                        color = Color(0xFFA0A5B5)
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        "進入研究者專屬的聲學量測模式，包含校正純音輸出、WDRC I/O 自動掃頻、" +
-                        "暫態響應測試、OSPL90 對數掃頻及雙麥錄音比對。",
-                        color = Color(0xFF707585), fontSize = 11.sp, lineHeight = 15.sp
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Button(
-                        onClick = onNavigateToCalib,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF2E4A3E)
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("📐 進入實驗測試模式 →", color = Color.White)
-                    }
-                }
-            }
-            // ─────────────────────────────────────────────────────────────
+            // (學術實驗測試模式入口已移至實驗模式主畫面)
         }  // end Column
     }  // end Scaffold
 }  // end DspTestScreen

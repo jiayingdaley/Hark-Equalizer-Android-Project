@@ -110,7 +110,7 @@ class HarkAudioService : Service() {
         )
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Hark 助聽器運行中")
+            .setContentTitle("Hark 輔助聽力運行中")
             .setContentText("正在背景處理音訊以輔助您的聽力")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(pendingIntent)

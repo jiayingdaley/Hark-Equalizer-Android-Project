@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Hearing
 import androidx.compose.material.icons.filled.HearingDisabled
 import androidx.compose.material.icons.filled.Info
@@ -33,6 +34,8 @@ import com.wcy.hark.audiometry.sqlite.SRTResultContract
 import com.wcy.hark.audiometry.sqlite.SRTResultDbHelper
 import androidx.compose.ui.viewinterop.AndroidView
 import com.wcy.hark.ui.theme.HarkTheme
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -76,6 +79,14 @@ data class ParsedPureToneResult(
     val hasReliabilityWarning: Boolean
 )
 
+data class SsnSessionItem(
+    val sessionId: Long,
+    val timestamp: Long,
+    val subjectName: String,
+    val snrList: String,
+    val srt50: Float?    // null = 未能內插
+)
+
 // ── Activity 實作 ──────────────────────────────────────────────────────
 
 class TestHistoryActivity : ComponentActivity() {
@@ -111,21 +122,23 @@ fun TestHistoryScreen(
     onBack: () -> Unit
 ) {
     var selectedTab by remember { mutableStateOf(0) }
-    val tabs = listOf("語詞辨識 (SRT)", "純音聽力 (Pure Tone)")
-    
+    val tabs = listOf("語詞辨識", "噪音語詞", "純音聽力")
+
     val context = androidx.compose.ui.platform.LocalContext.current
     val srtDiagnosticMap = remember { loadSrtDiagnosticDatabase(context) }
 
     // 狀態讀取
     var srtSessions by remember { mutableStateOf(listOf<SrtSession>()) }
+    var ssnSessions by remember { mutableStateOf(listOf<SsnSessionItem>()) }
     var pureToneFiles by remember { mutableStateOf(listOf<PureToneCsvItem>()) }
+    var reloadKey by remember { mutableStateOf(0) }
 
     // 載入數據的 side effect
-    LaunchedEffect(selectedTab) {
-        if (selectedTab == 0) {
-            srtSessions = loadSrtSessions(dbHelper)
-        } else {
-            pureToneFiles = loadPureToneCsvs(externalFilesDir)
+    LaunchedEffect(selectedTab, reloadKey) {
+        when (selectedTab) {
+            0 -> srtSessions = loadSrtSessions(dbHelper)
+            1 -> ssnSessions = loadSsnSessions(dbHelper)
+            else -> pureToneFiles = loadPureToneCsvs(externalFilesDir)
         }
     }
 
@@ -133,6 +146,12 @@ fun TestHistoryScreen(
     var activeSrtSession by remember { mutableStateOf<SrtSession?>(null) }
     var srtRecordsForActiveSession by remember { mutableStateOf(listOf<SrtRecord>()) }
     var activePureToneItem by remember { mutableStateOf<PureToneCsvItem?>(null) }
+    var activeSsnSession by remember { mutableStateOf<SsnSessionItem?>(null) }
+    var ssnPointsForActiveSession by remember { mutableStateOf(listOf<Pair<Float, Float>>()) }
+
+    // 刪除確認狀態（實驗資料珍貴：一律二次確認）
+    var pendingDelete by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var pendingDeleteLabel by remember { mutableStateOf("") }
 
     // 彈出視窗觸發
     LaunchedEffect(activeSrtSession) {
@@ -173,46 +192,114 @@ fun TestHistoryScreen(
                 }
             }
 
-            if (selectedTab == 0) {
-                // SRT 列表
-                if (srtSessions.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("暫無語詞辨識測試紀錄", color = Color.Gray, fontSize = 16.sp)
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(srtSessions) { session ->
-                            SrtSessionCard(session = session) {
-                                activeSrtSession = session
+            when (selectedTab) {
+                0 -> {
+                    // SRT 列表
+                    if (srtSessions.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("暫無語詞辨識測試紀錄", color = Color.Gray, fontSize = 16.sp)
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(srtSessions) { session ->
+                                SrtSessionCard(
+                                    session = session,
+                                    onDelete = {
+                                        pendingDeleteLabel = "語詞辨識紀錄（${SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault()).format(Date(session.timestamp))}）"
+                                        pendingDelete = {
+                                            deleteSrtSession(dbHelper, session.sessionId)
+                                            reloadKey++
+                                        }
+                                    }
+                                ) { activeSrtSession = session }
                             }
                         }
                     }
                 }
-            } else {
-                // Pure Tone 列表
-                if (pureToneFiles.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("暫無純音測驗記錄 (CSV)", color = Color.Gray, fontSize = 16.sp)
+                1 -> {
+                    // SSN 噪音下語詞列表
+                    if (ssnSessions.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("暫無噪音下語詞測試紀錄", color = Color.Gray, fontSize = 16.sp)
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(ssnSessions) { session ->
+                                SsnSessionCard(
+                                    session = session,
+                                    onDelete = {
+                                        pendingDeleteLabel = "噪音下語詞紀錄（${SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault()).format(Date(session.timestamp))}）"
+                                        pendingDelete = {
+                                            deleteSsnSession(dbHelper, session.sessionId)
+                                            reloadKey++
+                                        }
+                                    }
+                                ) {
+                                    // 重算各 SNR 分數並以彈窗顯示曲線圖
+                                    ssnPointsForActiveSession = loadSsnPoints(dbHelper, session.sessionId)
+                                    activeSsnSession = session
+                                }
+                            }
+                        }
                     }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(pureToneFiles) { item ->
-                            PureToneFileCard(item = item) {
-                                activePureToneItem = item
+                }
+                else -> {
+                    // Pure Tone 列表
+                    if (pureToneFiles.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("暫無純音測驗記錄 (CSV)", color = Color.Gray, fontSize = 16.sp)
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(pureToneFiles) { item ->
+                                PureToneFileCard(
+                                    item = item,
+                                    onDelete = {
+                                        pendingDeleteLabel = "純音測驗紀錄（${item.formattedDate}，${item.ear}）"
+                                        pendingDelete = {
+                                            item.file.delete()
+                                            reloadKey++
+                                        }
+                                    }
+                                ) { activePureToneItem = item }
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    // ── 刪除確認（實驗資料珍貴）──
+    if (pendingDelete != null) {
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text("確定刪除？", fontWeight = FontWeight.Bold) },
+            text = {
+                Text("即將刪除：$pendingDeleteLabel\n\n⚠️ 實驗資料非常珍貴，刪除後無法復原。請確認這筆資料已備份或確定不再需要。")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingDelete?.invoke()
+                    pendingDelete = null
+                }) { Text("刪除", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDelete = null }) { Text("取消") }
+            }
+        )
     }
 
     // ── 語詞明細對話框 ──
@@ -230,10 +317,14 @@ fun TestHistoryScreen(
                 )
             },
             text = {
-                Column(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                ) {
                     if (session.subjectName.isNotEmpty() && session.subjectName != "未填寫") {
                         Text(
-                            text = "受試者：${session.subjectName}",
+                            text = "使用者：${session.subjectName}",
                             fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurface,
@@ -282,13 +373,9 @@ fun TestHistoryScreen(
 
                     Text("答題明細：", fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 4.dp))
                     
-                    // 明細列表
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp)
-                    ) {
-                        items(srtRecordsForActiveSession) { record ->
+                    // 明細列表：完整展開，跟著整個對話框一起捲動（不另設固定高度框）
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        srtRecordsForActiveSession.forEach { record ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -327,6 +414,101 @@ fun TestHistoryScreen(
         )
     }
 
+    // ── 噪音下語詞（SSN）明細對話框 ──
+    if (activeSsnSession != null) {
+        val session = activeSsnSession!!
+        val points = ssnPointsForActiveSession
+        val dateString = SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault()).format(Date(session.timestamp))
+        AlertDialog(
+            onDismissRequest = { activeSsnSession = null },
+            title = {
+                Text("噪音下語詞測驗詳情", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    if (session.subjectName.isNotEmpty() && session.subjectName != "未填寫") {
+                        Text("使用者：${session.subjectName}", fontWeight = FontWeight.Bold)
+                    }
+                    Text("測試日期：$dateString", fontWeight = FontWeight.SemiBold)
+                    Text("SNR 條件：${session.snrList} dB", fontWeight = FontWeight.SemiBold)
+                    Text(
+                        text = session.srt50?.let { "SRT50：${String.format(Locale.getDefault(), "%.1f", it)} dB SNR" }
+                            ?: "SRT50：無法內插（辨識率未跨越 50%）",
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Psychometric Function：", fontWeight = FontWeight.Bold)
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(280.dp)
+                            .padding(vertical = 4.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        AndroidView(
+                            factory = { ctx ->
+                                PsychometricView(ctx).apply { setData(points, session.srt50) }
+                            },
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(8.dp),
+                            update = { view -> view.setData(points, session.srt50) }
+                        )
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+                    Text("各 SNR 之辨識率：", fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
+                    if (points.isEmpty()) {
+                        Text("無有效數據", color = Color.Gray)
+                    } else {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .padding(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("SNR (dB)", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                                Text("辨識率", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
+                            }
+                            HorizontalDivider(color = Color.LightGray)
+                            points.forEach { (snr, score) ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(if (snr == snr.toInt().toFloat()) "${snr.toInt()}" else "$snr", modifier = Modifier.weight(1f))
+                                    Text(String.format(Locale.getDefault(), "%.0f%%", score),
+                                         fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { activeSsnSession = null }) {
+                    Text("關閉", fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
+
     // ── 純音明細對話框 ──
     if (activePureToneItem != null) {
         val item = activePureToneItem!!
@@ -355,7 +537,7 @@ fun TestHistoryScreen(
                         .verticalScroll(rememberScrollState())
                 ) {
                     if (item.subjectName.isNotEmpty() && item.subjectName != "未填寫") {
-                        Text("受試者：${item.subjectName}", fontWeight = FontWeight.Bold)
+                        Text("使用者：${item.subjectName}", fontWeight = FontWeight.Bold)
                     }
                     Text("測試日期：${item.formattedDate}", fontWeight = FontWeight.SemiBold)
                     Text("測試耳別：${item.ear}", fontWeight = FontWeight.SemiBold)
@@ -408,7 +590,7 @@ fun TestHistoryScreen(
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "1000 Hz 首次測試與第二次重測閾值差值達 10 dB 以上，表明受試者反應一致性較低，建議參考價值降低並重新測試。",
+                                    text = "1000 Hz 首次測試與第二次重測閾值差值達 10 dB 以上，表明使用者反應一致性較低，建議參考價值降低並重新測試。",
                                     fontSize = 11.sp,
                                     lineHeight = 15.sp,
                                     color = Color(0xFF5D4037)
@@ -417,9 +599,34 @@ fun TestHistoryScreen(
                         }
                     }
 
-                    // ── 繪製聽力圖走勢 Card ──
+                    // ── 繪製聽力圖走勢 Card（可切換 dB HL / dB FS）──
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("聽力圖走勢：", fontWeight = FontWeight.Bold)
+                    var showDbfs by remember { mutableStateOf(false) }
+                    // dB HL → dB FS 換算：優先用目前耳機的實測校正表，未校準時
+                    // 退回播音同款相對映射（100 dB HL = 0 dBFS）
+                    val dbfsConverter = remember {
+                        val calibRepo = com.wcy.hark.data.experiment.EarphoneCalibrationRepository(context)
+                        val model = try {
+                            runBlocking {
+                                (context.applicationContext as com.wcy.hark.HarkApplication)
+                                    .eqSettingsRepository.getSelectedEarphoneFlow().first()
+                            }
+                        } catch (e: Exception) { "其他" }
+                        val table = calibRepo.getAllCalibrations(model);
+                        { freqHz: Int, dbHl: Int ->
+                            calibRepo.dbfsForTargetDbhl(table, freqHz, dbHl.toFloat()) ?: (dbHl - 100f)
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("聽力圖走勢：", fontWeight = FontWeight.Bold)
+                        TextButton(onClick = { showDbfs = !showDbfs }) {
+                            Text(if (showDbfs) "顯示 dB HL" else "顯示 dB FS", fontSize = 12.sp)
+                        }
+                    }
                     Card(
                         colors = CardDefaults.cardColors(containerColor = Color.White),
                         shape = RoundedCornerShape(12.dp),
@@ -433,6 +640,7 @@ fun TestHistoryScreen(
                             factory = { context ->
                                 AudiogramView(context).apply {
                                     setResults(leftEarMap, rightEarMap)
+                                    setDbfsConverter(dbfsConverter)
                                 }
                             },
                             modifier = Modifier
@@ -440,6 +648,8 @@ fun TestHistoryScreen(
                                 .padding(8.dp),
                             update = { view ->
                                 view.setResults(leftEarMap, rightEarMap)
+                                view.setDbfsConverter(dbfsConverter)
+                                view.setDisplayDbfs(showDbfs)
                             }
                         )
                     }
@@ -494,7 +704,7 @@ fun TestHistoryScreen(
 // ── 卡片設計 ──────────────────────────────────────────────────────────
 
 @Composable
-fun SrtSessionCard(session: SrtSession, onClick: () -> Unit) {
+fun SrtSessionCard(session: SrtSession, onDelete: (() -> Unit)? = null, onClick: () -> Unit) {
     val dateString = SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault()).format(Date(session.timestamp))
     
     Card(
@@ -562,25 +772,113 @@ fun SrtSessionCard(session: SrtSession, onClick: () -> Unit) {
                     )
                 }
             }
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = String.format(Locale.getDefault(), "%.0f%%", session.accuracy),
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = "答對 ${String.format(Locale.getDefault(), "%.0f", session.accuracy * session.totalQuestions / 100)} / ${session.totalQuestions} 題",
-                    fontSize = 11.sp,
-                    color = Color.Gray
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = String.format(Locale.getDefault(), "%.0f%%", session.accuracy),
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "答對 ${String.format(Locale.getDefault(), "%.0f", session.accuracy * session.totalQuestions / 100)} / ${session.totalQuestions} 題",
+                        fontSize = 11.sp,
+                        color = Color.Gray
+                    )
+                }
+                if (onDelete != null) {
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Default.Delete, contentDescription = "刪除",
+                             tint = Color(0xFFB0B0B0), modifier = Modifier.size(20.dp))
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-fun PureToneFileCard(item: PureToneCsvItem, onClick: () -> Unit) {
+fun SsnSessionCard(session: SsnSessionItem, onDelete: (() -> Unit)? = null, onClick: () -> Unit) {
+    val dateString = SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault()).format(Date(session.timestamp))
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFB2DFDB),
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.BarChart,
+                            contentDescription = null,
+                            tint = Color(0xFF00695C),
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+                Column {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("噪音下語詞測驗", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        if (session.subjectName.isNotEmpty() && session.subjectName != "未填寫") {
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                            ) {
+                                Text(
+                                    text = session.subjectName,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+                    Text(dateString, fontSize = 12.sp, color = Color.Gray)
+                    Text("SNR: ${session.snrList} dB", fontSize = 11.sp, color = Color.Gray)
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = session.srt50?.let { "SRT50\n${String.format(Locale.getDefault(), "%.1f", it)} dB" } ?: "SRT50\n—",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.End,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                if (onDelete != null) {
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Default.Delete, contentDescription = "刪除",
+                             tint = Color(0xFFB0B0B0), modifier = Modifier.size(20.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PureToneFileCard(item: PureToneCsvItem, onDelete: (() -> Unit)? = null, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -646,17 +944,103 @@ fun PureToneFileCard(item: PureToneCsvItem, onClick: () -> Unit) {
                     )
                 }
             }
-            Icon(
-                imageVector = Icons.Default.BarChart,
-                contentDescription = null,
-                tint = Color.LightGray,
-                modifier = Modifier.size(20.dp)
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.BarChart,
+                    contentDescription = null,
+                    tint = Color.LightGray,
+                    modifier = Modifier.size(20.dp)
+                )
+                if (onDelete != null) {
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Default.Delete, contentDescription = "刪除",
+                             tint = Color(0xFFB0B0B0), modifier = Modifier.size(20.dp))
+                    }
+                }
+            }
         }
     }
 }
 
 // ── 輔助方法 ──────────────────────────────────────────────────────────
+
+private fun loadSsnSessions(dbHelper: SRTResultDbHelper): List<SsnSessionItem> {
+    val list = mutableListOf<SsnSessionItem>()
+    try {
+        val db = dbHelper.readableDatabase
+        val cursor = db.query(
+            SRTResultContract.SSNSessionEntry.TABLE_NAME, null, null, null, null, null,
+            "${SRTResultContract.SSNSessionEntry.COLUMN_NAME_TEST_TIMESTAMP} DESC"
+        )
+        with(cursor) {
+            while (moveToNext()) {
+                val srtIdx = getColumnIndex(SRTResultContract.SSNSessionEntry.COLUMN_NAME_SRT50)
+                list.add(SsnSessionItem(
+                    sessionId = getLong(getColumnIndexOrThrow(SRTResultContract.SSNSessionEntry.COLUMN_NAME_SESSION_ID)),
+                    timestamp = getLong(getColumnIndexOrThrow(SRTResultContract.SSNSessionEntry.COLUMN_NAME_TEST_TIMESTAMP)),
+                    subjectName = getString(getColumnIndexOrThrow(SRTResultContract.SSNSessionEntry.COLUMN_NAME_SUBJECT_NAME)) ?: "未填寫",
+                    snrList = getString(getColumnIndexOrThrow(SRTResultContract.SSNSessionEntry.COLUMN_NAME_SNR_LIST)) ?: "",
+                    srt50 = if (srtIdx >= 0 && !isNull(srtIdx)) getFloat(srtIdx) else null
+                ))
+            }
+            close()
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+    return list
+}
+
+/** 由 ssn_test_records 重算各 SNR 的正確率（%）。 */
+private fun loadSsnPoints(dbHelper: SRTResultDbHelper, sessionId: Long): List<Pair<Float, Float>> {
+    val correct = mutableMapOf<Float, Int>()
+    val total = mutableMapOf<Float, Int>()
+    try {
+        val db = dbHelper.readableDatabase
+        val cursor = db.query(
+            SRTResultContract.SSNRecordEntry.TABLE_NAME,
+            arrayOf(SRTResultContract.SSNRecordEntry.COLUMN_NAME_SNR_DB,
+                    SRTResultContract.SSNRecordEntry.COLUMN_NAME_WAS_CORRECT),
+            "${SRTResultContract.SSNRecordEntry.COLUMN_NAME_SESSION_ID_FK} = ?",
+            arrayOf(sessionId.toString()), null, null, null
+        )
+        with(cursor) {
+            while (moveToNext()) {
+                val snr = getFloat(0)
+                total[snr] = (total[snr] ?: 0) + 1
+                if (getInt(1) == 1) correct[snr] = (correct[snr] ?: 0) + 1
+            }
+            close()
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+    return total.map { (snr, n) -> snr to (correct[snr] ?: 0) * 100f / n }.sortedBy { it.first }
+}
+
+private fun deleteSsnSession(dbHelper: SRTResultDbHelper, sessionId: Long) {
+    try {
+        val db = dbHelper.writableDatabase
+        db.delete(SRTResultContract.SSNRecordEntry.TABLE_NAME,
+            "${SRTResultContract.SSNRecordEntry.COLUMN_NAME_SESSION_ID_FK} = ?", arrayOf(sessionId.toString()))
+        db.delete(SRTResultContract.SSNSessionEntry.TABLE_NAME,
+            "${SRTResultContract.SSNSessionEntry.COLUMN_NAME_SESSION_ID} = ?", arrayOf(sessionId.toString()))
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+}
+
+private fun deleteSrtSession(dbHelper: SRTResultDbHelper, sessionId: Long) {
+    try {
+        val db = dbHelper.writableDatabase
+        db.delete(SRTResultContract.SRTRecordEntry.TABLE_NAME,
+            "${SRTResultContract.SRTRecordEntry.COLUMN_NAME_SESSION_ID_FK} = ?", arrayOf(sessionId.toString()))
+        db.delete(SRTResultContract.TestSessionEntry.TABLE_NAME,
+            "${SRTResultContract.TestSessionEntry.COLUMN_NAME_SESSION_ID} = ?", arrayOf(sessionId.toString()))
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+}
 
 private fun loadSrtSessions(dbHelper: SRTResultDbHelper): List<SrtSession> {
     val list = mutableListOf<SrtSession>()
@@ -883,80 +1267,93 @@ private fun getAcousticDiagnostic(
     if (wrongRecords.isEmpty()) {
         return "✨ 恭喜！本次測試您答對了所有題目！這代表您目前的音訊補償或聽力狀況在語詞辨識上非常良好。"
     }
-    
-    val freqBands = listOf(
-        250.0, 315.0, 400.0, 500.0, 630.0, 800.0, 
-        1000.0, 1250.0, 1600.0, 2000.0, 2500.0, 
-        3150.0, 4000.0, 5000.0, 6300.0, 8000.0
-    )
-    val freqCount = freqBands.associateWith { 0 }.toMutableMap()
+
+    // 頻譜分析僅適用「聽成另一個詞」的錯題；按「不確定」屬未作答，另計。
+    val notSureCount = wrongRecords.count { it.userAnswer == "not_sure" }
+    val substitutionRecords = wrongRecords.filter { it.userAnswer != "not_sure" }
+
+    // 每個詞對的票數以 (1 − confusion_score) 加權：
+    // 聲學上本來就極相似（confusion 高）的詞對，聽錯所提供的診斷資訊較少。
+    val freqWeight = mutableMapOf<Double, Double>()
     var validDataCount = 0
-    
-    wrongRecords.forEach { record ->
-        // 使用正確詞與使用者回答作為 key，查詢預計算的 Mel 頻譜特徵差異數據
-        val key = "${record.correctWord},${record.userAnswer}"
-        val item = diagnosticMap[key]
+    substitutionRecords.forEach { record ->
+        val item = diagnosticMap["${record.correctWord},${record.userAnswer}"]
         if (item != null) {
             validDataCount++
+            val w = (1.0 - item.confusionScore).coerceAtLeast(0.1)
             item.riskyFrequencies.forEach { freq ->
-                freqCount[freq] = (freqCount[freq] ?: 0) + 1
+                freqWeight[freq] = (freqWeight[freq] ?: 0.0) + w
             }
         }
     }
-    
+
+    // 先驗正規化：對照表中各頻帶本身出現次數不均（低頻與 8kHz 偏多），
+    // 直接比原始票數會系統性偏向低頻。以「觀察值 / 全表先驗」的過度代表比例比較。
+    val prior = mutableMapOf<Double, Int>()
+    diagnosticMap.values.forEach { it.riskyFrequencies.forEach { f -> prior[f] = (prior[f] ?: 0) + 1 } }
+    val priorTotal = prior.values.sum().toDouble().coerceAtLeast(1.0)
+    val obsTotal = freqWeight.values.sum().coerceAtLeast(1e-9)
+    fun overRepresentation(freqs: List<Double>): Double {
+        val obs = freqs.sumOf { freqWeight[it] ?: 0.0 } / obsTotal
+        val pri = freqs.sumOf { (prior[it] ?: 0).toDouble() } / priorTotal
+        return if (pri > 0) obs / pri else 0.0
+    }
+
+    val lowFreqs = listOf(250.0, 315.0, 400.0, 500.0, 630.0, 800.0)
+    val midFreqs = listOf(1000.0, 1250.0, 1600.0, 2000.0, 2500.0)
+    val highFreqs = listOf(3150.0, 4000.0, 5000.0, 6300.0, 8000.0)
+
     val totalWrong = wrongRecords.size
-    
+    val minValidForDiagnosis = 5   // 4AFC 有 25% 猜對率，錯題太少不足以下頻譜結論
+
     return buildString {
-        append("📊 錯題頻譜特徵診斷與 EQ 建議：\n")
-        append("本次測試共答錯 $totalWrong 題。")
-        
-        if (validDataCount > 0) {
-            // 將 16 個助聽器頻段劃分為低、中、高頻三大聲學區間
-            val lowFreqs = listOf(250.0, 315.0, 400.0, 500.0, 630.0, 800.0)
-            val midFreqs = listOf(1000.0, 1250.0, 1600.0, 2000.0, 2500.0)
-            val highFreqs = listOf(3150.0, 4000.0, 5000.0, 6300.0, 8000.0)
-            
-            val lowCount = lowFreqs.sumOf { freqCount[it] ?: 0 }
-            val midCount = midFreqs.sumOf { freqCount[it] ?: 0 }
-            val highCount = highFreqs.sumOf { freqCount[it] ?: 0 }
-            val totalMentions = lowCount + midCount + highCount
-            
-            val lowRatio = if (totalMentions > 0) lowCount.toFloat() / totalMentions else 0f
-            val midRatio = if (totalMentions > 0) midCount.toFloat() / totalMentions else 0f
-            val highRatio = if (totalMentions > 0) highCount.toFloat() / totalMentions else 0f
-            
-            // 找出最頻繁出現的前 3 名風險頻率
-            val topFrequencies = freqCount.entries
-                .filter { it.value > 0 }
-                .sortedByDescending { it.value }
+        append("📊 錯題頻譜特徵分析（探索性參考）：\n")
+        append("本次測試共答錯 $totalWrong 題")
+        if (notSureCount > 0) append("（其中 $notSureCount 題按「不確定」，屬未作答，不納入頻譜分析）")
+        append("。")
+
+        if (validDataCount >= minValidForDiagnosis) {
+            val lowOR = overRepresentation(lowFreqs)
+            val midOR = overRepresentation(midFreqs)
+            val highOR = overRepresentation(highFreqs)
+            val orSum = (lowOR + midOR + highOR).coerceAtLeast(1e-9)
+
+            // 前 3 名風險頻率（同樣以過度代表比例排序）
+            val topFrequencies = freqWeight.keys
+                .sortedByDescending { f ->
+                    val p = (prior[f] ?: 0).toDouble() / priorTotal
+                    if (p > 0) (freqWeight[f]!! / obsTotal) / p else 0.0
+                }
                 .take(3)
-                .map { it.key }
-            
-            append("\n\n【混淆風險特徵分佈】")
-            append(String.format(Locale.getDefault(), "\n  低頻共鳴區 (250-800Hz): %.1f%%", lowRatio * 100))
-            append(String.format(Locale.getDefault(), "\n  中頻人聲區 (1000-2500Hz): %.1f%%", midRatio * 100))
-            append(String.format(Locale.getDefault(), "\n  高頻摩擦音 (3150-8000Hz): %.1f%%", highRatio * 100))
-            
+
+            append("\n\n【混淆特徵分佈（相對於題庫先驗之過度代表比例）】")
+            append(String.format(Locale.getDefault(), "\n  低頻共鳴區 (250-800Hz): %.0f%%", lowOR / orSum * 100))
+            append(String.format(Locale.getDefault(), "\n  中頻人聲區 (1000-2500Hz): %.0f%%", midOR / orSum * 100))
+            append(String.format(Locale.getDefault(), "\n  高頻摩擦音 (3150-8000Hz): %.0f%%", highOR / orSum * 100))
+
             if (topFrequencies.isNotEmpty()) {
-                append("\n\n⚠️ 聲學特徵極相似之高混淆風險頻率：")
+                append("\n\n最常涉及的分辨頻率：")
                 append(topFrequencies.joinToString { "${it.toInt()}Hz" })
             }
-            
+
             append("\n\n")
-            if (highRatio >= lowRatio && highRatio >= midRatio) {
-                append("⚠️ 診斷：您聽錯的詞對在頻譜上的特徵差異主要分布在【高頻摩擦音區間】（如 ㄙ、ㄕ、ㄒ 等摩擦音）。這類輔音的聲學能量集中在 3150Hz 至 8000Hz，您可能在此高頻區段的分辨較為吃力。\n\n")
-                append("💡 EQ 建議：建議在使用等化器 (EQ) 時，適度將 4000Hz 與 8000Hz 頻段的增益額外調高 3~5 dB，這能有效突顯輔音的聲學細節，提升字詞辨識清晰度。")
-            } else if (midRatio >= lowRatio && midRatio >= highRatio) {
-                append("⚠️ 診斷：您的聽錯詞對特徵差異主要分布在【中頻人聲核心區間】（如 ㄓ、ㄌ、ㄋ 等聲母）。這類語音的共振峰能量主要分布在 1000Hz 至 2500Hz 之間，是日常對話中語意理解與語音辨識的最關鍵頻帶。\n\n")
-                append("💡 EQ 建議：建議調高 1000Hz、1600Hz 與 2000Hz 頻段的 EQ 增益，可以讓對話的人聲邊緣與字詞細節更加分明與飽滿。")
+            if (highOR >= lowOR && highOR >= midOR) {
+                append("📌 觀察：您聽錯的詞對，其分辨線索多位於【高頻摩擦音區間】（如 ㄙ、ㄕ、ㄒ 等摩擦音，能量集中於 3150–8000Hz）。\n\n")
+                append("💡 參考建議：可對照純音聽力圖確認高頻閾值後，嘗試微調 4000Hz 與 8000Hz 的 EQ 增益，觀察辨識是否改善。")
+            } else if (midOR >= lowOR && midOR >= highOR) {
+                append("📌 觀察：您聽錯的詞對，其分辨線索多位於【中頻人聲核心區間】（1000–2500Hz，語音共振峰與語意理解的關鍵頻帶）。\n\n")
+                append("💡 參考建議：可對照純音聽力圖後，嘗試微調 1000Hz、1600Hz 與 2000Hz 的 EQ 增益。")
             } else {
-                append("⚠️ 診斷：您的聽錯詞對特徵差異主要分布在【低頻與母音/鼻音共鳴區間】（如 ㄅ、ㄇ、ㄉ 等聲母，或鼻音 ㄣ、ㄤ）。這些語音在物理聲學上的主要能量低於 1000Hz。\n\n")
-                append("💡 EQ 建議：建議微調 500Hz 與 800Hz 增益。另外請檢查您的耳塞密合度。若是使用藍牙/有線耳機，耳塞密合度不良會造成低頻嚴重衰減，直接削弱這類低頻與鼻音共鳴的辨識能力。")
+                append("📌 觀察：您聽錯的詞對，其分辨線索多位於【低頻與母音/鼻音共鳴區間】（能量多低於 1000Hz）。\n\n")
+                append("💡 參考建議：可嘗試微調 500Hz 與 800Hz 增益，並檢查耳塞密合度——密合不良會造成低頻嚴重衰減。")
             }
+            append("\n\n※ 本分析為探索性參考：答錯也可能來自猜測（四選一有 25% 猜對率）、詞彙熟悉度或注意力，請以純音聽力檢測結果為主要依據。")
+        } else if (validDataCount > 0) {
+            append("\n\n📌 有效錯題僅 $validDataCount 題（少於 $minValidForDiagnosis 題），樣本不足以進行頻譜特徵分析——少量錯誤可能只是猜測波動。\n\n")
+            append("💡 參考建議：可對照純音聽力檢測結果調整 EQ，或增加測驗題數後再分析。")
         } else {
-            // 回退邏輯：若少數錯題不在對照表內，使用均勻的綜合建議
-            append("\n\n⚠️ 診斷：聽錯詞對在不同頻帶的能量分布較為均勻，無單一主導頻譜區間。\n\n")
-            append("💡 EQ 建議：建議您對照 PTA 純音聽力檢測的結果，對聽力閾值受損較嚴重的頻段進行對應的 EQ 增益微調，或重新進行一次測試確認。")
+            append("\n\n📌 錯題無對應的頻譜特徵資料（例如皆為「不確定」），無法進行頻譜分析。\n\n")
+            append("💡 參考建議：請以純音聽力檢測結果為依據調整 EQ，或重新進行一次語詞測驗。")
         }
     }
 }

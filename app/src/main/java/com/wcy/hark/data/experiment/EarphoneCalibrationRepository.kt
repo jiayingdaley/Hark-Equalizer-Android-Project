@@ -5,16 +5,33 @@ import org.json.JSONObject
 import java.io.File
 
 /**
- * EarphoneCalibrationRepository
+ * Per-frequency calibration state for one earphone model.
  *
- * Manages ETSPL (Equivalent Threshold Sound Pressure Level) correction values
- * for each earphone model. The calibration table is stored as a JSON file in
- * the app's internal files directory, initially seeded from assets/.
+ * @param refDbfs        dBFS level at which the researcher played the calibration tone
+ * @param measuredDbSpl  SPL measured externally (coupler / sound level meter) at refDbfs;
+ *                       null = this frequency has not been calibrated yet
+ */
+data class FreqCalibration(
+    val refDbfs: Float,
+    val measuredDbSpl: Float?
+)
+
+/**
+ * EarphoneCalibrationRepository (schema v2)
  *
- * Correction values are set by the researcher using an external sound level
- * meter: correction[Hz] = measured_SPL - reference_SPL_at_that_dBFS.
+ * Stores a per-earphone, per-frequency measured calibration table as JSON in the
+ * app's internal files directory (seeded from assets on first launch).
  *
- * Reference: ISO 8253-1, ANSI S3.22 (audiometric earphone calibration)
+ * Schema v2:
+ *   { "_version": 2,
+ *     "<model>": { "<freqHz>": { "refDbfs": -20.0, "measuredDbSpl": 78.3 | null }, ... } }
+ *
+ * Conversion math (linear output assumption within the usable range):
+ *   dBSPL(f, dbfs) = measuredDbSpl + (dbfs - refDbfs)
+ *   dBHL           = dBSPL - RETSPL[f]
+ *   dbfs for target dBHL = refDbfs + (targetDbhl + RETSPL[f]) - measuredDbSpl
+ *
+ * Reference: ISO 389-1 (RETSPL), ISO 8253-1, ANSI S3.22
  */
 class EarphoneCalibrationRepository(private val context: Context) {
 
@@ -22,114 +39,156 @@ class EarphoneCalibrationRepository(private val context: Context) {
         private const val ASSET_FILE = "earphone_calibration.json"
         private const val LOCAL_FILE = "earphone_calibration.json"
         private const val COMMENT_KEY = "_comment"
+        private const val VERSION_KEY = "_version"
+        private const val SCHEMA_VERSION = 2
+        const val DEFAULT_REF_DBFS = -20.0f
 
         // Audiometric test frequencies (Hz)
         val TEST_FREQUENCIES = listOf(250, 500, 1000, 2000, 3000, 4000, 6000, 8000)
+
+        // RETSPL (Reference Equivalent Threshold SPL), ISO 389-1, TDH-39 supra-aural.
+        // Swap for ISO 389-2 insert-earphone values if insert phones are used.
+        val RETSPL: Map<Int, Float> = mapOf(
+            250 to 25.5f, 500 to 11.5f, 1000 to 7.0f, 2000 to 9.0f,
+            3000 to 10.0f, 4000 to 9.5f, 6000 to 15.5f, 8000 to 13.0f
+        )
     }
 
-    // Lazy-loaded local file in internal storage
     private val localFile: File get() = File(context.filesDir, LOCAL_FILE)
 
     /**
-     * Returns a mutable JSONObject loaded from the local file.
-     * On first call (local file not yet created), seeds from assets/.
+     * Loads the local JSON, seeding from assets on first launch and migrating
+     * v1 files (plain numeric corrections — all unmeasured zeros) to v2.
      */
+    @Synchronized
     private fun loadJson(): JSONObject {
         if (!localFile.exists()) {
-            // First launch: copy asset to internal storage so it becomes writable
             context.assets.open(ASSET_FILE).use { input ->
                 localFile.outputStream().use { output -> input.copyTo(output) }
             }
         }
-        return JSONObject(localFile.readText())
+        var json = JSONObject(localFile.readText())
+        if (json.optInt(VERSION_KEY, 1) < SCHEMA_VERSION) {
+            json = migrateToV2(json)
+            saveJson(json)
+        }
+        return json
     }
 
+    /** v1 corrections were all 0.0 / unmeasured, so they are discarded. */
+    private fun migrateToV2(old: JSONObject): JSONObject {
+        val v2 = JSONObject()
+        v2.put(VERSION_KEY, SCHEMA_VERSION)
+        for (key in old.keys()) {
+            if (key == COMMENT_KEY || key == VERSION_KEY) continue
+            val freqs = JSONObject()
+            TEST_FREQUENCIES.forEach { f ->
+                freqs.put(f.toString(), JSONObject().apply {
+                    put("refDbfs", DEFAULT_REF_DBFS.toDouble())
+                    put("measuredDbSpl", JSONObject.NULL)
+                })
+            }
+            v2.put(key, freqs)
+        }
+        return v2
+    }
+
+    @Synchronized
     private fun saveJson(json: JSONObject) {
         localFile.writeText(json.toString(2))
     }
 
-    /**
-     * Returns the list of available earphone model names.
-     */
+    /** Returns the list of available earphone model names. */
     fun getEarphoneModels(): List<String> {
         val json = loadJson()
         return json.keys().asSequence()
-            .filter { it != COMMENT_KEY }
+            .filter { it != COMMENT_KEY && it != VERSION_KEY }
             .toList()
     }
 
-    /**
-     * Returns the ETSPL correction value for the given earphone model and frequency.
-     * Returns 0.0 if the model or frequency is not found.
-     *
-     * @param model   Earphone model name (must match a key in the JSON)
-     * @param freqHz  Frequency in Hz (250/500/1000/2000/3000/4000/6000/8000)
-     */
-    fun getCorrection(model: String, freqHz: Int): Float {
+    private fun parseEntry(obj: JSONObject?): FreqCalibration? {
+        obj ?: return null
+        val measured = if (obj.isNull("measuredDbSpl")) null
+                       else obj.optDouble("measuredDbSpl").toFloat()
+        return FreqCalibration(
+            refDbfs = obj.optDouble("refDbfs", DEFAULT_REF_DBFS.toDouble()).toFloat(),
+            measuredDbSpl = measured
+        )
+    }
+
+    /** Returns the calibration entry for a model + frequency, or null if absent. */
+    fun getCalibration(model: String, freqHz: Int): FreqCalibration? {
         return try {
-            val json   = loadJson()
-            val entry  = json.optJSONObject(model) ?: return 0.0f
-            entry.optDouble(freqHz.toString(), 0.0).toFloat()
+            parseEntry(loadJson().optJSONObject(model)?.optJSONObject(freqHz.toString()))
         } catch (e: Exception) {
-            0.0f
+            null
         }
     }
 
     /**
-     * Returns all corrections for the given earphone model as a Map<Int, Float>.
-     * Keys are frequencies in Hz, values are dB correction values.
+     * Batch getter — load the whole table for a model once (e.g. before a
+     * pure-tone test) so no JSON file reads happen on the audio path.
      */
-    fun getAllCorrections(model: String): Map<Int, Float> {
+    fun getAllCalibrations(model: String): Map<Int, FreqCalibration> {
         return try {
-            val json  = loadJson()
-            val entry = json.optJSONObject(model) ?: return emptyMap()
-            TEST_FREQUENCIES.associateWith { freq ->
-                entry.optDouble(freq.toString(), 0.0).toFloat()
-            }
+            val entry = loadJson().optJSONObject(model) ?: return emptyMap()
+            TEST_FREQUENCIES.mapNotNull { f ->
+                parseEntry(entry.optJSONObject(f.toString()))?.let { f to it }
+            }.toMap()
         } catch (e: Exception) {
             emptyMap()
         }
     }
 
-    /**
-     * Updates and persists the ETSPL correction value for a specific earphone model
-     * and frequency. Typically called after the researcher measures the actual SPL
-     * output with a HATS or coupler microphone.
-     *
-     * @param model       Earphone model name
-     * @param freqHz      Frequency in Hz
-     * @param correction  Measured correction in dB
-     */
-    fun saveCorrection(model: String, freqHz: Int, correction: Float) {
+    /** Persists a researcher measurement for one model + frequency. */
+    fun saveMeasurement(model: String, freqHz: Int, refDbfs: Float, measuredDbSpl: Float) {
         try {
-            val json  = loadJson()
+            val json = loadJson()
             val entry = json.optJSONObject(model) ?: JSONObject().also { json.put(model, it) }
-            entry.put(freqHz.toString(), correction.toDouble())
+            entry.put(freqHz.toString(), JSONObject().apply {
+                put("refDbfs", refDbfs.toDouble())
+                put("measuredDbSpl", measuredDbSpl.toDouble())
+            })
             saveJson(json)
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
+    /** True when all TEST_FREQUENCIES have a measured SPL for this model. */
+    fun isFullyCalibrated(model: String): Boolean {
+        val table = getAllCalibrations(model)
+        return TEST_FREQUENCIES.all { table[it]?.measuredDbSpl != null }
+    }
+
     /**
-     * Calculates the estimated output level in dBHL for a given earphone model,
-     * frequency, and dBFS signal level.
-     *
-     * Estimated dBHL = signalDbfs + ETSPL_correction + dBFS_to_dBSPL_offset
-     *
-     * The dBFS_to_dBSPL_offset is device- and earphone-specific. The researcher
-     * should establish this baseline once with a reference tone and a sound level
-     * meter, then hard-code or adjust it here.
-     *
-     * For now, returns signalDbfs + correction as a relative estimate.
-     * The researcher should interpret this as "relative dBHL shift from baseline".
-     *
-     * @param model       Earphone model name
-     * @param freqHz      Frequency in Hz
-     * @param signalDbfs  Signal level in dBFS (typically -40 to 0)
+     * dBFS required to produce the target dBHL at this frequency,
+     * or null when the frequency is uncalibrated.
      */
-    fun estimateOutputDbhl(model: String, freqHz: Int, signalDbfs: Float): Float {
-        val correction = getCorrection(model, freqHz)
-        return signalDbfs + correction
+    fun dbfsForTargetDbhl(model: String, freqHz: Int, targetDbhl: Float): Float? {
+        val cal = getCalibration(model, freqHz) ?: return null
+        val measured = cal.measuredDbSpl ?: return null
+        val retspl = RETSPL[freqHz] ?: return null
+        return cal.refDbfs + (targetDbhl + retspl) - measured
+    }
+
+    /** Same as [dbfsForTargetDbhl] but against a pre-loaded table (audio path safe). */
+    fun dbfsForTargetDbhl(table: Map<Int, FreqCalibration>, freqHz: Int, targetDbhl: Float): Float? {
+        val cal = table[freqHz] ?: return null
+        val measured = cal.measuredDbSpl ?: return null
+        val retspl = RETSPL[freqHz] ?: return null
+        return cal.refDbfs + (targetDbhl + retspl) - measured
+    }
+
+    /**
+     * Estimated output dBHL for a signal at [signalDbfs], or null when the
+     * frequency is uncalibrated (no absolute baseline available).
+     */
+    fun estimateOutputDbhl(model: String, freqHz: Int, signalDbfs: Float): Float? {
+        val cal = getCalibration(model, freqHz) ?: return null
+        val measured = cal.measuredDbSpl ?: return null
+        val retspl = RETSPL[freqHz] ?: return null
+        val dbSpl = measured + (signalDbfs - cal.refDbfs)
+        return dbSpl - retspl
     }
 }
