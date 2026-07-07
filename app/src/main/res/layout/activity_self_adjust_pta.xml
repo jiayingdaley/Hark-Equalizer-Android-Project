@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center_horizontal"
+    android:background="#F5F7FA"
+    android:fitsSystemWindows="true"
+    android:padding="20dp">
+
+    <TextView
+        android:id="@+id/textSaTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:text="快速純音（自調式）"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:textColor="@android:color/black" />
+
+    <TextView
+        android:id="@+id/textSaProgress"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="右耳 · 1 / 8"
+        android:textSize="14sp"
+        android:textColor="#666666" />
+
+    <TextView
+        android:id="@+id/textSaFreq"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="28dp"
+        android:text="1000 Hz"
+        android:textSize="40sp"
+        android:textStyle="bold"
+        android:textColor="#1a56b0" />
+
+    <TextView
+        android:id="@+id/textSaLevel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="−80 dB FS"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:textColor="@android:color/black" />
+
+    <TextView
+        android:id="@+id/textSaInstruction"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:gravity="center"
+        android:text="步驟 1／2：拖動滑桿或按 +/−，把聲音調到「剛好聽得見」，然後按確認。"
+        android:textSize="16sp"
+        android:lineSpacingExtra="4dp"
+        android:textColor="#333333" />
+
+    <SeekBar
+        android:id="@+id/seekSaLevel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="28dp"
+        android:max="40"
+        android:progress="20" />
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="20dp"
+        android:gravity="center">
+
+        <Button
+            android:id="@+id/buttonSaMinus"
+            android:layout_width="90dp"
+            android:layout_height="72dp"
+            android:text="−1 dB"
+            android:textSize="18sp"
+            android:background="@drawable/rounded_button" />
+
+        <Space
+            android:layout_width="28dp"
+            android:layout_height="1dp" />
+
+        <Button
+            android:id="@+id/buttonSaPlus"
+            android:layout_width="90dp"
+            android:layout_height="72dp"
+            android:text="+1 dB"
+            android:textSize="18sp"
+            android:background="@drawable/rounded_button" />
+    </LinearLayout>
+
+    <Space
+        android:layout_width="1dp"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <Button
+        android:id="@+id/buttonSaConfirm"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:layout_marginBottom="28dp"
+        android:text="確認：剛好聽得見"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:background="@drawable/rounded_button" />
+</LinearLayout>

@@ -9,6 +9,7 @@ import com.wcy.hark.audio.bridge.HarkAudioBridge
 import com.wcy.hark.audio.service.HarkAudioService
 import com.wcy.hark.audio.manager.SceneManager
 import com.wcy.hark.audio.manager.SystemDspManager
+import com.wcy.hark.audio.fitting.Prescriptions
 import com.wcy.hark.data.EqSettingsRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -27,7 +28,9 @@ enum class EarType {
 class EqViewModel(private val repository: EqSettingsRepository) : ViewModel() {
 
     companion object {
-        const val MAX_GAIN_DB = 24f
+        // +30 dB：環境輔聽麥克風輸入約 −40 dBFS 以下仍有數位餘裕，且輸出端有
+        // limiter 防削波；市售 PSAP 最大聲學增益普遍 25–35 dB。
+        const val MAX_GAIN_DB = 30f
         const val MIN_GAIN_DB = -24f
         const val DEFAULT_Q: Float = 1.4f
     }
@@ -74,7 +77,36 @@ class EqViewModel(private val repository: EqSettingsRepository) : ViewModel() {
 
     // Frequencies
     val centerFrequencies16 = listOf(250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000)
-    
+
+    // ── 8 段檢視層（對齊聽力檢查頻率）────────────────────────────────
+    // 底層儲存與 DSP 永遠是 16 段；8 段只是 UI 檢視。分組邊界取相鄰
+    // 中心頻率的幾何平均（例：√(2000×3000)=2449，故 2500 歸 3000 組）。
+    val centerFrequencies8 = listOf(250, 500, 1000, 2000, 3000, 4000, 6000, 8000)
+    val band8To16: List<List<Int>> = listOf(
+        listOf(0, 1),        // 250:  250, 315
+        listOf(2, 3, 4),     // 500:  400, 500, 630
+        listOf(5, 6, 7),     // 1000: 800, 1000, 1250
+        listOf(8, 9),        // 2000: 1600, 2000
+        listOf(10, 11),      // 3000: 2500, 3150
+        listOf(12),          // 4000: 4000
+        listOf(13, 14),      // 6000: 5000, 6300
+        listOf(15)           // 8000: 8000
+    )
+    val band16ToGroup8: IntArray = IntArray(16).also { arr ->
+        band8To16.forEachIndexed { g, members -> members.forEach { arr[it] = g } }
+    }
+
+    /** 8 段 slider 顯示值 = 該組 16 段子頻段的平均增益 */
+    fun band8Gain(gains16: List<MutableState<Float>>, band8Index: Int): Float {
+        val members = band8To16[band8Index]
+        return members.map { gains16[it].value }.sum() / members.size
+    }
+
+    /** 一支 8 段 slider 同時驅動它管轄的所有 16 段子頻段 */
+    fun updateBand8Gain(ear: EarType, band8Index: Int, gain: Float) {
+        band8To16[band8Index].forEach { updateBandGain(ear, it, gain) }
+    }
+
     val currentEarTab = mutableStateOf(EarType.BOTH)
 
     private val _bandGainsLeft16 = List(centerFrequencies16.size) { mutableStateOf(0f) }
@@ -346,61 +378,64 @@ fun selectSituationalMode(mode: SceneManager.Mode) {
     }
 
     /**
-     * Applies DSL v5 compensation formula using saved audiogram thresholds.
+     * 依儲存的聽力圖套用處方增益（DSL v5 by Hand 成人近似 或 NAL-R）。
+     * 缺測頻率以鄰近已測值於對數頻率軸內插；計算細節見
+     * docs/FITTING_PRESCRIPTIONS.md。完成後以 onResult 回報摘要訊息。
      */
-    fun applyDslV5Fitting() {
+    fun applyFitting(method: Prescriptions.Method, onResult: (String) -> Unit) {
         viewModelScope.launch {
-            val leftAudiogram = mutableMapOf<Int, Int>()
-            val rightAudiogram = mutableMapOf<Int, Int>()
             val testFrequencies = listOf(250, 500, 1000, 2000, 3000, 4000, 6000, 8000)
-
-            for (freq in testFrequencies) {
-                leftAudiogram[freq] = repository.getAudiogramThresholdFlow("left", freq).first()
-                rightAudiogram[freq] = repository.getAudiogramThresholdFlow("right", freq).first()
-            }
-
-            // Apply to Left channel
-            if (leftAudiogram.values.any { it != -1 }) {
-                centerFrequencies16.forEachIndexed { index, freq ->
-                    val threshold = interpolateThreshold(freq, leftAudiogram)
-                    val dslGain = calculateDslV5Gain(threshold)
-                    updateBandGain(EarType.LEFT, index, dslGain)
+            suspend fun loadAudiogram(ear: String): Map<Int, Float> = buildMap {
+                for (freq in testFrequencies) {
+                    val t = repository.getAudiogramThresholdFlow(ear, freq).first()
+                    if (t != -1) put(freq, t.toFloat())
                 }
             }
+            val leftAudiogram = loadAudiogram("left")
+            val rightAudiogram = loadAudiogram("right")
 
-            // Apply to Right channel
-            if (rightAudiogram.values.any { it != -1 }) {
+            if (leftAudiogram.isEmpty() && rightAudiogram.isEmpty()) {
+                onResult("沒有聽力圖資料，請先完成純音聽力測驗")
+                return@launch
+            }
+
+            // 雙耳皆有聽力圖 → DSL v5 套用雙耳配戴 −3 dB 修正
+            val binaural = leftAudiogram.isNotEmpty() && rightAudiogram.isNotEmpty()
+            var clampedBands = 0
+
+            fun applyEar(ear: EarType, audiogram: Map<Int, Float>) {
+                if (audiogram.isEmpty()) return
+                // NAL-R 的 X 項：500/1k/2k 三頻平均（缺測時同樣內插）
+                val h3fa = listOf(500, 1000, 2000)
+                    .mapNotNull { Prescriptions.interpolateThreshold(it, audiogram) }
+                    .average().toFloat()
                 centerFrequencies16.forEachIndexed { index, freq ->
-                    val threshold = interpolateThreshold(freq, rightAudiogram)
-                    val dslGain = calculateDslV5Gain(threshold)
-                    updateBandGain(EarType.RIGHT, index, dslGain)
+                    val threshold = Prescriptions.interpolateThreshold(freq, audiogram) ?: return@forEachIndexed
+                    val gain = when (method) {
+                        Prescriptions.Method.DSL_V5 -> Prescriptions.dslV5Gain(freq, threshold, binaural)
+                        Prescriptions.Method.NAL_R -> Prescriptions.nalRGain(freq, threshold, h3fa)
+                    }
+                    if (gain > MAX_GAIN_DB) clampedBands++
+                    updateBandGain(ear, index, gain.coerceIn(MIN_GAIN_DB, MAX_GAIN_DB))
                 }
             }
+            applyEar(EarType.LEFT, leftAudiogram)
+            applyEar(EarType.RIGHT, rightAudiogram)
+
+            val name = if (method == Prescriptions.Method.DSL_V5) "DSL v5" else "NAL-R"
+            val ears = when {
+                binaural -> "雙耳"
+                leftAudiogram.isNotEmpty() -> "左耳（右耳無聽力圖）"
+                else -> "右耳（左耳無聽力圖）"
+            }
+            val msg = buildString {
+                append("已套用 $name 處方（$ears）")
+                if (clampedBands > 0) {
+                    append("\n⚠️ ${clampedBands} 個頻段已達增益上限 ${MAX_GAIN_DB.toInt()} dB，未能完全達到處方目標")
+                }
+            }
+            onResult(msg)
         }
-    }
-
-    private fun calculateDslV5Gain(threshold: Float): Float {
-        if (threshold <= 20f) return 0f
-        // DSL v5 adult target gain approximation for moderate speech: Gain = 0.35 * (Threshold - 20) + 3.0
-        val targetGain = 0.35f * (threshold - 20f) + 3f
-        return targetGain.coerceIn(0f, MAX_GAIN_DB)
-    }
-
-    private fun interpolateThreshold(targetFreq: Int, audiogram: Map<Int, Int>): Float {
-        // Map 16 parametric EQ bands to nearest measured frequencies
-        val freqMap = mapOf(
-            250 to 250, 315 to 250, 400 to 250,
-            500 to 500, 630 to 500, 800 to 500,
-            1000 to 1000, 1250 to 1000,
-            1600 to 2000, 2000 to 2000,
-            2500 to 3000, 3150 to 3000,
-            4000 to 4000,
-            5000 to 6000, 6300 to 6000,
-            8000 to 8000
-        )
-        val measuredFreq = freqMap[targetFreq] ?: 1000
-        val threshold = audiogram[measuredFreq] ?: -1
-        return if (threshold == -1) 0f else threshold.toFloat()
     }
 }
 

@@ -30,15 +30,11 @@ class AudiogramActivity : AppCompatActivity() {
         audiogramView.setResults(leftEarResults, rightEarResults)
 
         val toggleButton = findViewById<Button>(R.id.button_toggle_unit)
-        toggleButton.visibility = android.view.View.GONE
 
-        // Experiment mode: allow switching to dB FS display using the earphone
-        // calibration table (dbfs = refDbfs + (dBHL + RETSPL) − measuredDbSpl).
+        // 預設以 dB FS 顯示（聽力圖式：越上方越小聲），可切換回 dB HL。
+        // dB FS 換算採耳機校正表（dbfs = refDbfs + (dBHL + RETSPL) − measuredDbSpl）。
         val repository = (application as HarkApplication).eqSettingsRepository
         lifecycleScope.launch {
-            val isExperiment = repository.getExperimentModeFlow().first()
-            if (!isExperiment) return@launch
-
             val model = repository.getSelectedEarphoneFlow().first()
             val calibRepo = EarphoneCalibrationRepository(this@AudiogramActivity)
             val table: Map<Int, FreqCalibration> =
@@ -52,9 +48,9 @@ class AudiogramActivity : AppCompatActivity() {
                     ?: (dbHl.toFloat() - 100f)
             }
 
-            var showDbfs = false
-            toggleButton.visibility = android.view.View.VISIBLE
-            toggleButton.text = "顯示 dB FS (Show dB FS)"
+            var showDbfs = true
+            audiogramView.setDisplayDbfs(true)
+            toggleButton.text = "顯示 dB HL (Show dB HL)"
             toggleButton.setOnClickListener {
                 showDbfs = !showDbfs
                 audiogramView.setDisplayDbfs(showDbfs)

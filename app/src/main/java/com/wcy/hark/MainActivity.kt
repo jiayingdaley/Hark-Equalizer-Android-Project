@@ -13,32 +13,31 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.wcy.hark.audio.bridge.HarkAudioBridge
+import com.wcy.hark.audio.manager.SystemDspManager
 import com.wcy.hark.audio.router.HarkAudioRouter
 import com.wcy.hark.audio.router.VolumeSyncHelper
-import com.wcy.hark.audio.service.HarkAudioService
 import com.wcy.hark.audio.service.FloatingEqService
-import com.wcy.hark.audio.manager.SystemDspManager
-import com.wcy.hark.ui.viewmodel.EqViewModel
-import com.wcy.hark.ui.viewmodel.EqViewModelFactory
-import com.wcy.hark.ui.viewmodel.AudioSourceMode
+import com.wcy.hark.audio.service.HarkAudioService
 import com.wcy.hark.data.experiment.EarphoneCalibrationRepository
 import com.wcy.hark.data.experiment.ExperimentLogRepository
 import com.wcy.hark.ui.screen.CalibrationTestScreen
 import com.wcy.hark.ui.screen.EarphoneCalibrationScreen
-import com.wcy.hark.ui.screen.HarkMainScreen
-import com.wcy.hark.ui.screen.HarkEqualizerScreen
 import com.wcy.hark.ui.screen.HarkAppScreen
+import com.wcy.hark.ui.screen.HarkEqualizerScreen
+import com.wcy.hark.ui.screen.HarkMainScreen
 import com.wcy.hark.ui.theme.HarkTheme
+import com.wcy.hark.ui.viewmodel.AudioSourceMode
+import com.wcy.hark.ui.viewmodel.EqViewModel
+import com.wcy.hark.ui.viewmodel.EqViewModelFactory
 import com.wcy.hark.ui.viewmodel.ExperimentViewModel
 import com.wcy.hark.ui.viewmodel.ExperimentViewModelFactory
 import kotlinx.coroutines.flow.first
@@ -65,7 +64,7 @@ class MainActivity : ComponentActivity() {
     // "main"           → HarkMainScreen (主控制面板, default)
     // "equalizer"      → HarkEqualizerScreen (EQUALIZER 等化器微調)
     // "debug"          → HarkAppScreen (實驗調試面板, original UI)
-    // "experiment"     → CalibrationTestScreen (學術實驗面板, experiment mode only)
+    // "experiment"     → CalibrationTestScreen (聲學實驗面板, experiment mode only)
     // "earphone_calib" → EarphoneCalibrationScreen (逐頻率耳機校準, experiment mode only)
     private var currentScreen by mutableStateOf("main")
 
@@ -180,11 +179,12 @@ class MainActivity : ComponentActivity() {
                             // Screen 2: EQUALIZER — 等化器微調
                             HarkEqualizerScreen(
                                 viewModel = viewModel,
+                                isExperimentMode = isExperimentMode,
                                 onBack = { currentScreen = "main" }
                             )
                         }
                         "experiment" -> {
-                            // 學術實驗面板 (top-level in experiment mode)
+                            // 聲學實驗面板 (top-level in experiment mode)
                             CalibrationTestScreen(
                                 viewModel = experimentViewModel,
                                 onBack = { currentScreen = "main" },

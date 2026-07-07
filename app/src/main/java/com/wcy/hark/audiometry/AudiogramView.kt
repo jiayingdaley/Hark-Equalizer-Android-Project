@@ -224,8 +224,8 @@ class AudiogramView(context: Context, attrs: AttributeSet? = null) : View(contex
     private fun mapLevelToY(level: Float, height: Float): Float {
         val availableHeight = height - 2 * padding
         return if (displayDbfs) {
-            // 0 dBFS at top, −100 at bottom
-            padding + ((fsMax - level) / (fsMax - fsMin)) * availableHeight
+            // 聽力圖慣例：越上方越小聲 → −100 dBFS 在頂、0 dBFS 在底
+            padding + ((level - fsMin) / (fsMax - fsMin)) * availableHeight
         } else {
             // −10 dB HL at top, 120 at bottom
             padding + ((level - hlMin) / (hlMax - hlMin)) * availableHeight

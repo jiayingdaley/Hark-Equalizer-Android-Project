@@ -382,7 +382,7 @@ fun HarkMainScreen(
                 )
 
                 LargeNavCard(
-                    label = "學術實驗面板",
+                    label = "聲學實驗面板",
                     sublabel = "MEASUREMENT PANEL",
                     icon = Icons.Default.Science,
                     containerColor = MaterialTheme.colorScheme.errorContainer,

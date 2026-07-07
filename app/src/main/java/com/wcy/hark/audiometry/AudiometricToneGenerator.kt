@@ -33,9 +33,15 @@ class AudiometricToneGenerator(private val sampleRate: Int = 44100) {
      * @param frequencyHz  tone frequency in Hz
      * @param dbfs         digital level in dBFS (0 = full scale); amplitude = 10^(dbfs/20)
      * @param ear          output channel(s)
-     * @param pulsed       true = 300 ms on / 200 ms off pulses with 10 ms ramps
+     * @param pulsed       true = pulseOnMs on / pulseOffMs off pulses with 10 ms ramps
      * @param durationSec  buffer duration in seconds
      * @param loop         true = loop indefinitely until stop() (calibration tone)
+     * @param pulseOnMs    pulse ON time in ms (audiometric standard 300)
+     * @param pulseOffMs   pulse OFF time in ms (audiometric standard 200)
+     * @param bakeVolume   true = amplitude baked into samples (test tones);
+     *                     false = samples at full scale, level applied via
+     *                     AudioTrack.setVolume() so setVolumeDbfs() can change
+     *                     it later WITHOUT restarting the waveform (no clicks)
      */
     fun play(
         frequencyHz: Int,
@@ -43,41 +49,43 @@ class AudiometricToneGenerator(private val sampleRate: Int = 44100) {
         ear: Ear,
         pulsed: Boolean = false,
         durationSec: Float = 1.5f,
-        loop: Boolean = false
+        loop: Boolean = false,
+        pulseOnMs: Float = 300.0f,
+        pulseOffMs: Float = 200.0f,
+        bakeVolume: Boolean = true
     ) {
         val numSamples = (durationSec * sampleRate).toInt()
         val volume = 10.0.pow(dbfs / 20.0).toFloat().coerceIn(0.0f, 1.0f)
+        val bakedAmp = if (bakeVolume) volume else 1.0f
 
-        val tone = ShortArray(numSamples)
+        val periodMs = pulseOnMs + pulseOffMs
+        // Float PCM：16-bit 的量化底線約 −90.3 dBFS（更低即全零靜音），會讓正常
+        // 聽力者的閾值區（約 −100 ~ −85 dBFS）無法呈現；浮點路徑以 ≥24-bit 精度
+        // 送入 DAC，實際下限由硬體底噪決定。
+        val tone = FloatArray(numSamples)
         for (i in 0 until numSamples) {
             val time = i.toFloat() / sampleRate
             val fade: Float
             if (pulsed) {
-                // Pulsed tone (300ms ON, 200ms OFF -> period 500ms)
-                val tMs = time * 1000.0f
-                val tMod = tMs % 500.0f
+                val tMod = (time * 1000.0f) % periodMs
                 fade = when {
-                    tMod < 10.0f -> tMod / 10.0f            // 10ms fade-in
-                    tMod < 290.0f -> 1.0f                   // on
-                    tMod < 300.0f -> (300.0f - tMod) / 10.0f // 10ms fade-out
-                    else -> 0.0f                            // off
+                    tMod < 10.0f -> tMod / 10.0f                          // 10ms fade-in
+                    tMod < pulseOnMs - 10.0f -> 1.0f                      // on
+                    tMod < pulseOnMs -> (pulseOnMs - tMod) / 10.0f        // 10ms fade-out
+                    else -> 0.0f                                          // off
                 }
             } else {
                 fade = 1.0f
             }
-            tone[i] = (Short.MAX_VALUE * volume * fade * sin(2 * PI * frequencyHz * time)).toInt().toShort()
+            tone[i] = (bakedAmp * fade * sin(2 * PI * frequencyHz * time)).toFloat()
         }
 
-        // Local per-channel copies keep the silent channel truly silent
-        // (avoids residual DC transient "thud" between back-to-back calls).
-        val silent = ShortArray(numSamples)
-        val leftData = if (ear == Ear.LEFT || ear == Ear.BOTH) tone else silent
-        val rightData = if (ear == Ear.RIGHT || ear == Ear.BOTH) tone else silent
-
-        val stereoBuffer = ShortArray(numSamples * 2)
+        val stereoBuffer = FloatArray(numSamples * 2)
+        val leftOn = ear == Ear.LEFT || ear == Ear.BOTH
+        val rightOn = ear == Ear.RIGHT || ear == Ear.BOTH
         for (i in 0 until numSamples) {
-            stereoBuffer[i * 2] = leftData[i]
-            stereoBuffer[i * 2 + 1] = rightData[i]
+            stereoBuffer[i * 2] = if (leftOn) tone[i] else 0.0f
+            stereoBuffer[i * 2 + 1] = if (rightOn) tone[i] else 0.0f
         }
 
         // MODE_STATIC buffer size is fixed at construction; recreate only when it changes.
@@ -90,10 +98,10 @@ class AudiometricToneGenerator(private val sampleRate: Int = 44100) {
                     .build(),
                 AudioFormat.Builder()
                     .setSampleRate(sampleRate)
-                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                    .setEncoding(AudioFormat.ENCODING_PCM_FLOAT)
                     .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
                     .build(),
-                numSamples * 4,
+                numSamples * 8,
                 AudioTrack.MODE_STATIC,
                 AudioManager.AUDIO_SESSION_ID_GENERATE
             )
@@ -110,9 +118,20 @@ class AudiometricToneGenerator(private val sampleRate: Int = 44100) {
             Log.w("AudiometricToneGen", "AudioTrack reset skipped: ${e.message}")
         }
 
-        audioTrack?.write(stereoBuffer, 0, stereoBuffer.size)
+        audioTrack?.write(stereoBuffer, 0, stereoBuffer.size, AudioTrack.WRITE_BLOCKING)
         audioTrack?.setLoopPoints(0, numSamples, if (loop) -1 else 0)
+        audioTrack?.setVolume(if (bakeVolume) 1.0f else volume)
         audioTrack?.play()
+    }
+
+    /**
+     * Changes the playback level of the currently looping tone without
+     * touching the waveform — no stop/flush, hence no click transients.
+     * Only meaningful after play(..., bakeVolume = false).
+     */
+    fun setVolumeDbfs(dbfs: Float) {
+        val v = 10.0.pow(dbfs / 20.0).toFloat().coerceIn(0.0f, 1.0f)
+        try { audioTrack?.setVolume(v) } catch (e: Exception) { /* no-op */ }
     }
 
     fun pause() {

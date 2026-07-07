@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -38,9 +39,14 @@ import com.wcy.hark.ui.viewmodel.AudioSourceMode
 @Composable
 fun HarkEqualizerScreen(
     viewModel: EqViewModel,
+    isExperimentMode: Boolean = false,
     onBack: () -> Unit
 ) {
-    val centerFrequencies = viewModel.centerFrequencies16
+    // 使用者模式固定 8 段（對齊聽力檢查頻率）；實驗模式可切 8/16 段。
+    // 底層儲存與 DSP 永遠是 16 段，8 段只是檢視層。
+    var use16Bands by rememberSaveable { mutableStateOf(false) }
+    val show16 = isExperimentMode && use16Bands
+    val centerFrequencies = if (show16) viewModel.centerFrequencies16 else viewModel.centerFrequencies8
     val currentEar by viewModel.currentEarTab
     
     // Choose active band gains list according to current selection
@@ -79,17 +85,23 @@ fun HarkEqualizerScreen(
     val previewBaseDbfs = -35f
     fun startBandPreview(bandIndex: Int, freq: Int, gainDb: Float) {
         val level = (previewBaseDbfs + kotlin.math.round(gainDb)).coerceAtMost(0f)
-        if (previewingBand != bandIndex || level != previewingLevel) {
+        if (previewingBand != bandIndex) {
+            // 換頻段才重建波形；音量變化只用 setVolume（波形不中斷 → 無爆音）
             previewingBand = bandIndex
             previewingLevel = level
-            toneGen.play(freq, level, previewEar, pulsed = true, durationSec = 1.0f, loop = true)
+            toneGen.play(freq, level, previewEar, pulsed = true, durationSec = 1.0f, loop = true,
+                         pulseOnMs = 150.0f, pulseOffMs = 100.0f, bakeVolume = false)
+        } else if (level != previewingLevel) {
+            previewingLevel = level
+            toneGen.setVolumeDbfs(level)
         }
     }
     fun endBandPreview(freq: Int, gainDb: Float) {
         previewingBand = -1
         previewingLevel = Float.NaN
         toneGen.play(freq, (previewBaseDbfs + gainDb).coerceAtMost(0f), previewEar,
-                     pulsed = false, durationSec = 0.8f)
+                     pulsed = true, durationSec = 0.5f,
+                     pulseOnMs = 150.0f, pulseOffMs = 100.0f)
     }
 
     // Gradient background matching Hark theme
@@ -219,13 +231,19 @@ fun HarkEqualizerScreen(
                         .fillMaxSize()
                         .padding(12.dp)
                 ) {
+                    // 曲線永遠畫 16 段（真實 DSP 響應）；8 段模式下拖曳曲線
+                    // 會連動該點所屬 8 段群組的所有子頻段。
                     EqualizerCurveDisplay(
                         modifier = Modifier.fillMaxSize(),
                         bandGains = activeBandGains,
-                        centerFrequencies = centerFrequencies,
+                        centerFrequencies = viewModel.centerFrequencies16,
                         lineColor = themeColorAnimated,
                         onDragBand = { index, gain ->
-                            viewModel.updateBandGain(currentEar, index, gain)
+                            if (show16) {
+                                viewModel.updateBandGain(currentEar, index, gain)
+                            } else {
+                                viewModel.updateBand8Gain(currentEar, viewModel.band16ToGroup8[index], gain)
+                            }
                         }
                     )
                 }
@@ -240,30 +258,76 @@ fun HarkEqualizerScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "頻段增益微調 (dB)",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                )
-                Button(
-                    onClick = {
-                        viewModel.applyDslV5Fitting()
-                        Toast.makeText(context, "已成功套用聽力圖補償 (DSL v5)", Toast.LENGTH_SHORT).show()
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    ),
-                    shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                    modifier = Modifier.height(34.dp)
-                ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "套用聽力圖 (DSL v5)",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                        text = "頻段增益微調 (dB)",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
                     )
+                    if (isExperimentMode) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        FilterChip(
+                            selected = !use16Bands,
+                            onClick = { use16Bands = false },
+                            label = { Text("8段", style = MaterialTheme.typography.labelSmall) },
+                            modifier = Modifier.height(28.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        FilterChip(
+                            selected = use16Bands,
+                            onClick = { use16Bands = true },
+                            label = { Text("16段", style = MaterialTheme.typography.labelSmall) },
+                            modifier = Modifier.height(28.dp)
+                        )
+                    }
+                }
+                // 使用者模式：一鍵套用 DSL v5；實驗模式：下拉選 DSL v5 / NAL-R
+                var fittingMenuExpanded by remember { mutableStateOf(false) }
+                fun applyFitting(method: com.wcy.hark.audio.fitting.Prescriptions.Method) {
+                    viewModel.applyFitting(method) { msg ->
+                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                    }
+                }
+                Box {
+                    Button(
+                        onClick = {
+                            if (isExperimentMode) fittingMenuExpanded = true
+                            else applyFitting(com.wcy.hark.audio.fitting.Prescriptions.Method.DSL_V5)
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        ),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.height(34.dp)
+                    ) {
+                        Text(
+                            text = if (isExperimentMode) "套用聽力圖 ▾" else "套用聽力圖 (DSL v5)",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = fittingMenuExpanded,
+                        onDismissRequest = { fittingMenuExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("DSL v5 處方") },
+                            onClick = {
+                                fittingMenuExpanded = false
+                                applyFitting(com.wcy.hark.audio.fitting.Prescriptions.Method.DSL_V5)
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("NAL-R 處方") },
+                            onClick = {
+                                fittingMenuExpanded = false
+                                applyFitting(com.wcy.hark.audio.fitting.Prescriptions.Method.NAL_R)
+                            }
+                        )
+                    }
                 }
             }
 
@@ -275,8 +339,14 @@ fun HarkEqualizerScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 centerFrequencies.forEachIndexed { index, freq ->
-                    val gainVal = activeBandGains[index].value
-                    
+                    // 16 段模式直接一對一；8 段模式顯示該組子頻段平均增益
+                    val gainVal = if (show16) activeBandGains[index].value
+                                  else viewModel.band8Gain(activeBandGains, index)
+                    fun setGain(newVal: Float) {
+                        if (show16) viewModel.updateBandGain(currentEar, index, newVal)
+                        else viewModel.updateBand8Gain(currentEar, index, newVal)
+                    }
+
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),
@@ -307,7 +377,7 @@ fun HarkEqualizerScreen(
                             IconButton(
                                 onClick = {
                                     val newVal = (gainVal - 0.5f).coerceIn(EqViewModel.MIN_GAIN_DB, EqViewModel.MAX_GAIN_DB)
-                                    viewModel.updateBandGain(currentEar, index, newVal)
+                                    setGain(newVal)
                                     endBandPreview(freq, newVal)
                                 },
                                 modifier = Modifier.size(30.dp)
@@ -324,10 +394,12 @@ fun HarkEqualizerScreen(
                                 value = gainVal,
                                 onValueChange = { newVal ->
                                     startBandPreview(index, freq, newVal)
-                                    viewModel.updateBandGain(currentEar, index, newVal)
+                                    setGain(newVal)
                                 },
                                 onValueChangeFinished = {
-                                    endBandPreview(freq, activeBandGains[index].value)
+                                    val finalVal = if (show16) activeBandGains[index].value
+                                                   else viewModel.band8Gain(activeBandGains, index)
+                                    endBandPreview(freq, finalVal)
                                 },
                                 valueRange = EqViewModel.MIN_GAIN_DB..EqViewModel.MAX_GAIN_DB,
                                 modifier = Modifier
@@ -344,7 +416,7 @@ fun HarkEqualizerScreen(
                             IconButton(
                                 onClick = {
                                     val newVal = (gainVal + 0.5f).coerceIn(EqViewModel.MIN_GAIN_DB, EqViewModel.MAX_GAIN_DB)
-                                    viewModel.updateBandGain(currentEar, index, newVal)
+                                    setGain(newVal)
                                     endBandPreview(freq, newVal)
                                 },
                                 modifier = Modifier.size(30.dp)

@@ -24,13 +24,14 @@
 | 文件 | 內容 |
 |------|------|
 | [SSN_GENERATION.md](SSN_GENERATION.md) | Speech-shaped noise 產生方法（LTAS 塑形）、SNR 混音公式、可重現腳本、論文方法段落建議 |
+| [FITTING_PRESCRIPTIONS.md](FITTING_PRESCRIPTIONS.md) | 聽力圖處方增益計算（DSL v5 by Hand 成人近似 / NAL-R）：公式、查表、內插、計算示例與引用文獻 |
 
 ## 校正與實驗（程式內對應）
 
 - 逐頻率耳機校正表：`app/src/main/java/com/wcy/hark/data/experiment/EarphoneCalibrationRepository.kt`
   （schema v2：`refDbfs` + `measuredDbSpl`，RETSPL 採 ISO 389-1；種子檔 `app/src/main/assets/earphone_calibration.json`）
 - 校準操作畫面：`ui/screen/EarphoneCalibrationScreen.kt`（實驗模式）
-- 學術實驗面板（校正音 / WDRC I/O 掃頻 / Tone Burst / OSPL90 / 雙麥錄音）：
+- 聲學實驗面板（校正音 / WDRC I/O 掃頻 / Tone Burst / OSPL90 / 雙麥錄音）：
   `ui/screen/CalibrationTestScreen.kt` + `ui/viewmodel/ExperimentViewModel.kt`
 
 ## 其他

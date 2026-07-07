@@ -191,4 +191,12 @@ class EarphoneCalibrationRepository(private val context: Context) {
         val dbSpl = measured + (signalDbfs - cal.refDbfs)
         return dbSpl - retspl
     }
+
+    /** 同上，但用預載的校正表（避免音訊互動路徑上重複讀 JSON）。 */
+    fun estimateOutputDbhlFromTable(table: Map<Int, FreqCalibration>, freqHz: Int, signalDbfs: Float): Float? {
+        val cal = table[freqHz] ?: return null
+        val measured = cal.measuredDbSpl ?: return null
+        val retspl = RETSPL[freqHz] ?: return null
+        return measured + (signalDbfs - cal.refDbfs) - retspl
+    }
 }

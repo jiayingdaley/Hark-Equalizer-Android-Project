@@ -77,6 +77,12 @@
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
 
         <activity
+            android:name=".audiometry.SelfAdjustPtaActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+
+        <activity
             android:name=".audiometry.SelectEarActivity"
             android:exported="false"
             android:screenOrientation="portrait"

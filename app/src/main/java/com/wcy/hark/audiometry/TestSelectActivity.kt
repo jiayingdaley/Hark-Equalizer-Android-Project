@@ -48,6 +48,14 @@ class TestSelectActivity : ComponentActivity() {
             }
         }
 
+        // 快速純音（自調式 Method of Adjustment）
+        findViewById<Button>(R.id.button_self_adjust_pta).apply {
+            setTextColor(Color.WHITE)
+            setOnClickListener {
+                startActivity(Intent(this@TestSelectActivity, SelfAdjustPtaActivity::class.java))
+            }
+        }
+
         // 噪音下語詞測驗 (SSN speech-in-noise)
         findViewById<Button>(R.id.button_ssn_test).apply {
             setTextColor(Color.WHITE)

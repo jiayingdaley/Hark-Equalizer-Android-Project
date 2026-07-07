@@ -10,11 +10,11 @@ Hark 是一款專為**輕中度聽損者**設計的 Android 輔助聽力應用�
 
 **雙介面模式**（主畫面右上角切換，DataStore 持久化）：
 
-| | 使用者模式（亮色、簡潔） | 實驗模式（研究人員） |
-|---|---|---|
-| 輔助聽力 | 環境輔聽（麥克風）/ 手機影音（媒體 DSP）、16 段 EQ（拖曳附頻率預覽音） | 同左 + DSP 調試面板（模組 bypass、參數微調） |
-| 聽力檢測 | 純音聽閾（Hughson-Westlake）、中文語詞辨識、噪音下語詞（SSN）、歷史紀錄（可刪除，含警示） | 同左 + 聽力圖 dB FS 顯示切換、自訂 SNR 條件 |
-| 校正 | 沿用已存的耳機校正表 | 逐頻率耳機校準（dBFS→dBSPL→RETSPL→dB HL）、學術實驗面板（校正音 / WDRC I/O 掃頻 / Tone Burst / OSPL90 / 雙麥錄音） |
+| | 使用者模式（亮色、簡潔） | 實驗模式（研究人員）                                                                              |
+|---|---|-----------------------------------------------------------------------------------------|
+| 輔助聽力 | 環境輔聽（麥克風）/ 手機影音（媒體 DSP）、16 段 EQ（拖曳附頻率預覽音） | 同左 + DSP 調試面板（模組 bypass、參數微調）                                                           |
+| 聽力檢測 | 純音聽閾（Hughson-Westlake）、中文語詞辨識、噪音下語詞（SSN）、歷史紀錄（可刪除，含警示） | 同左 + 聽力圖 dB FS 顯示切換、自訂 SNR 條件                                                           |
+| 校正 | 沿用已存的耳機校正表 | 逐頻率耳機校準（dBFS→dBSPL→RETSPL→dB HL）、聲學實驗面板（校正音 / WDRC I/O 掃頻 / Tone Burst / OSPL90 / 雙麥錄音） |
 
 圖表遵循聽力學慣例：右耳 ○ 紅、左耳 × 藍；聽力圖為對數頻率軸（125 Hz–8 kHz）
 + 反向 dB HL 軸；SSN 結果為 Psychometric Function（辨識率 % vs SNR，內插
@@ -164,7 +164,7 @@ Hark/
 │   │   │       │   ├── HarkMainScreen.kt        # 主畫面（雙模式、實驗工具區）
 │   │   │       │   ├── HarkEqualizerScreen.kt   # 16 段 EQ（右紅左藍、頻率預覽音）
 │   │   │       │   ├── EarphoneCalibrationScreen.kt  # 逐頻率耳機校準（實驗模式）
-│   │   │       │   ├── CalibrationTestScreen.kt # 學術實驗面板（六項量測）
+│   │   │       │   ├── CalibrationTestScreen.kt # 聲學實驗面板（六項量測）
 │   │   │       │   ├── MainScreen.kt / DspTestScreen.kt  # 實驗調試面板
 │   │   │       ├── viewmodel/                   # EqViewModel、ExperimentViewModel
 │   │   │       ├── components/                  # EQ 曲線 Canvas、系統音量滑桿

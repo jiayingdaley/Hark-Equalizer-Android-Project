@@ -659,7 +659,7 @@ fun TestHistoryScreen(
 
                     // ── 繪製聽力圖走勢 Card（可切換 dB HL / dB FS）──
                     Spacer(modifier = Modifier.height(8.dp))
-                    var showDbfs by remember { mutableStateOf(false) }
+                    var showDbfs by remember { mutableStateOf(true) }  // 預設 dB FS（聽力圖式）
                     // dB HL → dB FS 換算：優先用目前耳機的實測校正表，未校準時
                     // 退回播音同款相對映射（100 dB HL = 0 dBFS）
                     val dbfsConverter = remember {
@@ -976,7 +976,7 @@ fun PureToneFileCard(item: PureToneCsvItem, onDelete: (() -> Unit)? = null, onCl
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = "純音聽閾測試 (${item.ear})",
+                            text = "純音聽閾測試 ${item.ear}",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold
                         )
