@@ -26,7 +26,22 @@ class SsnAudioMixer(private val context: Context) {
         private const val TAG = "SsnAudioMixer"
         const val SAMPLE_RATE = 16000
         private const val PAD_MS = 500
+
+        /**
+         * 固定呈現餘裕（presentation headroom），對「所有」trial 一律套用，
+         * 因此各 trial 的絕對呈現級別彼此一致、SNR 不受影響，且大幅降低
+         * 混音削波（進而觸發逐題正規化）的機率。
+         */
+        const val PRESENTATION_GAIN_DB = -6.0f
     }
+
+    /**
+     * @param durationMs 播放總長（毫秒）；-1 表示失敗
+     * @param normGainDb 削波防護的額外正規化增益（dB，≤0）；0 表示未觸發。
+     *                   此值必須寫入測試紀錄——它代表該 trial 的絕對呈現級別
+     *                   相對其他 trial 額外降低了多少。
+     */
+    data class MixResult(val durationMs: Long, val normGainDb: Float)
 
     private var noisePcm: ShortArray? = null
     private var audioTrack: AudioTrack? = null
@@ -73,9 +88,8 @@ class SsnAudioMixer(private val context: Context) {
 
     /**
      * Mixes and plays one word at the given SNR (dB).
-     * @return total playback duration in ms, or -1 on failure.
      */
-    fun playWordInNoise(wordResId: Int, noiseResId: Int, snrDb: Float): Long {
+    fun playWordInNoise(wordResId: Int, noiseResId: Int, snrDb: Float): MixResult {
         return try {
             val speech = readWavResource(wordResId)
             val noise = ensureNoiseLoaded(noiseResId)
@@ -91,22 +105,31 @@ class SsnAudioMixer(private val context: Context) {
             // Scale noise so speechRms / (noiseRms*g) = 10^(snr/20)
             val noiseGain = (speechRms / (noiseRms * 10.0.pow(snrDb / 20.0))).toFloat()
 
-            val mix = ShortArray(totalLen)
-            var peak = 0
+            // 固定呈現餘裕（全 trial 一致，不影響 SNR 也不影響 trial 間可比性）
+            val presentGain = 10.0.pow(PRESENTATION_GAIN_DB / 20.0).toFloat()
+
+            // 先以浮點混音求峰值，再一次性量化，避免「先削波再縮小」造成失真
+            val mixF = FloatArray(totalLen)
+            var peak = 0f
             for (i in 0 until totalLen) {
                 val s = if (i in padSamples until padSamples + speech.size)
-                    speech[i - padSamples].toInt() else 0
-                val n = (noise[start + i] * noiseGain).toInt()
-                var v = s + n
-                if (v > peak) peak = v
-                if (-v > peak) peak = -v
-                mix[i] = v.coerceIn(-32768, 32767).toShort()
+                    speech[i - padSamples].toFloat() else 0f
+                val v = (s + noise[start + i] * noiseGain) * presentGain
+                mixF[i] = v
+                val a = if (v >= 0f) v else -v
+                if (a > peak) peak = a
             }
-            // Soft normalization if the sum clips
-            if (peak > 32767) {
+            // 削波防護：仍超出 16-bit 範圍時整段等比例縮小，並回報衰減量
+            var normGainDb = 0f
+            if (peak > 32767f) {
                 val g = 32000f / peak
-                for (i in mix.indices) mix[i] = (mix[i] * g).toInt().toShort()
-                Log.w(TAG, "Mix clipped (peak=$peak); normalized by ${20 * log10(g.toDouble())} dB")
+                for (i in mixF.indices) mixF[i] *= g
+                normGainDb = (20.0 * log10(g.toDouble())).toFloat()
+                Log.w(TAG, "Mix clipped (peak=$peak); normalized by $normGainDb dB — recorded in trial data")
+            }
+            val mix = ShortArray(totalLen)
+            for (i in 0 until totalLen) {
+                mix[i] = mixF[i].toInt().coerceIn(-32768, 32767).toShort()
             }
 
             stop()
@@ -127,10 +150,10 @@ class SsnAudioMixer(private val context: Context) {
             audioTrack?.write(mix, 0, mix.size)
             audioTrack?.play()
 
-            totalLen * 1000L / SAMPLE_RATE
+            MixResult(totalLen * 1000L / SAMPLE_RATE, normGainDb)
         } catch (e: Exception) {
             Log.e(TAG, "playWordInNoise failed: ${e.message}", e)
-            -1L
+            MixResult(-1L, 0f)
         }
     }
 

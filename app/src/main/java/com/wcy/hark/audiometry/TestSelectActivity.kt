@@ -52,7 +52,7 @@ class TestSelectActivity : ComponentActivity() {
         findViewById<Button>(R.id.button_ssn_test).apply {
             setTextColor(Color.WHITE)
             setOnClickListener {
-                startActivity(Intent(this@TestSelectActivity, SSNTestActivity::class.java))
+                startActivity(Intent(this@TestSelectActivity, SSNExplanationActivity::class.java))
             }
         }
 

@@ -71,6 +71,9 @@ object SRTResultContract {
         const val COLUMN_NAME_CORRECT_WORD = "correct_word"
         const val COLUMN_NAME_USER_ANSWER = "user_answer"
         const val COLUMN_NAME_WAS_CORRECT = "was_correct"
+        // 削波防護正規化增益（dB，≤0；0 = 未觸發）。非 0 代表該 trial 的
+        // 絕對呈現級別相對其他 trial 額外降低，學術報告必須揭露。
+        const val COLUMN_NAME_NORM_GAIN_DB = "norm_gain_db"
     }
 
     const val SQL_CREATE_SSN_SESSIONS_TABLE =
@@ -92,6 +95,7 @@ object SRTResultContract {
                 SSNRecordEntry.COLUMN_NAME_CORRECT_WORD + " TEXT," +
                 SSNRecordEntry.COLUMN_NAME_USER_ANSWER + " TEXT," +
                 SSNRecordEntry.COLUMN_NAME_WAS_CORRECT + " INTEGER," +
+                SSNRecordEntry.COLUMN_NAME_NORM_GAIN_DB + " REAL DEFAULT 0," +
                 "FOREIGN KEY(" + SSNRecordEntry.COLUMN_NAME_SESSION_ID_FK + ") REFERENCES " +
                 SSNSessionEntry.TABLE_NAME + "(" + SSNSessionEntry.COLUMN_NAME_SESSION_ID + "))"
 

@@ -27,7 +27,7 @@ import kotlinx.coroutines.launch
  * series of SNR conditions. Per-SNR percent-correct is plotted as a
  * psychometric function (score % vs SNR) in SSNTestResultActivity.
  */
-class SSNTestActivity : AppCompatActivity(), DialogNavCallback {
+class SSNTestActivity : AppCompatActivity() {
 
     private lateinit var textViewQuestionCount: TextView
     private lateinit var textViewSnr: TextView
@@ -54,7 +54,8 @@ class SSNTestActivity : AppCompatActivity(), DialogNavCallback {
     private var sessionId = System.currentTimeMillis()
     private var isTestOver = false
     private var isTestStarted = false
-    private var volumeConfirmed = false   // 音量對話框按 OK（而非 X）離開
+    private var currentNormGainDb = 0f   // 本題削波防護正規化增益（dB，≤0）
+    private var applyDsp = true          // 是否對測驗音訊套用聽力補償（DSP EQ）
     private val handler = Handler(Looper.getMainLooper())
 
     companion object { private const val TAG = "SSNTestActivity" }
@@ -96,26 +97,30 @@ class SSNTestActivity : AppCompatActivity(), DialogNavCallback {
         buttonNotSure.setOnClickListener { processAnswer("not_sure") }
         buttonEndEarly.setOnClickListener { confirmEndEarly() }
 
-        // 音量對話框按「X」（未按 OK）關閉時，回到說明頁
-        supportFragmentManager.registerFragmentLifecycleCallbacks(
-            object : androidx.fragment.app.FragmentManager.FragmentLifecycleCallbacks() {
-                override fun onFragmentDestroyed(
-                    fm: androidx.fragment.app.FragmentManager,
-                    f: androidx.fragment.app.Fragment
-                ) {
-                    if (f is VolumeAdjustmentDialogFragment && !volumeConfirmed &&
-                        !isTestStarted && !isTestOver && !isFinishing) {
-                        showInstructionsDialog()
-                    }
-                }
-            }, false
-        )
+        // 設置全部來自 SSNExplanationActivity（說明與設置頁）
+        applyDsp = intent.getBooleanExtra("EXTRA_APPLY_DSP", true)
+        subjectName = intent.getStringExtra("EXTRA_SUBJECT") ?: "未填寫"
+        intent.getFloatArrayExtra("EXTRA_SNRS")?.toList()?.takeIf { it.isNotEmpty() }?.let {
+            snrConditions = it
+        }
+        questionsPerSnr = intent.getIntExtra("EXTRA_QUESTIONS_PER_SNR", questionsPerSnr)
 
         val repository = (application as HarkApplication).eqSettingsRepository
         lifecycleScope.launch {
             isExperimentMode = repository.getExperimentModeFlow().first()
-            val prefill = repository.getLastSubjectNameFlow().first()
-            showSetupDialog(prefill)
+            startTest()
+        }
+    }
+
+    /** 與 SRT 測驗一致的 DSP 狀態標示。 */
+    private fun updateDspStatusBadge() {
+        val badge = findViewById<TextView>(R.id.textViewSsnDspStatus)
+        if (applyDsp) {
+            badge.text = "● DSP 聽力補償 已套用"
+            badge.setTextColor(android.graphics.Color.parseColor("#2E7D32"))
+        } else {
+            badge.text = "○ DSP 聽力補償 未套用"
+            badge.setTextColor(android.graphics.Color.parseColor("#757575"))
         }
     }
 
@@ -131,105 +136,14 @@ class SSNTestActivity : AppCompatActivity(), DialogNavCallback {
 
     private fun currentQuestion(): WordQuestion? = trials.getOrNull(trialIndex)?.second
 
-    private fun showSetupDialog(prefillName: String) {
-        val density = resources.displayMetrics.density
-        val layout = android.widget.LinearLayout(this).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
-            setPadding((24 * density).toInt(), (16 * density).toInt(), (24 * density).toInt(), (8 * density).toInt())
+    /** 停止播放前先解除本題 AudioTrack session 的 DSP 掛載。 */
+    private fun stopPlayback() {
+        try {
+            com.wcy.hark.audio.manager.SystemDspManager.detachFromSession(mixer.audioSessionId)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error detaching DSP: ${e.message}")
         }
-        val nameInput = android.widget.EditText(this).apply {
-            hint = "使用者姓名（可不填）"
-            setSingleLine(true)
-            setText(prefillName)
-        }
-        layout.addView(nameInput)
-
-        var snrInput: android.widget.EditText? = null
-        var countInput: android.widget.EditText? = null
-        if (isExperimentMode) {
-            layout.addView(android.widget.TextView(this).apply {
-                text = "SNR 條件 SNR conditions (dB, comma-separated):"
-                textSize = 13f
-            })
-            snrInput = android.widget.EditText(this).apply {
-                setText(snrConditions.joinToString(",") { if (it == it.toInt().toFloat()) "${it.toInt()}" else "$it" })
-                setSingleLine(true)
-            }
-            layout.addView(snrInput)
-            layout.addView(android.widget.TextView(this).apply {
-                text = "每個 SNR 題數 Questions per SNR:"
-                textSize = 13f
-            })
-            countInput = android.widget.EditText(this).apply {
-                setText(questionsPerSnr.toString())
-                inputType = android.text.InputType.TYPE_CLASS_NUMBER
-                setSingleLine(true)
-            }
-            layout.addView(countInput)
-        }
-
-        AlertDialog.Builder(this)
-            .setTitle("噪音下語詞測驗設置")
-            .setMessage("將在不同訊噪比 (SNR) 的語音噪音下播放語詞，請選出聽到的詞。")
-            .setView(layout)
-            .setPositiveButton("開始測驗") { _, _ ->
-                val entered = nameInput.text.toString().trim()
-                subjectName = if (entered.isEmpty()) "未填寫" else entered
-                if (entered.isNotEmpty()) {
-                    lifecycleScope.launch {
-                        (application as HarkApplication).eqSettingsRepository.saveLastSubjectName(entered)
-                    }
-                }
-                snrInput?.text?.toString()?.let { txt ->
-                    val parsed = txt.split(",").mapNotNull { it.trim().toFloatOrNull() }
-                    if (parsed.isNotEmpty()) snrConditions = parsed.distinct().sortedDescending()
-                }
-                countInput?.text?.toString()?.toIntOrNull()?.let { if (it in 1..20) questionsPerSnr = it }
-                showVolumeAdjustDialog()
-            }
-            .setNegativeButton("取消") { _, _ -> finish() }
-            .setCancelable(false)
-            .show()
-    }
-
-    /**
-     * 舒適音量調整：沿用語詞測試（SRT）相同的 VolumeAdjustmentDialogFragment
-     * （循環播放示範語音 + 系統音量拉桿）。SNR 由數位混音精確控制，與播放音量無關。
-     * 按 OK → 說明頁；按 X → 也回到說明頁（透過 fragment 銷毀偵測）。
-     */
-    private fun showVolumeAdjustDialog() {
-        volumeConfirmed = false
-        VolumeAdjustmentDialogFragment().show(supportFragmentManager, VolumeAdjustmentDialogFragment.TAG)
-    }
-
-    /** 測驗說明頁（SSN 專用）。 */
-    private fun showInstructionsDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("噪音下語詞測驗說明")
-            .setMessage(
-                "1. 每一題會先聽到背景噪音，接著在噪音中播放一個中文語詞。\n" +
-                "2. 請從四個選項中選出您聽到的詞；聽不清楚可按「不確定」。\n" +
-                "3. 測驗過程中噪音大小會改變，這是正常的測驗設計。\n" +
-                "4. 測驗開始後音量將被鎖定，無法再以音量鍵調整。"
-            )
-            .setPositiveButton("開始測驗") { _, _ -> startTest() }
-            .setNegativeButton("重新調整音量") { _, _ -> showVolumeAdjustDialog() }
-            .setCancelable(false)
-            .show()
-    }
-
-    // DialogNavCallback：音量對話框按「OK」→ 顯示說明頁
-    override fun onVolumeAdjustedShowInstructions() {
-        volumeConfirmed = true
-        showInstructionsDialog()
-    }
-
-    override fun onInstructionsDismissedShowVolume() {
-        showVolumeAdjustDialog()
-    }
-
-    override fun onStartSrtTestFromInstructions() {
-        startTest()
+        mixer.stop()
     }
 
     private fun startTest() {
@@ -249,6 +163,7 @@ class SSNTestActivity : AppCompatActivity(), DialogNavCallback {
         trialList.shuffle()
         trials = trialList
         isTestStarted = true
+        updateDspStatusBadge()
         results.clear()
         snrConditions.forEach { results[it] = intArrayOf(0, 0) }
         trialIndex = 0
@@ -278,9 +193,20 @@ class SSNTestActivity : AppCompatActivity(), DialogNavCallback {
                 enableButtons(true)
                 return@postDelayed
             }
-            val durMs = mixer.playWordInNoise(resId, R.raw.ssn_noise, snr)
-            if (durMs > 0) {
-                handler.postDelayed({ enableButtons(true) }, durMs / 2) // enable mid-playback
+            val result = mixer.playWordInNoise(resId, R.raw.ssn_noise, snr)
+            currentNormGainDb = result.normGainDb
+            // 依設置對本題的 AudioTrack session 套用聽力補償（與 SRT 相同機制）
+            if (applyDsp && result.durationMs > 0) {
+                try {
+                    com.wcy.hark.audio.manager.SystemDspManager.attachToSession(
+                        mixer.audioSessionId, forceEnabled = true
+                    )
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to attach DSP: ${e.message}")
+                }
+            }
+            if (result.durationMs > 0) {
+                handler.postDelayed({ enableButtons(true) }, result.durationMs / 2) // enable mid-playback
             } else {
                 enableButtons(true)
             }
@@ -289,7 +215,7 @@ class SSNTestActivity : AppCompatActivity(), DialogNavCallback {
 
     private fun processAnswer(answer: String) {
         val (snr, q) = trials.getOrNull(trialIndex) ?: return
-        mixer.stop()
+        stopPlayback()
         val correct = answer == q.correctWord
         results[snr]!!.let { r -> if (correct) r[0]++; r[1]++ }
         records.add(ContentValues().apply {
@@ -299,7 +225,9 @@ class SSNTestActivity : AppCompatActivity(), DialogNavCallback {
             put(SRTResultContract.SSNRecordEntry.COLUMN_NAME_CORRECT_WORD, q.correctWord)
             put(SRTResultContract.SSNRecordEntry.COLUMN_NAME_USER_ANSWER, answer)
             put(SRTResultContract.SSNRecordEntry.COLUMN_NAME_WAS_CORRECT, if (correct) 1 else 0)
+            put(SRTResultContract.SSNRecordEntry.COLUMN_NAME_NORM_GAIN_DB, currentNormGainDb)
         })
+        currentNormGainDb = 0f
         trialIndex++
         nextTrial()
     }
@@ -340,7 +268,7 @@ class SSNTestActivity : AppCompatActivity(), DialogNavCallback {
         if (isTestOver) return
         isTestOver = true
         handler.removeCallbacksAndMessages(null)
-        mixer.stop()
+        stopPlayback()
 
         val points = scoreBySnr()
         val srt50 = computeSrt50(points)
@@ -368,12 +296,21 @@ class SSNTestActivity : AppCompatActivity(), DialogNavCallback {
             db.endTransaction()
         }
 
+        // 削波正規化統計（學術揭露：受影響題數與最大衰減量）
+        val normValues = records.mapNotNull {
+            it.getAsFloat(SRTResultContract.SSNRecordEntry.COLUMN_NAME_NORM_GAIN_DB)
+        }
+        val attenuatedCount = normValues.count { it < 0f }
+        val maxAttenuationDb = normValues.minOrNull() ?: 0f
+
         // Result screen
         val intent = Intent(this, SSNTestResultActivity::class.java).apply {
             putExtra("EXTRA_SNRS", points.map { it.first }.toFloatArray())
             putExtra("EXTRA_SCORES", points.map { it.second }.toFloatArray())
             putExtra("EXTRA_SRT50", srt50 ?: Float.NaN)
             putExtra("EXTRA_SUBJECT", subjectName)
+            putExtra("EXTRA_ATTENUATED_COUNT", attenuatedCount)
+            putExtra("EXTRA_MAX_ATTENUATION_DB", maxAttenuationDb)
         }
         startActivity(intent)
         finish()
@@ -383,6 +320,9 @@ class SSNTestActivity : AppCompatActivity(), DialogNavCallback {
 
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
+        try {
+            com.wcy.hark.audio.manager.SystemDspManager.detachFromSession(mixer.audioSessionId)
+        } catch (e: Exception) { /* best effort */ }
         mixer.release()
         try {
             com.wcy.hark.audio.bridge.HarkAudioBridge.setBypassMode(false)

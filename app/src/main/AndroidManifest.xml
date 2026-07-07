@@ -119,6 +119,12 @@
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
 
         <activity
+            android:name=".audiometry.SSNExplanationActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+
+        <activity
             android:name=".audiometry.SSNTestActivity"
             android:exported="false"
             android:screenOrientation="portrait"

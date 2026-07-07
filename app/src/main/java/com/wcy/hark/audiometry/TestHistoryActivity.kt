@@ -79,6 +79,14 @@ data class ParsedPureToneResult(
     val hasReliabilityWarning: Boolean
 )
 
+data class SsnRecordItem(
+    val questionNumber: Int,
+    val snrDb: Float,
+    val correctWord: String,
+    val userAnswer: String,
+    val wasCorrect: Boolean
+)
+
 data class SsnSessionItem(
     val sessionId: Long,
     val timestamp: Long,
@@ -148,6 +156,8 @@ fun TestHistoryScreen(
     var activePureToneItem by remember { mutableStateOf<PureToneCsvItem?>(null) }
     var activeSsnSession by remember { mutableStateOf<SsnSessionItem?>(null) }
     var ssnPointsForActiveSession by remember { mutableStateOf(listOf<Pair<Float, Float>>()) }
+    var ssnAttenuationForActiveSession by remember { mutableStateOf(0 to 0f) } // (題數, 最大衰減 dB)
+    var ssnRecordsForActiveSession by remember { mutableStateOf(listOf<SsnRecordItem>()) }
 
     // 刪除確認狀態（實驗資料珍貴：一律二次確認）
     var pendingDelete by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -245,6 +255,8 @@ fun TestHistoryScreen(
                                 ) {
                                     // 重算各 SNR 分數並以彈窗顯示曲線圖
                                     ssnPointsForActiveSession = loadSsnPoints(dbHelper, session.sessionId)
+                                    ssnAttenuationForActiveSession = loadSsnAttenuation(dbHelper, session.sessionId)
+                                    ssnRecordsForActiveSession = loadSsnRecords(dbHelper, session.sessionId)
                                     activeSsnSession = session
                                 }
                             }
@@ -442,6 +454,16 @@ fun TestHistoryScreen(
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(vertical = 4.dp)
                     )
+                    val (attCount, attMaxDb) = ssnAttenuationForActiveSession
+                    if (attCount > 0) {
+                        Text(
+                            text = "⚠️ 削波防護：$attCount 題觸發輸出正規化（最大額外衰減 " +
+                                   "${String.format(Locale.getDefault(), "%.1f", attMaxDb)} dB；SNR 不受影響）",
+                            fontSize = 12.sp,
+                            color = Color(0xFFE65100),
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("Psychometric Function：", fontWeight = FontWeight.Bold)
@@ -495,6 +517,42 @@ fun TestHistoryScreen(
                                     Text(if (snr == snr.toInt().toFloat()) "${snr.toInt()}" else "$snr", modifier = Modifier.weight(1f))
                                     Text(String.format(Locale.getDefault(), "%.0f%%", score),
                                          fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
+                                }
+                            }
+                        }
+                    }
+
+                    // 答題明細（完整展開，跟整個對話框一起捲動）
+                    if (ssnRecordsForActiveSession.isNotEmpty()) {
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+                        Text("答題明細：", fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            ssnRecordsForActiveSession.forEach { record ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Q${record.questionNumber}. [ ${record.correctWord} ] @ ${if (record.snrDb == record.snrDb.toInt().toFloat()) "${record.snrDb.toInt()}" else "${record.snrDb}"} dB",
+                                        fontSize = 14.sp,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Text(
+                                        text = if (record.userAnswer == "not_sure") "不確定" else record.userAnswer,
+                                        fontSize = 14.sp,
+                                        color = if (record.wasCorrect) Color(0xFF2E7D32) else Color(0xFFC62828),
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(end = 8.dp)
+                                    )
+                                    Text(
+                                        text = if (record.wasCorrect) "✓" else "✗",
+                                        fontSize = 14.sp,
+                                        color = if (record.wasCorrect) Color(0xFF2E7D32) else Color(0xFFC62828),
+                                        fontWeight = FontWeight.ExtraBold
+                                    )
                                 }
                             }
                         }
@@ -1016,6 +1074,72 @@ private fun loadSsnPoints(dbHelper: SRTResultDbHelper, sessionId: Long): List<Pa
         e.printStackTrace()
     }
     return total.map { (snr, n) -> snr to (correct[snr] ?: 0) * 100f / n }.sortedBy { it.first }
+}
+
+/** 讀取一場 SSN 測驗的逐題紀錄（依題號排序）。 */
+private fun loadSsnRecords(dbHelper: SRTResultDbHelper, sessionId: Long): List<SsnRecordItem> {
+    val list = mutableListOf<SsnRecordItem>()
+    try {
+        val db = dbHelper.readableDatabase
+        val cursor = db.query(
+            SRTResultContract.SSNRecordEntry.TABLE_NAME,
+            arrayOf(
+                SRTResultContract.SSNRecordEntry.COLUMN_NAME_QUESTION_NUMBER,
+                SRTResultContract.SSNRecordEntry.COLUMN_NAME_SNR_DB,
+                SRTResultContract.SSNRecordEntry.COLUMN_NAME_CORRECT_WORD,
+                SRTResultContract.SSNRecordEntry.COLUMN_NAME_USER_ANSWER,
+                SRTResultContract.SSNRecordEntry.COLUMN_NAME_WAS_CORRECT
+            ),
+            "${SRTResultContract.SSNRecordEntry.COLUMN_NAME_SESSION_ID_FK} = ?",
+            arrayOf(sessionId.toString()), null, null,
+            "${SRTResultContract.SSNRecordEntry.COLUMN_NAME_QUESTION_NUMBER} ASC"
+        )
+        with(cursor) {
+            while (moveToNext()) {
+                list.add(SsnRecordItem(
+                    questionNumber = getInt(0),
+                    snrDb = getFloat(1),
+                    correctWord = getString(2) ?: "",
+                    userAnswer = getString(3) ?: "",
+                    wasCorrect = getInt(4) == 1
+                ))
+            }
+            close()
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+    return list
+}
+
+/** 削波防護統計：回傳（觸發正規化的題數, 最大額外衰減 dB ≤0）。 */
+private fun loadSsnAttenuation(dbHelper: SRTResultDbHelper, sessionId: Long): Pair<Int, Float> {
+    var count = 0
+    var minDb = 0f
+    try {
+        val db = dbHelper.readableDatabase
+        val cursor = db.query(
+            SRTResultContract.SSNRecordEntry.TABLE_NAME,
+            arrayOf(SRTResultContract.SSNRecordEntry.COLUMN_NAME_NORM_GAIN_DB),
+            "${SRTResultContract.SSNRecordEntry.COLUMN_NAME_SESSION_ID_FK} = ?",
+            arrayOf(sessionId.toString()), null, null, null
+        )
+        with(cursor) {
+            val idx = getColumnIndex(SRTResultContract.SSNRecordEntry.COLUMN_NAME_NORM_GAIN_DB)
+            while (moveToNext()) {
+                if (idx < 0 || isNull(idx)) continue
+                val v = getFloat(idx)
+                if (v < 0f) {
+                    count++
+                    if (v < minDb) minDb = v
+                }
+            }
+            close()
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+    return count to minDb
 }
 
 private fun deleteSsnSession(dbHelper: SRTResultDbHelper, sessionId: Long) {

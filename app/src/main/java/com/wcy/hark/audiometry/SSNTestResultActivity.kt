@@ -28,13 +28,21 @@ class SSNTestResultActivity : AppCompatActivity() {
         findViewById<PsychometricView>(R.id.psychometric_view)
             .setData(points, if (srt50.isNaN()) null else srt50)
 
+        val attenuatedCount = intent.getIntExtra("EXTRA_ATTENUATED_COUNT", 0)
+        val maxAttenuationDb = intent.getFloatExtra("EXTRA_MAX_ATTENUATION_DB", 0f)
+
         findViewById<TextView>(R.id.textViewSsnSummary).text = buildString {
             append("使用者：$subject\n")
             if (!srt50.isNaN()) {
-                append("SRT50（50%% 辨識率之訊噪比）：${String.format("%.1f", srt50)} dB SNR\n".format())
+                append("SRT50（50% 辨識率之訊噪比）：${String.format("%.1f", srt50)} dB SNR\n")
                 append("SRT50 越低代表在噪音中的語音理解能力越好。")
             } else {
                 append("無法內插出 SRT50（辨識率未跨越 50%），可調整 SNR 範圍後重測。")
+            }
+            if (attenuatedCount > 0) {
+                append("\n\n⚠️ 削波防護記錄：$attenuatedCount 題觸發輸出正規化，" +
+                       "最大額外衰減 ${String.format("%.1f", maxAttenuationDb)} dB" +
+                       "（SNR 不受影響，但該些題目的絕對呈現級別較低，已逐題存入資料庫）。")
             }
         }
     }

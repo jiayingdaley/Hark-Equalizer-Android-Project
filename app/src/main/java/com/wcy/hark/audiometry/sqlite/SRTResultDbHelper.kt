@@ -8,7 +8,7 @@ class SRTResultDbHelper(context: Context) :
     SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
 
     companion object {
-        const val DATABASE_VERSION = 5 // v5: SSN (speech-in-noise) test tables
+        const val DATABASE_VERSION = 6 // v6: ssn_test_records.norm_gain_db（削波正規化衰減記錄）
         const val DATABASE_NAME = "SRTResults.db"
     }
 
@@ -25,6 +25,14 @@ class SRTResultDbHelper(context: Context) :
             try {
                 // Ensure experiment_log table exists (added in version 3)
                 db.execSQL("CREATE TABLE IF NOT EXISTS experiment_log (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, test_type TEXT, earphone TEXT, dsp_bypass TEXT, params TEXT, note TEXT)")
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        if (oldVersion in 5 until 6) {
+            try {
+                // v6: 逐題記錄削波防護正規化增益（非破壞性）
+                db.execSQL("ALTER TABLE ssn_test_records ADD COLUMN norm_gain_db REAL DEFAULT 0")
             } catch (e: Exception) {
                 e.printStackTrace()
             }
