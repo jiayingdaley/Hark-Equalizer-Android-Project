@@ -257,7 +257,7 @@ private fun CalibrationSignalCard(vm: ExperimentViewModel, onOpenEarphoneCalib: 
             onToggle = { modelExpanded = it },
             items = models,
             onSelect = { idx ->
-                vm.selectedEarphone.value = models[idx]
+                vm.selectEarphone(models[idx])
                 vm.updateCalibCorrection()
             }
         )

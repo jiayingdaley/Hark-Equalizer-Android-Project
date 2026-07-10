@@ -356,7 +356,7 @@ private fun QuestionnaireScreen(
                             .padding(vertical = 24.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        OutlinedButton(onClick = onSkip, modifier = Modifier.weight(1f)) {
+                        OutlinedButton(onClick = { showExitDialog = true }, modifier = Modifier.weight(1f)) {
                             Text("略過")
                         }
                         Button(

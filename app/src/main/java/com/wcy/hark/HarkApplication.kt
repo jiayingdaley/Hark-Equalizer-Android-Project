@@ -9,6 +9,16 @@ class HarkApplication : Application() {
     
     lateinit var eqSettingsRepository: EqSettingsRepository
 
+    /**
+     * App 層共用的 EqViewModel：MainActivity 與 FloatingEqService（懸浮等化器）
+     * 共用同一個實例，slider/曲線改動即時互通，不再依賴 DataStore 去回同步
+     * （兩個獨立實例經 200ms debounce 寫入/收集，曾造成懸浮窗與 app 內
+     * 等化器參數不同步）。應用程式存活期間不釋放。
+     */
+    val sharedEqViewModel: com.wcy.hark.ui.viewmodel.EqViewModel by lazy {
+        com.wcy.hark.ui.viewmodel.EqViewModel(eqSettingsRepository)
+    }
+
     override fun onCreate() {
         super.onCreate()
         

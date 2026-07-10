@@ -58,9 +58,9 @@ fun HarkEqualizerScreen(
     
     // Set dynamic theme color
     val themeColor = when (currentEar) {
-        EarType.LEFT -> Color(0xFF2F80ED)   // Clinical Blue
-        EarType.RIGHT -> Color(0xFFEB5757)  // Clinical Red
-        EarType.BOTH -> Color(0xFF9B51E0)   // Clinical Purple
+        EarType.LEFT -> com.wcy.hark.ui.theme.HarkColors.EarLeft   // Clinical Blue
+        EarType.RIGHT -> com.wcy.hark.ui.theme.HarkColors.EarRight  // Clinical Red
+        EarType.BOTH -> com.wcy.hark.ui.theme.HarkColors.EarBoth   // Clinical Purple
     }
 
     val themeColorAnimated by animateColorAsState(targetValue = themeColor, label = "themeColor")
@@ -191,9 +191,9 @@ fun HarkEqualizerScreen(
                     contentColor = themeColorAnimated
                 ) {
                     val tabs = listOf(
-                        Triple(EarType.LEFT, "左耳 (L)", Color(0xFF2F80ED)),
-                        Triple(EarType.BOTH, "雙耳連動", Color(0xFF9B51E0)),
-                        Triple(EarType.RIGHT, "右耳 (R)", Color(0xFFEB5757))
+                        Triple(EarType.LEFT, "左耳 (L)", com.wcy.hark.ui.theme.HarkColors.EarLeft),
+                        Triple(EarType.BOTH, "雙耳連動", com.wcy.hark.ui.theme.HarkColors.EarBoth),
+                        Triple(EarType.RIGHT, "右耳 (R)", com.wcy.hark.ui.theme.HarkColors.EarRight)
                     )
 
                     tabs.forEachIndexed { index, (earType, title, color) ->
@@ -337,6 +337,56 @@ fun HarkEqualizerScreen(
                         )
                     }
                 }
+            }
+
+            // ── 高頻移頻（NLFC）：Rule 4 的使用者介面 ─────────────────────
+            // 高頻重度損失、增益補不到位時的最後手段；預設關閉。
+            // 僅作用於環境輔聽（麥克風）路徑，影音路徑無此處理。
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "高頻移頻（NLFC）",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+                    )
+                    Text(
+                        "將 4.5 kHz 以上的聲音壓縮搬移到較低頻率，適用於高頻重度損失；僅環境輔聽有效",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = viewModel.testFrequencyLoweringEnabled.value,
+                    onCheckedChange = { viewModel.setTestFrequencyLoweringEnabled(it) }
+                )
+            }
+
+            // 套用處方後高頻增益被截斷 → 建議開啟移頻（漸進式補償）
+            if (viewModel.suggestNlfc.value) {
+                AlertDialog(
+                    onDismissRequest = { viewModel.suggestNlfc.value = false },
+                    title = { Text("建議開啟高頻移頻") },
+                    text = {
+                        Text(
+                            "你的高頻聽力損失較重，增益補償已達上限、可能仍聽不清 ㄙ/ㄒ/ㄑ 等" +
+                            "高頻子音。建議開啟移頻（NLFC），把高頻聲音搬移到你聽得較好的頻率範圍。"
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            viewModel.setTestFrequencyLoweringEnabled(true)
+                            viewModel.suggestNlfc.value = false
+                        }) { Text("開啟") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { viewModel.suggestNlfc.value = false }) { Text("暫不") }
+                    }
+                )
             }
 
             Column(

@@ -112,6 +112,21 @@ class EqSettingsRepository(private val context: Context) {
         preferences[appExperimentModeKey] ?: false
     }
 
+    // ── Frequency Lowering (NLFC) ─────────────────────────────────────────────
+    // 使用者可選的移頻功能（高頻重度損失、增益補償不足時的最後手段）。
+    // 僅作用於原生環境輔聽引擎（影音路徑的 DynamicsProcessing 無此能力）。
+    private val frequencyLoweringKey = booleanPreferencesKey("frequency_lowering_enabled")
+
+    suspend fun saveFrequencyLoweringEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[frequencyLoweringKey] = enabled
+        }
+    }
+
+    fun getFrequencyLoweringFlow(): Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[frequencyLoweringKey] ?: false
+    }
+
     // ── Selected Earphone Model ───────────────────────────────────────────────
     // Single source of truth for the earphone model used by both the experiment
     // panel and the pure-tone test (calibration table lookup).
@@ -124,7 +139,9 @@ class EqSettingsRepository(private val context: Context) {
     }
 
     fun getSelectedEarphoneFlow(): Flow<String> = context.dataStore.data.map { preferences ->
-        preferences[selectedEarphoneKey] ?: "其他"
+        val saved = preferences[selectedEarphoneKey] ?: "其他"
+        // 型號改名後（對齊系統 API 回報名），舊存值換算成新名稱
+        com.wcy.hark.data.experiment.EarphoneCalibrationRepository.MODEL_RENAMES[saved] ?: saved
     }
 
     // ── Last Subject Name (prefill convenience) ───────────────────────────────

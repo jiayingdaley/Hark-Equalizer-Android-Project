@@ -35,6 +35,7 @@ class SSNTestActivity : AppCompatActivity() {
     private lateinit var buttonNotSure: Button
     private lateinit var buttonEndEarly: android.view.View   // 左上角返回箭頭（觸發提早結束確認）
     private lateinit var progressBar: ProgressBar
+    private lateinit var textViewPlaying: TextView   // 播放中回饋（按鈕停用期間顯示）
 
     private lateinit var wordProvider: WordProvider
     private lateinit var mixer: SsnAudioMixer
@@ -63,6 +64,7 @@ class SSNTestActivity : AppCompatActivity() {
     private var isTestStarted = false
     private var currentNormGainDb = 0f   // 本題削波防護正規化增益（dB，≤0）
     private var applyDsp = true          // 是否對測驗音訊套用聽力補償（DSP EQ）
+    private var nlfc = false             // 語音先經離線移頻（NLFC）處理（實驗模式選項）
     private val handler = Handler(Looper.getMainLooper())
 
     // A/B 對照模式：由 SSNAbTestActivity 呼叫，結束時直接回傳 SRT50 而非
@@ -107,6 +109,7 @@ class SSNTestActivity : AppCompatActivity() {
         buttonNotSure = findViewById(R.id.buttonSsnNotSure)
         buttonEndEarly = findViewById(R.id.buttonSsnBack)
         progressBar = findViewById(R.id.progressBarSsn)
+        textViewPlaying = findViewById(R.id.textViewSsnPlaying)
 
         wordProvider = WordProvider(this)
         mixer = SsnAudioMixer(this)
@@ -123,6 +126,7 @@ class SSNTestActivity : AppCompatActivity() {
         subjectName = intent.getStringExtra("EXTRA_SUBJECT") ?: "未填寫"
         earphoneModel = intent.getStringExtra("EXTRA_EARPHONE_MODEL")
         noiseless = intent.getBooleanExtra("EXTRA_NOISELESS", false)
+        nlfc = intent.getBooleanExtra("EXTRA_NLFC", false)
         // 無噪音模式若未指定條件，預設一組 dB SL sweep（越小越接近閾值、越難）
         if (noiseless) snrConditions = listOf(25f, 20f, 15f, 10f, 5f)
         intent.getFloatArrayExtra("EXTRA_SNRS")?.toList()?.takeIf { it.isNotEmpty() }?.let {
@@ -256,9 +260,9 @@ class SSNTestActivity : AppCompatActivity() {
             val result = if (noiseless) {
                 // snr 於無噪音模式代表 dB SL：位準 = 錨點 + SL，夾在 −3 dBFS 以下防削波
                 val levelDbfs = (levelAnchorDbfs + snr).coerceAtMost(-3f)
-                mixer.playWordQuiet(resId, levelDbfs)
+                mixer.playWordQuiet(resId, levelDbfs, nlfc)
             } else {
-                mixer.playWordInNoise(resId, R.raw.ssn_noise, snr)
+                mixer.playWordInNoise(resId, R.raw.ssn_noise, snr, nlfc)
             }
             currentNormGainDb = result.normGainDb
             // 依設置對本題的 AudioTrack session 套用聽力補償（與 SRT 相同機制）
@@ -301,6 +305,9 @@ class SSNTestActivity : AppCompatActivity() {
     private fun enableButtons(enable: Boolean) {
         buttonOptions.forEach { it.isEnabled = enable }
         buttonNotSure.isEnabled = enable
+        // 播放/準備期間按鈕停用，同步顯示「播放中」回饋，避免受試者誤以為當機
+        textViewPlaying.visibility =
+            if (enable || isTestOver) android.view.View.INVISIBLE else android.view.View.VISIBLE
     }
 
     private fun confirmEndEarly() {
@@ -357,6 +364,7 @@ class SSNTestActivity : AppCompatActivity() {
                 put(SRTResultContract.SSNSessionEntry.COLUMN_NAME_TEST_MODE,
                     if (noiseless) SRTResultContract.SSNSessionEntry.MODE_SL
                     else SRTResultContract.SSNSessionEntry.MODE_SNR)
+                put(SRTResultContract.SSNSessionEntry.COLUMN_NAME_NLFC, if (nlfc) 1 else 0)
             })
             records.forEach { db.insert(SRTResultContract.SSNRecordEntry.TABLE_NAME, null, it) }
             db.setTransactionSuccessful()

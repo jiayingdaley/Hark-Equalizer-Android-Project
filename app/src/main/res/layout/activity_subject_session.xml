@@ -50,11 +50,32 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
 
+        <!-- 流程整體進度（Goal-Gradient：看得到終點，完成率較高） -->
+        <ProgressBar
+            android:id="@+id/progressSessionOverall"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="8dp"
+            android:layout_marginTop="24dp"
+            android:max="5"
+            android:progress="0"
+            android:progressTint="#00796B"
+            android:progressBackgroundTint="#CFD8DC" />
+
+        <TextView
+            android:id="@+id/textSessionProgress"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textSize="12sp"
+            android:textColor="#607D8B"
+            android:text="已完成 0 / 5 步" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:layout_marginTop="28dp">
+            android:layout_marginTop="12dp">
 
             <TextView android:id="@+id/stepText1" android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:text="① 快速純音（自調式）" android:textSize="16sp" android:textStyle="bold" android:padding="4dp" />

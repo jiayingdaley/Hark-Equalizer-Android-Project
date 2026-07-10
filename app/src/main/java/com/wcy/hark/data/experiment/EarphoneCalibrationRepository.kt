@@ -43,6 +43,15 @@ class EarphoneCalibrationRepository(private val context: Context) {
         private const val SCHEMA_VERSION = 2
         const val DEFAULT_REF_DBFS = -20.0f
 
+        // 型號改名對照（舊顯示名 → 系統 API 實際回報名，AudioDeviceInfo.productName）。
+        // 讀檔時就地遷移，讓既有量測校正資料跟著新名稱走；DataStore 已選型號
+        // 也用這張表換算。歷史資料庫紀錄保留舊字串不動（僅為標籤）。
+        val MODEL_RENAMES: Map<String, String> = mapOf(
+            "Apple EarPods (Type-C)" to "EarPods (USB-C)",
+            "AirPods Pro 2" to "AirPods Pro",
+            "SONY WH-1000XM6" to "WH-1000XM6"
+        )
+
         // Audiometric test frequencies (Hz)
         val TEST_FREQUENCIES = listOf(250, 500, 1000, 2000, 3000, 4000, 6000, 8000)
 
@@ -72,6 +81,16 @@ class EarphoneCalibrationRepository(private val context: Context) {
             json = migrateToV2(json)
             saveJson(json)
         }
+        // 型號改名遷移：把舊名稱底下的（可能已量測的）校正資料搬到新名稱
+        var renamed = false
+        MODEL_RENAMES.forEach { (old, new) ->
+            if (json.has(old)) {
+                if (!json.has(new)) json.put(new, json.getJSONObject(old))
+                json.remove(old)
+                renamed = true
+            }
+        }
+        if (renamed) saveJson(json)
         return json
     }
 

@@ -253,6 +253,17 @@ class PureToneTestActivity : ComponentActivity() {
         }
         layout.addView(earphoneSpinner)
 
+        // 自動偵測目前連接的耳機並預選（官方 API 回報型號；對不上校正表
+        // 只顯示提示不動選單，一律仍可手動改選）
+        val earphoneHint = android.widget.TextView(context).apply {
+            textSize = 12f
+            setTextColor(android.graphics.Color.parseColor("#00796B"))
+        }
+        layout.addView(earphoneHint)
+        val earphoneCallback = EarphoneAutoDetect.register(this, earphoneSpinner, models) { info ->
+            earphoneHint.text = info ?: ""
+        }
+
         val space0 = android.widget.Space(context).apply {
             minimumHeight = (12 * resources.displayMetrics.density).toInt()
         }
@@ -308,6 +319,7 @@ class PureToneTestActivity : ComponentActivity() {
         AlertDialog.Builder(context)
             .setTitle("純音測驗登錄與設置")
             .setView(layout)
+            .setOnDismissListener { EarphoneAutoDetect.unregister(this, earphoneCallback) }
             .setPositiveButton("開始測驗") { _, _ ->
                 val enteredName = nameInput.text.toString().trim()
                 subjectName = if (enteredName.isEmpty()) "未填寫" else enteredName

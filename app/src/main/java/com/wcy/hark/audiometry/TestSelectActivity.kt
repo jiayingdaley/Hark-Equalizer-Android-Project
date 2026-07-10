@@ -28,9 +28,10 @@ class TestSelectActivity : ComponentActivity() {
         val pureToneTestButton = findViewById<Button>(R.id.button_pure_tone_test)
         val speechAudiometryButton = findViewById<Button>(R.id.button_speech_audiometry)
 
-        // 設定 "Pure-Tone Test" 按鈕的樣式和點擊事件（tint 保留圓角背景）
+        // 顏色一律由 layout XML 的 backgroundTint 管理。層級規則：
+        // 主測驗（純音聽力測試 #00695C、語詞測試 #D84315）＝深色實心白字、最醒目；
+        // 輔助測驗（快速純音 #B2DFDB、噪音下語詞 #FFCCBC）＝同家族淺色底深字、次要。
         pureToneTestButton.apply {
-            backgroundTintList = android.content.res.ColorStateList.valueOf(Color.rgb(70, 147, 211))
             setTextColor(Color.WHITE)
             setOnClickListener {
                 val intent = Intent(this@TestSelectActivity, SelectEarActivity::class.java)
@@ -40,7 +41,6 @@ class TestSelectActivity : ComponentActivity() {
 
         // 設定 "Speech Audiometry" 按鈕的樣式和點擊事件
         speechAudiometryButton.apply {
-            backgroundTintList = android.content.res.ColorStateList.valueOf(Color.rgb(234, 135, 69))
             setTextColor(Color.WHITE)
             setOnClickListener {
                 val intent = Intent(this@TestSelectActivity, SpeechAudiometryExplanationActivity::class.java)
@@ -48,17 +48,17 @@ class TestSelectActivity : ComponentActivity() {
             }
         }
 
-        // 快速純音（自調式 Method of Adjustment）
+        // 快速純音（自調式）：輔助測驗 → 淺 teal 底＋深 teal 字，視覺上退居次要
         findViewById<Button>(R.id.button_self_adjust_pta).apply {
-            setTextColor(Color.WHITE)
+            setTextColor(Color.parseColor("#00695C"))
             setOnClickListener {
                 startActivity(Intent(this@TestSelectActivity, SelfAdjustPtaActivity::class.java))
             }
         }
 
-        // 噪音下語詞測驗 (SSN speech-in-noise)
+        // 噪音下語詞測驗：輔助測驗 → 淺橘底＋深橘字，視覺上退居次要
         findViewById<Button>(R.id.button_ssn_test).apply {
-            setTextColor(Color.WHITE)
+            setTextColor(Color.parseColor("#BF360C"))
             setOnClickListener {
                 startActivity(Intent(this@TestSelectActivity, SSNExplanationActivity::class.java))
             }
@@ -66,7 +66,6 @@ class TestSelectActivity : ComponentActivity() {
 
         // 設定 "View History" 按鈕的樣式和點擊事件
         findViewById<Button>(R.id.button_view_history).apply {
-            backgroundTintList = android.content.res.ColorStateList.valueOf(Color.rgb(103, 58, 183))
             setTextColor(Color.WHITE)
             setOnClickListener {
                 val intent = Intent(this@TestSelectActivity, TestHistoryActivity::class.java)

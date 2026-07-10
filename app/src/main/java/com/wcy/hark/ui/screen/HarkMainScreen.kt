@@ -97,10 +97,31 @@ fun HarkMainScreen(
             .fillMaxSize()
             .background(brush = bgGradient)
     ) {
+        // 實驗模式常駐色帶：任何截圖/任何時刻一眼可辨目前模式，
+        // 避免施測時忘記切回使用者模式而污染受試者資料。
+        if (isExperimentMode) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .background(com.wcy.hark.ui.theme.HarkColors.ExperimentBanner)
+                    .padding(vertical = 3.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "實驗模式 EXPERIMENT MODE",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = com.wcy.hark.ui.theme.HarkColors.ExperimentBannerText
+                    )
+                )
+            }
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
+                .padding(top = if (isExperimentMode) 24.dp else 0.dp)
                 .verticalScroll(scrollState)
                 .padding(horizontal = 20.dp, vertical = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -311,14 +332,21 @@ fun HarkMainScreen(
                                     )
                                     Column {
                                         Text(
-                                            text = "手機影音輔聽 (DSP)",
+                                            text = "影音聽力補償",
                                             style = MaterialTheme.typography.bodyLarge.copy(
                                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                                                 fontWeight = FontWeight.Bold
                                             )
                                         )
                                         Text(
-                                            text = if (viewModel.isSystemDspOn.value) "音訊處理中，懸浮球已啟用" else "未啟用，麥克風已靜音",
+                                            text = when {
+                                                viewModel.isSystemDspOn.value && !viewModel.isHeadphoneConnected.value ->
+                                                    "已套用聽力補償（未接耳機，由手機喇叭外放）"
+                                                viewModel.isSystemDspOn.value ->
+                                                    "已對手機播放的影音套用聽力補償；懸浮等化器已顯示"
+                                                else ->
+                                                    "開啟後：手機播放的音樂／影片套用你的聽力補償，並顯示懸浮等化器"
+                                            },
                                             style = MaterialTheme.typography.bodySmall.copy(
                                                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                                             )
@@ -454,7 +482,7 @@ private fun PowerCard(
         Brush.horizontalGradient(
             colors = listOf(
                 MaterialTheme.colorScheme.primary,
-                Color(0xFF673AB7) // Premium violet/purple accent
+                com.wcy.hark.ui.theme.HarkColors.PrimaryDark // teal 漸層深端（主色系，不與耳別紅藍衝突）
             )
         )
     } else {

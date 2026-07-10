@@ -8,7 +8,7 @@ class SRTResultDbHelper(context: Context) :
     SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
 
     companion object {
-        const val DATABASE_VERSION = 9 // v9: ssn_sessions 新增 test_mode（SNR / SL 無噪音小聲）
+        const val DATABASE_VERSION = 10 // v10: ssn_sessions 新增 nlfc（語音是否經離線移頻）
         const val DATABASE_NAME = "SRTResults.db"
     }
 
@@ -23,6 +23,12 @@ class SRTResultDbHelper(context: Context) :
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         // Non-destructive migration to preserve clinical testing results
+        if (oldVersion < 10) {
+            try {
+                // v10: 記錄語音是否先經離線 NLFC 處理（移頻效益之行為驗證）
+                db.execSQL("ALTER TABLE ssn_sessions ADD COLUMN nlfc INTEGER DEFAULT 0")
+            } catch (e: Exception) { e.printStackTrace() }
+        }
         if (oldVersion < 9) {
             try {
                 // v9: 區分噪音下（SNR）與無噪音小聲（SL）場次；舊資料 NULL 視為 SNR

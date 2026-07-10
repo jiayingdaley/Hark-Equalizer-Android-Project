@@ -38,7 +38,7 @@ class AudiogramView(context: Context, attrs: AttributeSet? = null) : View(contex
     private val textColor = Color.rgb(33, 33, 33)
     private val gridColor = Color.rgb(200, 200, 200)
     private val minorGridColor = Color.rgb(230, 230, 230)
-    private val leftEarColor = Color.rgb(33, 102, 204)   // audiological blue
+    private val leftEarColor = Color.rgb(25, 118, 210)   // audiological blue（#1976D2，與 Compose HarkColors.EarLeft 同步）
     private val rightEarColor = Color.rgb(211, 47, 47)   // audiological red
     private val padding = 110f
 

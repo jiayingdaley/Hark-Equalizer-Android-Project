@@ -56,6 +56,14 @@ object HarkAudioBridge {
     external fun setFrequencyLoweringParams(cutoffHz: Float, ratio: Float)
     external fun isFrequencyLoweringEnabled(): Boolean
 
+    /**
+     * 離線 NLFC：對整段測試音套用與即時引擎相同的移頻演算法（獨立實例），
+     * 供語詞測驗做移頻效益的行為驗證。輸入輸出等長、時間對齊。
+     */
+    external fun nlfcProcessOffline(
+        input: FloatArray, sampleRate: Int, cutoffHz: Float, ratio: Float
+    ): FloatArray
+
     external fun setWdrcExpanderThreshold(thresholdDb: Float)
     external fun setLimiterParameters(thresholdDb: Float, releaseMs: Float)
     external fun setStreamOverrides(sharingMode: Int, inputPreset: Int)

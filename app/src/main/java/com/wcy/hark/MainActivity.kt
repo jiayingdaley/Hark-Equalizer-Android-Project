@@ -49,8 +49,9 @@ import kotlinx.coroutines.launch
  */
 class MainActivity : ComponentActivity() {
 
-    private val viewModel: EqViewModel by viewModels {
-        EqViewModelFactory((application as HarkApplication).eqSettingsRepository)
+    // 共用 Application 層的 EqViewModel（與懸浮等化器同一實例，狀態即時互通）
+    private val viewModel: EqViewModel by lazy {
+        (application as HarkApplication).sharedEqViewModel
     }
 
     private lateinit var audioManager: AudioManager
@@ -316,6 +317,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun updateAudioStates(isHeadphoneConnected: Boolean, deviceLabel: String) {
+        viewModel.isHeadphoneConnected.value = isHeadphoneConnected
         val sourceMode = viewModel.currentSourceMode.value
 
         if (sourceMode == AudioSourceMode.MICROPHONE) {
@@ -356,7 +358,9 @@ class MainActivity : ComponentActivity() {
             startService(serviceIntent)
 
             // 2. System-wide Media Hearing Aid (Internal Media mode)
-            val shouldSystemDspBeOn = isEngineRunningByUserIntent && isHeadphoneConnected && viewModel.isSystemDspOn.value
+            // 不要求耳機：媒體路徑處理的是播放音訊、沒有麥克風回授問題，
+            // 使用者可用手機喇叭外放聽經補償的影音。
+            val shouldSystemDspBeOn = isEngineRunningByUserIntent && viewModel.isSystemDspOn.value
 
             SystemDspManager.setEnabled(shouldSystemDspBeOn)
             if (shouldSystemDspBeOn) {
@@ -369,12 +373,12 @@ class MainActivity : ComponentActivity() {
                 stopService(Intent(this, FloatingEqService::class.java))
             }
 
-            // Update status text for media mode
+            // Update status text for media mode（媒體路徑無回授問題，無耳機時以喇叭外放）
             viewModel.statusText.value = if (isEngineRunningByUserIntent) {
-                if (!isHeadphoneConnected) {
-                    "狀態：請連接耳機"
-                } else {
-                    if (viewModel.isSystemDspOn.value) "狀態：手機影音 DSP 已啟用" else "狀態：手機影音 DSP 已暫停"
+                when {
+                    !viewModel.isSystemDspOn.value -> "狀態：影音聽力補償已暫停"
+                    !isHeadphoneConnected -> "狀態：影音聽力補償已啟用（喇叭外放）"
+                    else -> "狀態：影音聽力補償已啟用"
                 }
             } else {
                 "狀態：已停用"

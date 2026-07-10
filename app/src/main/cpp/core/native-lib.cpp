@@ -1,5 +1,7 @@
 #include <jni.h>
 #include "HarkAudioEngine.h"
+#include "FrequencyLowering.h"
+#include <vector>
 
 // The single, static instance of our audio engine.
 static HarkAudioEngine engine;
@@ -207,6 +209,41 @@ extern "C" JNIEXPORT jboolean JNICALL
 Java_com_wcy_hark_audio_bridge_HarkAudioBridge_isFrequencyLoweringEnabled(
         JNIEnv *env, jobject /* this */) {
     return engine.isFrequencyLoweringEnabled();
+}
+
+/**
+ * 離線 NLFC：對整段測試音（如語詞刺激）套用與即時引擎相同的移頻演算法，
+ * 供語詞測驗評估移頻效益（4AFC 行為驗證）。獨立實例、不影響即時引擎狀態。
+ * 演算法固有延遲（kFftSize 樣本）以尾端補零沖出後截齊，輸出與輸入等長對齊。
+ */
+extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_wcy_hark_audio_bridge_HarkAudioBridge_nlfcProcessOffline(
+        JNIEnv *env, jobject /* this */, jfloatArray input, jint sampleRate,
+        jfloat cutoffHz, jfloat ratio) {
+    jsize n = env->GetArrayLength(input);
+    jfloat *in = env->GetFloatArrayElements(input, nullptr);
+
+    FrequencyLowering fl;
+    fl.setSampleRate(static_cast<double>(sampleRate));
+    fl.setParameters(cutoffHz, ratio);
+    fl.reset();
+
+    const int latency = FrequencyLowering::kFftSize;
+    std::vector<float> out(static_cast<size_t>(n));
+    // 先送 latency 長度後才開始收有效輸出
+    for (jsize i = 0; i < n; ++i) {
+        float y = fl.process(in[i]);
+        if (i >= latency) out[static_cast<size_t>(i - latency)] = y;
+    }
+    // 尾端補零，把最後 latency 個樣本沖出
+    for (int i = 0; i < latency && i < n; ++i) {
+        out[static_cast<size_t>(n - latency + i)] = fl.process(0.0f);
+    }
+    env->ReleaseFloatArrayElements(input, in, JNI_ABORT);
+
+    jfloatArray result = env->NewFloatArray(n);
+    env->SetFloatArrayRegion(result, 0, n, out.data());
+    return result;
 }
 
 extern "C" JNIEXPORT void JNICALL

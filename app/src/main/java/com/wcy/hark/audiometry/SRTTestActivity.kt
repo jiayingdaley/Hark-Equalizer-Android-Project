@@ -310,6 +310,8 @@ class SRTTestActivity : AppCompatActivity() {
     }
 
     private fun enableAnswerButtons(enable: Boolean) {
+        // 播放期間以說明列給「播放中」回饋（Doherty Threshold：避免無回饋的等待）
+        textViewInstruction.text = if (enable) "請選出你聽到的詞" else "🔊 播放中，請仔細聆聽…"
         buttonOption1.isEnabled = enable
         buttonOption2.isEnabled = enable
         buttonOption3.isEnabled = enable

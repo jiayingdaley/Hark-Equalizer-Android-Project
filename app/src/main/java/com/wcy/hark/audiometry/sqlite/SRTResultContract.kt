@@ -69,6 +69,8 @@ object SRTResultContract {
         const val COLUMN_NAME_TEST_MODE = "test_mode"
         const val MODE_SNR = "SNR"
         const val MODE_SL = "SL"
+        // 語音是否先經離線移頻（NLFC）處理（v10 新增；0/NULL = 否）
+        const val COLUMN_NAME_NLFC = "nlfc"
     }
 
     object SSNRecordEntry : BaseColumns {
@@ -94,7 +96,8 @@ object SRTResultContract {
                 SSNSessionEntry.COLUMN_NAME_SRT50 + " REAL," +
                 SSNSessionEntry.COLUMN_NAME_PHONE_VOLUME + " INTEGER," +
                 SSNSessionEntry.COLUMN_NAME_EARPHONE_MODEL + " TEXT," +
-                SSNSessionEntry.COLUMN_NAME_TEST_MODE + " TEXT)"
+                SSNSessionEntry.COLUMN_NAME_TEST_MODE + " TEXT," +
+                SSNSessionEntry.COLUMN_NAME_NLFC + " INTEGER DEFAULT 0)"
 
     const val SQL_CREATE_SSN_RECORDS_TABLE =
         "CREATE TABLE IF NOT EXISTS " + SSNRecordEntry.TABLE_NAME + " (" +

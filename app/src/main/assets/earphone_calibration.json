@@ -35,7 +35,7 @@
       "measuredDbSpl": null
     }
   },
-  "Apple EarPods (Type-C)": {
+  "EarPods (USB-C)": {
     "250": {
       "refDbfs": -20.0,
       "measuredDbSpl": null
@@ -137,7 +137,7 @@
       "measuredDbSpl": null
     }
   },
-  "AirPods Pro 2": {
+  "AirPods Pro": {
     "250": {
       "refDbfs": -20.0,
       "measuredDbSpl": null
@@ -205,7 +205,7 @@
       "measuredDbSpl": null
     }
   },
-  "SONY WH-1000XM6": {
+  "WH-1000XM6": {
     "250": {
       "refDbfs": -20.0,
       "measuredDbSpl": null

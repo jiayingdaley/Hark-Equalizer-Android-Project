@@ -181,7 +181,7 @@ fun EarphoneCalibrationScreen(
                                     if (name != selectedModel) {
                                         stopTone()
                                         selectedModel = name
-                                        viewModel.selectedEarphone.value = name
+                                        viewModel.selectEarphone(name)
                                         scope.launch { repository.saveSelectedEarphone(name) }
                                         reloadTable()
                                     }

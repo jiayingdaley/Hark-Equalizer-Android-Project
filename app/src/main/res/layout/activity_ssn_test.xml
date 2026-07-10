@@ -75,6 +75,17 @@
         android:textSize="16sp"
         android:textColor="#424242" />
 
+    <TextView
+        android:id="@+id/textViewSsnPlaying"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:text="🔊 播放中，請仔細聆聽…"
+        android:textSize="15sp"
+        android:textColor="#00796B"
+        android:visibility="invisible"
+        android:layout_marginBottom="4dp" />
+
     <GridLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -123,8 +134,10 @@
         android:id="@+id/buttonSsnNotSure"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:minHeight="56dp"
         android:layout_marginTop="8dp"
         android:text="不確定"
-        android:background="@drawable/rounded_button" />
+        android:textColor="#546E7A"
+        android:background="@drawable/outlined_button" />
 
 </LinearLayout>

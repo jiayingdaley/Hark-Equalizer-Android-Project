@@ -47,6 +47,9 @@ class EqViewModel(private val repository: EqSettingsRepository) : ViewModel() {
     val currentSourceMode = mutableStateOf(AudioSourceMode.MICROPHONE)
     val isSystemDspOn = mutableStateOf(SystemDspManager.isEnabled)
 
+    /** 耳機是否連接（由 MainActivity 的裝置回呼更新）；影音 DSP 開關依此啟用/停用。 */
+    val isHeadphoneConnected = mutableStateOf(false)
+
     // DSP Testing & Diagnostics State
     val testDcBlockerEnabled = mutableStateOf(true)
     val testNoiseReductionEnabled = mutableStateOf(true)
@@ -55,6 +58,9 @@ class EqViewModel(private val repository: EqSettingsRepository) : ViewModel() {
     val testTransientSuppressorEnabled = mutableStateOf(true)
     val testOwnVoiceDetectorEnabled = mutableStateOf(true)
     val testFrequencyLoweringEnabled = mutableStateOf(false)   // 移頻預設關閉
+
+    /** 套用處方後，若高頻（≥3 kHz）增益被上限截斷 → 建議開啟 NLFC（Rule 4 的 UI 化）。 */
+    val suggestNlfc = mutableStateOf(false)
 
     val testMasterGain = mutableStateOf(1.0f)
     val testInputGainOffset = mutableStateOf(0.0f)
@@ -161,6 +167,17 @@ class EqViewModel(private val repository: EqSettingsRepository) : ViewModel() {
         viewModelScope.launch {
             SystemDspManager.isEnabledFlow.collect { enabled ->
                 isSystemDspOn.value = enabled
+            }
+        }
+
+        // NLFC 持久化狀態 → UI 與引擎（引擎未跑時 JNI 只是暫存參數，無害）
+        viewModelScope.launch {
+            repository.getFrequencyLoweringFlow().collect { enabled ->
+                if (testFrequencyLoweringEnabled.value != enabled) {
+                    testFrequencyLoweringEnabled.value = enabled
+                    HarkAudioBridge.setFrequencyLoweringParams(4500f, 2.0f)
+                    HarkAudioBridge.setFrequencyLoweringEnabled(enabled)
+                }
             }
         }
 
@@ -350,6 +367,8 @@ fun selectSituationalMode(mode: SceneManager.Mode) {
         // 針對華語高頻擦音：cutoff 4.5 kHz、壓縮比 2:1
         HarkAudioBridge.setFrequencyLoweringParams(4500f, 2.0f)
         HarkAudioBridge.setFrequencyLoweringEnabled(enabled)
+        // 持久化：HarkAudioService 每次啟動引擎時會讀取並重新套用
+        viewModelScope.launch { repository.saveFrequencyLoweringEnabled(enabled) }
     }
 
     fun setTestMasterGain(gain: Float) {
@@ -416,6 +435,7 @@ fun selectSituationalMode(mode: SceneManager.Mode) {
             // 雙耳皆有聽力圖 → DSL v5 套用雙耳配戴 −3 dB 修正
             val binaural = leftAudiogram.isNotEmpty() && rightAudiogram.isNotEmpty()
             var clampedBands = 0
+            var clampedHighFreqBands = 0   // ≥3 kHz 的截斷頻段（NLFC 建議依據）
 
             fun applyEar(ear: EarType, audiogram: Map<Int, Float>) {
                 if (audiogram.isEmpty()) return
@@ -429,7 +449,10 @@ fun selectSituationalMode(mode: SceneManager.Mode) {
                         Prescriptions.Method.DSL_V5 -> Prescriptions.dslV5Gain(freq, threshold, binaural)
                         Prescriptions.Method.NAL_R -> Prescriptions.nalRGain(freq, threshold, h3fa)
                     }
-                    if (gain > MAX_GAIN_DB) clampedBands++
+                    if (gain > MAX_GAIN_DB) {
+                        clampedBands++
+                        if (freq >= 3000) clampedHighFreqBands++
+                    }
                     updateBandGain(ear, index, gain.coerceIn(MIN_GAIN_DB, MAX_GAIN_DB))
                 }
             }
@@ -447,6 +470,10 @@ fun selectSituationalMode(mode: SceneManager.Mode) {
                 if (clampedBands > 0) {
                     append("\n⚠️ ${clampedBands} 個頻段已達增益上限 ${MAX_GAIN_DB.toInt()} dB，未能完全達到處方目標")
                 }
+            }
+            // Rule 4（漸進式補償）：高頻增益補不到位時，才建議引入移頻
+            if (clampedHighFreqBands > 0 && !testFrequencyLoweringEnabled.value) {
+                suggestNlfc.value = true
             }
             onResult(msg)
         }

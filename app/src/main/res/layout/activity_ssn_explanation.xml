@@ -76,6 +76,14 @@
                 android:inputType="number"
                 android:singleLine="true"
                 android:text="5" />
+
+            <CheckBox
+                android:id="@+id/checkBoxSsnNlfc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="語音先經移頻（NLFC，4.5 kHz、2:1）— 移頻效益行為驗證"
+                android:textSize="13sp" />
         </LinearLayout>
 
         <LinearLayout

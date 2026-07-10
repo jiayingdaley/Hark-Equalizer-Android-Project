@@ -7,4 +7,10 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- Hark 語意色票（與 ui/theme/HarkColors.kt 同步維護） -->
+    <color name="hark_ear_right">#D32F2F</color>  <!-- 右耳紅（聽力學慣例） -->
+    <color name="hark_ear_left">#1976D2</color>   <!-- 左耳藍（聽力學慣例） -->
+    <color name="hark_primary">#00796B</color>    <!-- 品牌主色 teal -->
+    <color name="hark_bg_light">#F5F7FA</color>   <!-- 使用者模式亮背景 -->
 </resources>

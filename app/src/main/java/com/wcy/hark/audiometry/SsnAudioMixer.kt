@@ -88,12 +88,38 @@ class SsnAudioMixer(private val context: Context) {
         return sqrt(sum / len) / 32768.0
     }
 
+    private fun rmsF(x: FloatArray): Double {
+        var sum = 0.0
+        for (v in x) sum += v.toDouble() * v
+        return sqrt(sum / x.size) / 32768.0
+    }
+
+    /**
+     * 語詞 PCM → short 刻度浮點；nlfc = true 時先經離線 NLFC（與即時引擎
+     * 相同演算法：cutoff 4.5 kHz、2:1），供語詞測驗做移頻效益的行為驗證。
+     * 增益計算（RMS）在處理「之後」進行，SNR/呈現位準不受移頻影響。
+     */
+    private fun speechFloats(pcm: ShortArray, nlfc: Boolean): FloatArray {
+        val f = FloatArray(pcm.size) { pcm[it].toFloat() }
+        if (!nlfc) return f
+        return try {
+            com.wcy.hark.audio.bridge.HarkAudioBridge.nlfcProcessOffline(
+                f, SAMPLE_RATE, 4500f, 2.0f
+            )
+        } catch (e: Throwable) {
+            Log.e(TAG, "offline NLFC failed, using unprocessed speech: ${e.message}")
+            f
+        }
+    }
+
     /**
      * Mixes and plays one word at the given SNR (dB).
      */
-    fun playWordInNoise(wordResId: Int, noiseResId: Int, snrDb: Float): MixResult {
+    fun playWordInNoise(
+        wordResId: Int, noiseResId: Int, snrDb: Float, nlfc: Boolean = false
+    ): MixResult {
         return try {
-            val speech = readWavResource(wordResId)
+            val speech = speechFloats(readWavResource(wordResId), nlfc)
             val noise = ensureNoiseLoaded(noiseResId)
 
             val padSamples = SAMPLE_RATE * PAD_MS / 1000
@@ -102,7 +128,7 @@ class SsnAudioMixer(private val context: Context) {
             // Random noise segment
             val start = Random.nextInt(0, (noise.size - totalLen).coerceAtLeast(1))
 
-            val speechRms = rms(speech).coerceAtLeast(1e-6)
+            val speechRms = rmsF(speech).coerceAtLeast(1e-6)
             val noiseRms = rms(noise, start, totalLen).coerceAtLeast(1e-6)
             // 噪音固定在舒適音量（維持原始位準），依 SNR 調整「語音」相對大小：
             //   speechRms_out / noiseRms_out = 10^(snr/20)
@@ -117,7 +143,7 @@ class SsnAudioMixer(private val context: Context) {
             var peak = 0f
             for (i in 0 until totalLen) {
                 val s = if (i in padSamples until padSamples + speech.size)
-                    speech[i - padSamples].toFloat() else 0f
+                    speech[i - padSamples] else 0f
                 val v = (s * speechGain + noise[start + i]) * presentGain
                 mixF[i] = v
                 val a = if (v >= 0f) v else -v
@@ -149,13 +175,13 @@ class SsnAudioMixer(private val context: Context) {
      * 相對滿刻度）。levelDbfs 由施測端以「該受試者純音閾值 + 感覺級（dB SL）」換算
      * 而得，故位準綁定個人聽力（見 SSNTestActivity）。無噪音、無 SNR 混音。
      */
-    fun playWordQuiet(wordResId: Int, levelDbfs: Float): MixResult {
+    fun playWordQuiet(wordResId: Int, levelDbfs: Float, nlfc: Boolean = false): MixResult {
         return try {
-            val speech = readWavResource(wordResId)
+            val speech = speechFloats(readWavResource(wordResId), nlfc)
             val padSamples = SAMPLE_RATE * PAD_MS / 1000
             val totalLen = speech.size + 2 * padSamples
 
-            val speechRms = rms(speech).coerceAtLeast(1e-6)          // 正規化 (0..1)
+            val speechRms = rmsF(speech).coerceAtLeast(1e-6)         // 正規化 (0..1)
             val targetRms = 10.0.pow(levelDbfs / 20.0)               // 目標正規化 RMS
             val gain = (targetRms / speechRms).toFloat()
 
@@ -163,7 +189,7 @@ class SsnAudioMixer(private val context: Context) {
             var peak = 0f
             for (i in 0 until totalLen) {
                 val s = if (i in padSamples until padSamples + speech.size)
-                    speech[i - padSamples].toFloat() * gain else 0f
+                    speech[i - padSamples] * gain else 0f
                 mixF[i] = s
                 val a = if (s >= 0f) s else -s
                 if (a > peak) peak = a

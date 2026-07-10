@@ -12,32 +12,31 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+    primary = HarkColors.PrimaryLight,
+    onPrimary = androidx.compose.ui.graphics.Color(0xFF00332C),
+    primaryContainer = HarkColors.PrimaryDark,
+    onPrimaryContainer = HarkColors.PrimaryContainer,
+    secondary = androidx.compose.ui.graphics.Color(0xFF80CBC4),
+    tertiary = HarkColors.EarBoth,
+    background = HarkColors.ExperimentBg,
+    surface = HarkColors.ExperimentCard
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    primary = HarkColors.Primary,
+    onPrimary = androidx.compose.ui.graphics.Color.White,
+    primaryContainer = HarkColors.PrimaryContainer,
+    onPrimaryContainer = HarkColors.OnPrimaryContainer,
+    secondary = androidx.compose.ui.graphics.Color(0xFF00695C),
+    tertiary = HarkColors.EarBoth,
+    background = HarkColors.UserBgTop
 )
 
 @Composable
 fun HarkTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {

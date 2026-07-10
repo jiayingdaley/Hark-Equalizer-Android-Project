@@ -76,6 +76,9 @@ class SSNExplanationActivity : AppCompatActivity(), DialogNavCallback {
             putExtra("EXTRA_SUBJECT", if (entered.isEmpty()) "未填寫" else entered)
             putExtra("EXTRA_QUESTIONS_PER_SNR", qps)
             putExtra("EXTRA_NOISELESS", noiseless)
+            // 實驗模式選項：語音先經離線 NLFC（一般模式下核取框隱藏、恆為 false）
+            putExtra("EXTRA_NLFC",
+                findViewById<android.widget.CheckBox>(R.id.checkBoxSsnNlfc).isChecked)
             // 有噪音模式才傳 SNR 清單；無噪音模式由 SSNTestActivity 用 dB SL 預設。
             if (!noiseless) {
                 val snrs = snrInput.text.toString()

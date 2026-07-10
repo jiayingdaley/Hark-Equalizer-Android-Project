@@ -28,6 +28,20 @@ class SSNTestResultActivity : AppCompatActivity() {
         if (noiseless) supportActionBar?.title = "Quiet-Speech Result"
 
         val points = snrs.zip(scores.toTypedArray()) { a, b -> a to b }
+
+        // Peak-End Rule：最難的條件必然挫折，結束畫面先給正向、白話的摘要，
+        // 專業圖表與數據放在其後供研究者/進階使用者查閱。
+        findViewById<TextView>(R.id.textViewSsnHeadline).text = buildString {
+            append("測驗完成，辛苦了！\n")
+            val best = points.maxByOrNull { it.second }
+            if (best != null) {
+                val cond = if (noiseless) "${fmt(best.first)} dB SL 的音量" else "SNR ${fmt(best.first)} dB 的條件"
+                append("你在${cond}下答對了 ${best.second.toInt()}%")
+                append(if (best.second >= 80f) "，表現很穩定。" else "。")
+            }
+            if (!noiseless) append("越吵的條件本來就越難，答不出來是正常的。")
+            else append("越小聲的條件本來就越難，聽不到是正常的。")
+        }
         findViewById<PsychometricView>(R.id.psychometric_view)
             .setData(points, if (srt50.isNaN()) null else srt50)
 
@@ -51,4 +65,6 @@ class SSNTestResultActivity : AppCompatActivity() {
             }
         }
     }
+
+    private fun fmt(v: Float) = if (v == v.toInt().toFloat()) "${v.toInt()}" else "$v"
 }

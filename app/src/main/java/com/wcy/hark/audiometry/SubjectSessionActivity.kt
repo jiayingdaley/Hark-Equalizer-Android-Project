@@ -50,6 +50,8 @@ class SubjectSessionActivity : AppCompatActivity() {
     private lateinit var buttonRetestAb: Button
     private lateinit var buttonRetestQuestionnaire: Button
     private lateinit var stepViews: List<TextView>
+    private var earphoneCallback: android.media.AudioDeviceCallback? = null
+    private var lastEarphoneInfo: String? = null
 
     // 各步驟被「提早結束/離開」（RESULT_CANCELED）時不可視為完成：
     // ① 純音取消時若照樣套用 DSL v5，會拿到「上一輪測試者」的舊聽力圖，
@@ -106,6 +108,16 @@ class SubjectSessionActivity : AppCompatActivity() {
             val savedModel = repository.getSelectedEarphoneFlow().first()
             val idx = models.indexOf(savedModel)
             if (idx >= 0) spinnerEarphone.setSelection(idx)
+            // 先套上次選擇，再依實際連接的耳機自動預選（官方 API 回報型號；
+            // 對不上校正表就不動選單，仍可手動改選）
+            earphoneCallback = EarphoneAutoDetect.register(
+                this@SubjectSessionActivity, spinnerEarphone, models
+            ) { info ->
+                if (info != null && info != lastEarphoneInfo) {
+                    lastEarphoneInfo = info
+                    android.widget.Toast.makeText(this@SubjectSessionActivity, info, android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
         }
 
         buttonNext.setOnClickListener { onNextClicked() }
@@ -121,6 +133,10 @@ class SubjectSessionActivity : AppCompatActivity() {
 
     private fun updateUi() {
         stepViews.forEachIndexed { i, tv -> tv.alpha = if (i == stage) 1.0f else if (i < stage) 0.7f else 0.4f }
+        // 整體進度（Goal-Gradient）：stage 0..5 對應已完成步數
+        val done = stage.coerceIn(0, 5)
+        findViewById<android.widget.ProgressBar>(R.id.progressSessionOverall).progress = done
+        findViewById<TextView>(R.id.textSessionProgress).text = "\u5df2\u5b8c\u6210 $done / 5 \u6b65"
         textStatus.text = when (stage) {
             0 -> "請輸入測試者 ID 並選擇耳機型號，按開始進行快速純音（自調式）。"
             1 -> "快速純音進行中…"
@@ -274,5 +290,11 @@ class SubjectSessionActivity : AppCompatActivity() {
     private fun doExport() {
         val uri = SubjectExportUtil.exportSubjectData(this, subjectName) ?: return
         startActivity(SubjectExportUtil.shareIntent(this, uri))
+    }
+
+    override fun onDestroy() {
+        earphoneCallback?.let { EarphoneAutoDetect.unregister(this, it) }
+        earphoneCallback = null
+        super.onDestroy()
     }
 }

@@ -24,6 +24,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 /**
  * HarkAudioService: A Foreground Service that keeps the Oboe audio engine
@@ -163,6 +165,15 @@ class HarkAudioService : Service() {
 
         if (!HarkAudioBridge.isEngineActuallyRunning()) {
             HarkAudioBridge.startEngine()
+        }
+        // 重新套用持久化的 NLFC 設定：引擎重啟後原生端旗標歸零，
+        // 若不重套，使用者開過的移頻會在「關掉輔聽再開」後默默失效。
+        serviceScope.launch {
+            val nlfc = (application as com.wcy.hark.HarkApplication)
+                .eqSettingsRepository.getFrequencyLoweringFlow()
+                .first()
+            HarkAudioBridge.setFrequencyLoweringParams(4500f, 2.0f)
+            HarkAudioBridge.setFrequencyLoweringEnabled(nlfc)
         }
         sceneManager?.start()
 

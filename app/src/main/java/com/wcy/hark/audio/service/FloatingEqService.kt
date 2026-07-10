@@ -50,6 +50,7 @@ class FloatingEqService : Service(), LifecycleOwner, SavedStateRegistryOwner {
     private lateinit var floatingView: View
     private lateinit var params: WindowManager.LayoutParams
     private lateinit var viewModel: EqViewModel
+    private val isExperimentMode = mutableStateOf(false)
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -63,8 +64,12 @@ class FloatingEqService : Service(), LifecycleOwner, SavedStateRegistryOwner {
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         
         // Initialize ViewModel to share state
-        val factory = EqViewModelFactory((application as HarkApplication).eqSettingsRepository)
-        viewModel = factory.create(EqViewModel::class.java)
+        val repository = (application as HarkApplication).eqSettingsRepository
+        // 與 MainActivity 共用同一個 EqViewModel 實例：懸浮窗與 app 內等化器
+        // 讀寫同一份 MutableState，參數即時同步。
+        viewModel = (application as HarkApplication).sharedEqViewModel
+        // 段數規則與主 EQ 畫面一致：使用者模式固定 8 段、實驗模式可切 8/16
+        lifecycleScope.launch { isExperimentMode.value = repository.getExperimentModeFlow().first() }
 
         val overlayType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -94,6 +99,7 @@ class FloatingEqService : Service(), LifecycleOwner, SavedStateRegistryOwner {
                 MaterialTheme {
                     FloatingEqContent(
                         viewModel = viewModel,
+                        isExperimentMode = isExperimentMode.value,
                         onClose = { stopSelf() },
                         onDrag = { dx, dy ->
                             params.x += dx.toInt()
@@ -126,8 +132,17 @@ class FloatingEqService : Service(), LifecycleOwner, SavedStateRegistryOwner {
 }
 
 @Composable
-fun FloatingEqContent(viewModel: EqViewModel, onClose: () -> Unit, onDrag: (Float, Float) -> Unit) {
+fun FloatingEqContent(
+    viewModel: EqViewModel,
+    isExperimentMode: Boolean,
+    onClose: () -> Unit,
+    onDrag: (Float, Float) -> Unit
+) {
     var expanded by remember { mutableStateOf(false) }
+    // 使用者模式固定 8 段（對齊聽力檢查頻率）；實驗模式可切 16 段完整檢視
+    var use16 by remember { mutableStateOf(false) }
+    // 拖曳中的「頻段 + dB」標籤：顯示於提示列右側（固定位置、不被手指遮擋）
+    var dragLabel by remember { mutableStateOf<String?>(null) }
 
     if (!expanded) {
         // Collapsed state: just a floating button
@@ -169,7 +184,7 @@ fun FloatingEqContent(viewModel: EqViewModel, onClose: () -> Unit, onDrag: (Floa
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("手機影音 DSP", style = MaterialTheme.typography.titleMedium)
+                    Text("影音聽力補償", style = MaterialTheme.typography.titleMedium)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Switch(
                             checked = viewModel.isSystemDspOn.value,
@@ -182,16 +197,74 @@ fun FloatingEqContent(viewModel: EqViewModel, onClose: () -> Unit, onDrag: (Floa
                     }
                 }
                 
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                // We use a simplified scrolling view for the 16 bands
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "雙耳連動上下調整",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        dragLabel?.let {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                it,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                            )
+                        }
+                    }
+                    if (isExperimentMode) {
+                        TextButton(onClick = { use16 = !use16 }) {
+                            Text(if (use16) "16 段" else "8 段", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+
+                val show16 = isExperimentMode && use16
+                // 曲線（可拖曳）＝雙耳平均；拖曳為雙耳連動。
                 Box(modifier = Modifier.weight(1f)) {
-                    EqualizerCurveDisplay(
-                        modifier = Modifier.fillMaxSize(),
-                        bandGains = viewModel.bandGains16,
-                        centerFrequencies = viewModel.centerFrequencies16,
-                        onDragBand = { index, gain -> viewModel.updateBandGain(index, gain) }
-                    )
+                    if (show16) {
+                        val avg16 = (0 until 16).map { i ->
+                            remember("a16-" + i) {
+                                derivedStateOf {
+                                    (viewModel.bandGainsLeft16[i].value + viewModel.bandGainsRight16[i].value) / 2f
+                                }
+                            }
+                        }
+                        EqualizerCurveDisplay(
+                            modifier = Modifier.fillMaxSize(),
+                            bandGains = avg16,
+                            centerFrequencies = viewModel.centerFrequencies16,
+                            onDragBand = { index, gain -> viewModel.updateBandGain(index, gain) },
+                            onDragLabel = { dragLabel = it }
+                        )
+                    } else {
+                        // 8 段檢視：底層仍是 16 段，一支 slider 驅動其管轄子頻段
+                        val avg8 = (0 until 8).map { i ->
+                            remember("a8-" + i) {
+                                derivedStateOf {
+                                    (viewModel.band8Gain(viewModel.bandGainsLeft16, i) +
+                                     viewModel.band8Gain(viewModel.bandGainsRight16, i)) / 2f
+                                }
+                            }
+                        }
+                        EqualizerCurveDisplay(
+                            modifier = Modifier.fillMaxSize(),
+                            bandGains = avg8,
+                            centerFrequencies = viewModel.centerFrequencies8,
+                            onDragBand = { index, gain ->
+                                viewModel.updateBand8Gain(
+                                    com.wcy.hark.ui.viewmodel.EarType.BOTH, index, gain
+                                )
+                            },
+                            onDragLabel = { dragLabel = it }
+                        )
+                    }
                 }
             }
         }

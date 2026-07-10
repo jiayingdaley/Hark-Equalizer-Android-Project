@@ -16,6 +16,7 @@ import com.wcy.hark.data.experiment.ExperimentLogRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -72,8 +73,20 @@ class ExperimentViewModel(
     val calibLevelDbfs   = mutableStateOf(-20.0f)
     val calibToneRunning = mutableStateOf(false)
 
-    /** Selected earphone model (drives calibration table lookup). */
+    /** Selected earphone model (drives calibration table lookup).
+     *  與 DataStore selected_earphone_model 雙向同步：實驗面板選的耳機
+     *  會帶到純音測驗/受試者流程，反之亦然（單一真相）。 */
     val selectedEarphone = mutableStateOf("ATH-CKS330NC")
+
+    private val eqSettingsRepository =
+        (appContext.applicationContext as com.wcy.hark.HarkApplication).eqSettingsRepository
+
+    /** 一律用這個改耳機型號（會寫回 DataStore）；不要直接改 selectedEarphone。 */
+    fun selectEarphone(model: String) {
+        selectedEarphone.value = model
+        updateCalibCorrection()
+        viewModelScope.launch { eqSettingsRepository.saveSelectedEarphone(model) }
+    }
 
     /** Measured SPL at refDbfs for the current model + frequency (null = 未校準). */
     val calibMeasuredDbSpl = mutableStateOf<Float?>(null)
@@ -142,6 +155,11 @@ class ExperimentViewModel(
     init {
         viewModelScope.launch(Dispatchers.IO) {
             earphoneModels.value = calibRepo.getEarphoneModels()
+            // 載入上次選擇的耳機（與純音測驗共用的 DataStore 單一真相）
+            val saved = eqSettingsRepository.getSelectedEarphoneFlow().first()
+            if (saved.isNotEmpty() && earphoneModels.value.contains(saved)) {
+                selectedEarphone.value = saved
+            }
         }
         // Update correction whenever earphone or frequency changes
         updateCalibCorrection()

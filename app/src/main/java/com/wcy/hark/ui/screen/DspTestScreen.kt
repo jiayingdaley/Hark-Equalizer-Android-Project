@@ -592,6 +592,8 @@ fun StreamConfigCard(
 
 @Composable
 fun TroubleshootingGuideCard() {
+    // Miller's Law：長文預設收合，量測時常用的卡片（診斷表/旁路開關）更快夠到
+    var expanded by remember { mutableStateOf(false) }
     Card(
         colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1B18)),
         border = BorderStroke(1.dp, Color(0xFF4D3A25)),
@@ -599,7 +601,9 @@ fun TroubleshootingGuideCard() {
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier
+                .clickable { expanded = !expanded }
+                .padding(16.dp),
             verticalAlignment = Alignment.Top
         ) {
             Icon(
@@ -610,7 +614,15 @@ fun TroubleshootingGuideCard() {
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column {
-                Text("🎧 鐵三角等 USB 耳機斷續排障指引", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFFB74D))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("🎧 USB 耳機斷續排障指引", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFFB74D))
+                    Text(if (expanded) "收合 ▲" else "展開 ▼", fontSize = 12.sp, color = Color(0xFFFFB74D))
+                }
+                if (!expanded) return@Column
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     "當使用鐵三角 ATH-CKS330NC 或其他 USB DAC 耳機時，若聲音斷續，通常是因「獨占模式 (Exclusive)」下 USB 物理時脈與手機內建 Codec 有細微時差，導致 Oboe 來不及寫入/讀取而觸發大量 WouldBlock 阻礙。\n\n" +

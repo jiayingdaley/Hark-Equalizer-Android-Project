@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 「不確定」專用外框樣式：與答案選項（實心白底 rounded_button）明顯區隔，
+     降低誤按為答案的機率（Fitts's Law / 差異化目標）。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#00FFFFFF" />
+    <stroke android:width="1.5dp" android:color="#90A4AE" />
+    <corners android:radius="18dp" />
+</shape>
