@@ -10,7 +10,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
@@ -48,6 +48,7 @@ fun DspTestScreen(
     val limiter = viewModel.testLimiterEnabled.value
     val transientSuppressor = viewModel.testTransientSuppressorEnabled.value
     val ownVoiceDetector = viewModel.testOwnVoiceDetectorEnabled.value
+    val frequencyLowering = viewModel.testFrequencyLoweringEnabled.value
 
     val masterGain = viewModel.testMasterGain.value
     val inputGainOffset = viewModel.testInputGainOffset.value
@@ -67,10 +68,10 @@ fun DspTestScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("臨床級 DSP 測試與硬體診斷面版", fontWeight = FontWeight.Bold, color = Color.White) },
+                title = { Text("DSP 測試與硬體診斷面板", fontWeight = FontWeight.Bold, color = Color.White) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "返回", tint = Color.White)
+                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", tint = Color.White)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -86,7 +87,7 @@ fun DspTestScreen(
                 .padding(padding)
                 .verticalScroll(scrollState)
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedKeepSilently(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Section 1: Signal Chain Flowchart (訊號鏈流程圖)
             SignalChainFlowchart(
@@ -95,7 +96,8 @@ fun DspTestScreen(
                 crossoverWdrc = crossoverWdrc,
                 limiter = limiter,
                 transientSuppressor = transientSuppressor,
-                ownVoiceDetector = ownVoiceDetector
+                ownVoiceDetector = ownVoiceDetector,
+                frequencyLowering = frequencyLowering
             )
 
             // Section 2: Real-time Diagnostics (即時訊號診斷)
@@ -115,6 +117,7 @@ fun DspTestScreen(
                 limiter = limiter,
                 transientSuppressor = transientSuppressor,
                 ownVoiceDetector = ownVoiceDetector,
+                frequencyLowering = frequencyLowering,
                 viewModel = viewModel
             )
 
@@ -152,7 +155,8 @@ fun SignalChainFlowchart(
     crossoverWdrc: Boolean,
     limiter: Boolean,
     transientSuppressor: Boolean,
-    ownVoiceDetector: Boolean
+    ownVoiceDetector: Boolean,
+    frequencyLowering: Boolean
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1C24)),
@@ -190,6 +194,8 @@ fun SignalChainFlowchart(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                FlowBlock("移頻", frequencyLowering)
+                FlowArrow()
                 FlowBlock("分頻壓縮", crossoverWdrc)
                 FlowArrow()
                 FlowBlock("自我語音", ownVoiceDetector)
@@ -208,7 +214,7 @@ fun FlowBlock(name: String, enabled: Boolean) {
     val textColor = Color.White
     Box(
         modifier = Modifier
-            .width(64.dp)
+            .width(56.dp)
             .height(44.dp)
             .clip(RoundedCornerShape(6.dp))
             .background(bgColor)
@@ -217,7 +223,7 @@ fun FlowBlock(name: String, enabled: Boolean) {
     ) {
         Text(
             text = name,
-            fontSize = 11.sp,
+            fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
             color = textColor,
             textAlign = TextAlign.Center
@@ -258,7 +264,7 @@ fun DiagnosticsPanel(
             LevelMeter(label = "耳機輸出電平 (Headphone Output)", valueDb = diagOut)
 
             Spacer(modifier = Modifier.height(16.dp))
-            Divider(color = Color(0xFF2C2F3C))
+            HorizontalDivider(color = Color(0xFF2C2F3C))
             Spacer(modifier = Modifier.height(12.dp))
 
             Row(
@@ -339,6 +345,7 @@ fun BypassControlsCard(
     limiter: Boolean,
     transientSuppressor: Boolean,
     ownVoiceDetector: Boolean,
+    frequencyLowering: Boolean,
     viewModel: EqViewModel
 ) {
     Card(
@@ -353,6 +360,7 @@ fun BypassControlsCard(
             BypassSwitchRow("直流偏壓濾除 (DC Blocker)", dcBlocker) { viewModel.setTestDcBlockerEnabled(it) }
             BypassSwitchRow("時域脈衝抑制 (Transient Suppressor)", transientSuppressor) { viewModel.setTestTransientSuppressorEnabled(it) }
             BypassSwitchRow("背景降噪 (Noise Suppressor)", noiseReduction) { viewModel.setTestNoiseReductionEnabled(it) }
+            BypassSwitchRow("移頻／非線性頻率壓縮 (NLFC)", frequencyLowering) { viewModel.setTestFrequencyLoweringEnabled(it) }
             BypassSwitchRow("多頻段分頻與動態壓縮 (Crossover / WDRC)", crossoverWdrc) { viewModel.setTestCrossoverWdrcEnabled(it) }
             BypassSwitchRow("自我語音堵耳管理 (Own Voice Detector)", ownVoiceDetector) { viewModel.setTestOwnVoiceDetectorEnabled(it) }
             BypassSwitchRow("最大輸出限制器 (MPO Limiter)", limiter) { viewModel.setTestLimiterEnabled(it) }
@@ -619,6 +627,3 @@ fun TroubleshootingGuideCard() {
     }
 }
 
-private fun Arrangement.spacedKeepSilently(space: androidx.compose.ui.unit.Dp): Arrangement.Vertical {
-    return Arrangement.spacedBy(space)
-}

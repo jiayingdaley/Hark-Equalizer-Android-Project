@@ -57,7 +57,10 @@ class VolumeSyncHelper(
         
         Log.d(TAG, "Syncing volume ($activeStream): $currentVol/$maxVol (Ratio: $volRatio)")
         
-        HarkAudioBridge.setMuted(currentVol == 0)
+        // 測驗隔離中不得因音量同步而解除靜音（測驗會把媒體音量鎖到最大）。
+        HarkAudioBridge.setMuted(
+            currentVol == 0 || com.wcy.hark.audio.service.HarkAudioService.audiometryIsolationActive
+        )
         // 2.0x gain boost to maintain clarity even at lower system volumes
         HarkAudioBridge.setMasterGain(volRatio * 2.0f)
     }

@@ -61,6 +61,14 @@ object SRTResultContract {
         const val COLUMN_NAME_QUESTIONS_PER_SNR = "questions_per_snr"
         const val COLUMN_NAME_SRT50 = "srt50"                  // interpolated 50% SNR, nullable
         const val COLUMN_NAME_PHONE_VOLUME = "phone_volume"
+        // 測試者可能戴不同耳機分別測驗；此欄位讓匯出/分析可依耳機型號區分
+        // 同一測試者的多輪測驗（v8 新增，舊資料為 NULL）。
+        const val COLUMN_NAME_EARPHONE_MODEL = "earphone_model"
+        // 測驗模式（v9 新增）："SNR" = 噪音下（snr_list 為 dB SNR）、
+        // "SL" = 無噪音小聲（snr_list 為 dB SL）。舊資料為 NULL，視為 SNR。
+        const val COLUMN_NAME_TEST_MODE = "test_mode"
+        const val MODE_SNR = "SNR"
+        const val MODE_SL = "SL"
     }
 
     object SSNRecordEntry : BaseColumns {
@@ -84,7 +92,9 @@ object SRTResultContract {
                 SSNSessionEntry.COLUMN_NAME_SNR_LIST + " TEXT," +
                 SSNSessionEntry.COLUMN_NAME_QUESTIONS_PER_SNR + " INTEGER," +
                 SSNSessionEntry.COLUMN_NAME_SRT50 + " REAL," +
-                SSNSessionEntry.COLUMN_NAME_PHONE_VOLUME + " INTEGER)"
+                SSNSessionEntry.COLUMN_NAME_PHONE_VOLUME + " INTEGER," +
+                SSNSessionEntry.COLUMN_NAME_EARPHONE_MODEL + " TEXT," +
+                SSNSessionEntry.COLUMN_NAME_TEST_MODE + " TEXT)"
 
     const val SQL_CREATE_SSN_RECORDS_TABLE =
         "CREATE TABLE IF NOT EXISTS " + SSNRecordEntry.TABLE_NAME + " (" +
@@ -98,6 +108,75 @@ object SRTResultContract {
                 SSNRecordEntry.COLUMN_NAME_NORM_GAIN_DB + " REAL DEFAULT 0," +
                 "FOREIGN KEY(" + SSNRecordEntry.COLUMN_NAME_SESSION_ID_FK + ") REFERENCES " +
                 SSNSessionEntry.TABLE_NAME + "(" + SSNSessionEntry.COLUMN_NAME_SESSION_ID + "))"
+
+    // ── 測試者測驗流程：SSN A/B 對照（固定模擬中度聽損處方 vs 無補償）────────
+    object AbSessionEntry : BaseColumns {
+        const val TABLE_NAME = "ssn_ab_sessions"
+        const val COLUMN_NAME_GROUP_ID = "group_id"           // 本次 A/B 對照的唯一 ID
+        const val COLUMN_NAME_TEST_TIMESTAMP = "test_timestamp"
+        const val COLUMN_NAME_SUBJECT_NAME = "subject_name"
+        const val COLUMN_NAME_EARPHONE_MODEL = "earphone_model"
+        const val COLUMN_NAME_OFF_FIRST = "off_first"         // 1 = OFF 先測（順序交叉平衡）
+        const val COLUMN_NAME_SESSION_ID_OFF = "session_id_off" // FK → SSNSessionEntry
+        const val COLUMN_NAME_SESSION_ID_ON = "session_id_on"   // FK → SSNSessionEntry
+        const val COLUMN_NAME_SRT50_OFF = "srt50_off"
+        const val COLUMN_NAME_SRT50_ON = "srt50_on"
+        const val COLUMN_NAME_DELTA_SRT50 = "delta_srt50"     // OFF − ON；正值代表 ON 改善（所需 SNR 更低）
+    }
+
+    const val SQL_CREATE_AB_SESSIONS_TABLE =
+        "CREATE TABLE IF NOT EXISTS " + AbSessionEntry.TABLE_NAME + " (" +
+                AbSessionEntry.COLUMN_NAME_GROUP_ID + " INTEGER PRIMARY KEY," +
+                AbSessionEntry.COLUMN_NAME_TEST_TIMESTAMP + " INTEGER," +
+                AbSessionEntry.COLUMN_NAME_SUBJECT_NAME + " TEXT," +
+                AbSessionEntry.COLUMN_NAME_EARPHONE_MODEL + " TEXT," +
+                AbSessionEntry.COLUMN_NAME_OFF_FIRST + " INTEGER," +
+                AbSessionEntry.COLUMN_NAME_SESSION_ID_OFF + " INTEGER," +
+                AbSessionEntry.COLUMN_NAME_SESSION_ID_ON + " INTEGER," +
+                AbSessionEntry.COLUMN_NAME_SRT50_OFF + " REAL," +
+                AbSessionEntry.COLUMN_NAME_SRT50_ON + " REAL," +
+                AbSessionEntry.COLUMN_NAME_DELTA_SRT50 + " REAL)"
+
+    // ── 環境輔聽問卷（測試者測驗流程最後一步）────────────────────────────
+    object QuestionnaireEntry : BaseColumns {
+        const val TABLE_NAME = "questionnaire_responses"
+        const val COLUMN_NAME_SESSION_ID = "session_id"       // 本次問卷所屬測試者流程 ID
+        const val COLUMN_NAME_TEST_TIMESTAMP = "test_timestamp"
+        const val COLUMN_NAME_SUBJECT_NAME = "subject_name"
+        const val COLUMN_NAME_SCENE_KEY = "scene_key"         // 情境代碼；整體題填 "OVERALL"
+        const val COLUMN_NAME_CONDITION = "condition"         // "OFF" / "ON" / "NA"（整體題）
+        const val COLUMN_NAME_CLARITY = "clarity"             // 1-5，可為 NULL（情境不適用）
+        const val COLUMN_NAME_COMFORT = "comfort"              // 1-5
+        const val COLUMN_NAME_NOISE_INTERFERENCE = "noise_interference" // 1-5（分數越高＝越不受干擾）
+        const val COLUMN_NAME_DELAY_FEEL = "delay_feel"        // 1-5，整體題
+        const val COLUMN_NAME_ARTIFACT_FLAG = "artifact_flag"  // 0/1，整體題：是否聽到異音
+        const val COLUMN_NAME_ARTIFACT_NOTE = "artifact_note"  // 文字說明
+        const val COLUMN_NAME_NATURALNESS = "naturalness"      // 1-5，整體題
+        const val COLUMN_NAME_SATISFACTION = "satisfaction"    // 1-5，整體題
+        const val COLUMN_NAME_WILLINGNESS = "willingness"      // 1-5，整體題
+        const val COLUMN_NAME_FREE_TEXT = "free_text"
+        const val COLUMN_NAME_EARPHONE_MODEL = "earphone_model" // 同一測試者測多副耳機時區分輪次
+    }
+
+    const val SQL_CREATE_QUESTIONNAIRE_TABLE =
+        "CREATE TABLE IF NOT EXISTS " + QuestionnaireEntry.TABLE_NAME + " (" +
+                BaseColumns._ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
+                QuestionnaireEntry.COLUMN_NAME_SESSION_ID + " INTEGER," +
+                QuestionnaireEntry.COLUMN_NAME_TEST_TIMESTAMP + " INTEGER," +
+                QuestionnaireEntry.COLUMN_NAME_SUBJECT_NAME + " TEXT," +
+                QuestionnaireEntry.COLUMN_NAME_SCENE_KEY + " TEXT," +
+                QuestionnaireEntry.COLUMN_NAME_CONDITION + " TEXT," +
+                QuestionnaireEntry.COLUMN_NAME_CLARITY + " INTEGER," +
+                QuestionnaireEntry.COLUMN_NAME_COMFORT + " INTEGER," +
+                QuestionnaireEntry.COLUMN_NAME_NOISE_INTERFERENCE + " INTEGER," +
+                QuestionnaireEntry.COLUMN_NAME_DELAY_FEEL + " INTEGER," +
+                QuestionnaireEntry.COLUMN_NAME_ARTIFACT_FLAG + " INTEGER," +
+                QuestionnaireEntry.COLUMN_NAME_ARTIFACT_NOTE + " TEXT," +
+                QuestionnaireEntry.COLUMN_NAME_NATURALNESS + " INTEGER," +
+                QuestionnaireEntry.COLUMN_NAME_SATISFACTION + " INTEGER," +
+                QuestionnaireEntry.COLUMN_NAME_WILLINGNESS + " INTEGER," +
+                QuestionnaireEntry.COLUMN_NAME_FREE_TEXT + " TEXT," +
+                QuestionnaireEntry.COLUMN_NAME_EARPHONE_MODEL + " TEXT)"
 
     // SQL statements for deleting tables (optional, for upgrades)
     const val SQL_DELETE_TEST_SESSIONS_TABLE = "DROP TABLE IF EXISTS " + TestSessionEntry.TABLE_NAME

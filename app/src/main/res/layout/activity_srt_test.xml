@@ -9,12 +9,23 @@
     android:background="#F5F7FA"
     tools:context=".SRTTestActivity">
 
+    <ImageButton
+        android:id="@+id/buttonSrtBack"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginTop="8dp"
+        android:src="@drawable/ic_arrow_back"
+        android:contentDescription="結束並返回"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
     <!-- Read-only DSP status indicator; updated programmatically in SRTTestActivity -->
     <TextView
         android:id="@+id/textViewDspStatus"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
+        android:layout_marginTop="56dp"
         android:layout_marginStart="8dp"
         android:textSize="14sp"
         android:textStyle="bold"
@@ -141,19 +152,6 @@
             android:layout_weight="1"
             android:text="暫停"
             android:textSize="16sp"
-            android:layout_marginEnd="8dp"
-        android:background="@drawable/rounded_button"/>
-
-        <Button
-            android:id="@+id/buttonEndEarly"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="提早結束測驗"
-            android:textSize="16sp"
-            android:backgroundTint="@android:color/holo_red_light"
-            android:textColor="@android:color/white"
-            android:layout_marginStart="8dp"
         android:background="@drawable/rounded_button"/>
     </LinearLayout>
 

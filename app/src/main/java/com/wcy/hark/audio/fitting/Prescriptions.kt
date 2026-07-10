@@ -21,6 +21,27 @@ object Prescriptions {
 
     enum class Method { DSL_V5, NAL_R }
 
+    // 16 段 EQ 中心頻率（與 EqViewModel.centerFrequencies16 / SystemDspManager
+    // 一致）。獨立列於此供不持有 ViewModel 的情境（如測試者測驗流程 A/B 對照）
+    // 直接計算固定處方增益陣列。
+    val CENTER_FREQUENCIES_16 = listOf(
+        250, 315, 400, 500, 630, 800, 1000, 1250,
+        1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000
+    )
+    private const val MAX_GAIN_DB = 30f
+
+    // 模擬中度聽損（測試者測驗流程「SSN A/B 對照」用）：平坦 50 dB HL、
+    // 雙耳皆有聽力圖之假設（binaural = true）。此為固定、非個人化之處方，
+    // 目的僅是在正常聽力測試者身上建立一個穩定可重現的「有補償」條件，
+    // 與「無補償（OFF）」比較語詞辨識表現差異（ΔSRT50），而非驗配其本人。
+    const val SIMULATED_MODERATE_LOSS_HL = 50f
+
+    /** 平坦 50 dB HL 模擬聽損之 16 段 DSL v5 處方增益（雙耳修正 −3 dB 已套用）。 */
+    fun simulatedModerateLossGains16(): FloatArray =
+        CENTER_FREQUENCIES_16.map {
+            dslV5Gain(it, SIMULATED_MODERATE_LOSS_HL, binaural = true).coerceIn(0f, MAX_GAIN_DB)
+        }.toFloatArray()
+
     // ── DSL v5 by Hand ──────────────────────────────────────────────────
     // Table 7: Mid Speech (65 dB SPL) 目標真耳輸出 REAR (dB SPL re: ear canal)，
     // 小兒目標；成人使用時減 7 dB（by-Hand Appendix 1 第 1 點）。

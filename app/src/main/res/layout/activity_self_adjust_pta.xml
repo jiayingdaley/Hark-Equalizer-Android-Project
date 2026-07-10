@@ -8,11 +8,21 @@
     android:fitsSystemWindows="true"
     android:padding="20dp">
 
+    <ImageButton
+        android:id="@+id/buttonSaBack"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_gravity="start"
+        android:layout_marginTop="4dp"
+        android:src="@drawable/ic_arrow_back"
+        android:contentDescription="結束並返回"
+        android:background="?android:attr/selectableItemBackgroundBorderless" />
+
     <TextView
         android:id="@+id/textSaTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
+        android:layout_marginTop="0dp"
         android:text="快速純音（自調式）"
         android:textSize="22sp"
         android:textStyle="bold"

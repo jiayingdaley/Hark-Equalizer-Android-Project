@@ -9,6 +9,18 @@
     android:background="#F5F7FA"
     tools:context=".PureToneTestActivity">
 
+    <ImageButton
+        android:id="@+id/button_pt_back"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginStart="8dp"
+        android:src="@drawable/ic_arrow_back"
+        android:contentDescription="結束並返回"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
     <TextView
         android:id="@+id/textView_test_ear"
         android:layout_width="wrap_content"

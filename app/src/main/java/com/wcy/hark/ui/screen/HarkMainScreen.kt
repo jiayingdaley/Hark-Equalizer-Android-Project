@@ -29,6 +29,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wcy.hark.audio.manager.SceneManager
+import com.wcy.hark.audiometry.SubjectSessionActivity
 import com.wcy.hark.audiometry.TestSelectActivity
 import com.wcy.hark.ui.components.SystemVolumeSlider
 import com.wcy.hark.ui.viewmodel.AudioSourceMode
@@ -382,6 +383,28 @@ fun HarkMainScreen(
                 )
 
                 LargeNavCard(
+                    label = "測試者測驗流程",
+                    sublabel = "SUBJECT TEST SESSION",
+                    icon = Icons.Default.Groups,
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    onClick = {
+                        context.startActivity(Intent(context, SubjectSessionActivity::class.java))
+                    }
+                )
+
+                LargeNavCard(
+                    label = "測試者測驗歷史",
+                    sublabel = "SUBJECT TEST HISTORY",
+                    icon = Icons.Default.History,
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    onClick = {
+                        context.startActivity(Intent(context, com.wcy.hark.audiometry.SubjectTestHistoryActivity::class.java))
+                    }
+                )
+
+                LargeNavCard(
                     label = "聲學實驗面板",
                     sublabel = "MEASUREMENT PANEL",
                     icon = Icons.Default.Science,
@@ -657,9 +680,8 @@ private fun PresetsCard(
                         rowModes.forEach { (mode, label, icon) ->
                             val isSelected = situationalMode == mode
                             val isAutoActive = !isAutoLocked && isSelected // auto mode highlights this one
-                            // Buttons are disabled ONLY when auto-switching is ON (!isAutoLocked).
-                            // When auto is OFF (isAutoLocked=true), the user should freely pick a mode.
-                            val isDisabled = !isAutoLocked
+                            // Buttons are always enabled so the user can manually override auto-mode at any time.
+                            val isDisabled = false
 
                             // Border alpha: breathes when auto-selected
                             val borderAlpha = if (isAutoActive) breatheAlpha else 0f
@@ -672,7 +694,7 @@ private fun PresetsCard(
                                 isDisabled = isDisabled,
                                 breatheBorderColor = borderColor,
                                 modifier = Modifier.weight(1f),
-                                onClick = { if (!isDisabled) onModeSelect(mode) }
+                                onClick = { onModeSelect(mode) }
                             )
                         }
                     }

@@ -34,7 +34,7 @@ class SRTTestActivity : AppCompatActivity() {
     private lateinit var buttonOption4: Button
     private lateinit var buttonNotSure: Button
     private lateinit var buttonPauseResume: Button
-    private lateinit var buttonEndEarly: Button
+    private lateinit var buttonEndEarly: android.view.View   // 左上角返回箭頭（觸發提早結束確認）
     private lateinit var progressBarAudioLoading: ProgressBar
     private lateinit var textViewDspStatus: TextView
 
@@ -65,6 +65,7 @@ class SRTTestActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        disableSystemBackNavigation()
         setContentView(R.layout.activity_srt_test)
         window.statusBarColor = android.graphics.Color.parseColor("#F5F7FA")
         androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = true
@@ -74,6 +75,7 @@ class SRTTestActivity : AppCompatActivity() {
         // we mute the output and enable bypass mode so the Oboe engine keeps running silently.
         // This way the Service stays alive and the engine resumes automatically when the test ends.
         // Ref: KNOWN-ISSUE-004, HarkAudioBridge.setMuted() / setBypassMode()
+        com.wcy.hark.audio.service.HarkAudioService.audiometryIsolationActive = true
         try {
             com.wcy.hark.audio.bridge.HarkAudioBridge.setMuted(true)
             com.wcy.hark.audio.bridge.HarkAudioBridge.setBypassMode(true)
@@ -93,7 +95,7 @@ class SRTTestActivity : AppCompatActivity() {
         buttonOption4 = findViewById(R.id.buttonOption4)
         buttonNotSure = findViewById(R.id.buttonNotSure)
         buttonPauseResume = findViewById(R.id.buttonPauseResume)
-        buttonEndEarly = findViewById(R.id.buttonEndEarly)
+        buttonEndEarly = findViewById(R.id.buttonSrtBack)
         progressBarAudioLoading = findViewById(R.id.progressBarAudioLoading)
         textViewDspStatus = findViewById(R.id.textViewDspStatus)
 
@@ -527,6 +529,7 @@ class SRTTestActivity : AppCompatActivity() {
         // Restore the DSP engine to normal operation when leaving the test.
         // This is the counterpart to the mute/bypass we applied in onCreate.
         // Ref: KNOWN-ISSUE-004 fix — engine stays alive during test
+        com.wcy.hark.audio.service.HarkAudioService.audiometryIsolationActive = false
         try {
             com.wcy.hark.audio.bridge.HarkAudioBridge.setBypassMode(false)
             com.wcy.hark.audio.bridge.HarkAudioBridge.setMuted(false)

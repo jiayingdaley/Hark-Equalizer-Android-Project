@@ -83,7 +83,15 @@ fun CalibrationTestScreen(
         }
         
         onDispose {
-            // 4. Deactivate the academic experiment mode state
+            // 4a. Stop any measurement still running: leaving the screen must not
+            // keep a sweep/burst/tone playing into the user's ears, and the state
+            // flags must not stay stuck at "running" for the next entry.
+            viewModel.stopWdrcSweep()
+            viewModel.stopBurst()
+            viewModel.stopOspl90()
+            if (viewModel.calibToneRunning.value) viewModel.setCalibTone(false)
+
+            // 4b. Deactivate the academic experiment mode state
             com.wcy.hark.audio.bridge.HarkAudioBridge.setExperimentModeActive(false)
             
             // 5. Restore the original engine state: if it was OFF before, stop the engine now.

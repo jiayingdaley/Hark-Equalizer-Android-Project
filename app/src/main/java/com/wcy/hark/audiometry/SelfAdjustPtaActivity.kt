@@ -29,12 +29,13 @@ import kotlin.math.roundToInt
 /**
  * SelfAdjustPtaActivity — 快速純音（自調式，Method of Adjustment）。
  *
- * 受試者自行把脈衝純音調到「剛好聽得見」：每個頻率做兩步——
+ * 測試者自行把脈衝純音調到「剛好聽得見」：每個頻率做兩步——
  * 步驟1 直接調到剛好聽得見；步驟2 先調到完全聽不見、再調回剛好聽得見
  * （一次下-上折返）。閾值 = 兩步 dBFS 平均。
  *
- * 位準範圍 −100 ~ −60 dBFS、1 dB 解析度；播放走浮點 PCM（16-bit 量化
- * 底線 −90.3 dBFS 以下即靜音，浮點路徑才能呈現正常聽力者的閾值區）。
+ * 位準範圍 −100 ~ −60 dBFS、1 dB 解析度；−100 dBFS 定義為輸出振幅歸零
+ * （真正無聲端點），−99 以上走浮點 PCM（16-bit 量化底線 −90.3 dBFS 以下
+ * 即靜音，浮點路徑才能呈現正常聽力者的閾值區）。
  * 頻率序列與標準純音測驗相同（8 頻率，1k 起、不重測）。
  * 結果經耳機校正表換算為 dB HL，輸出與標準純音相容的 CSV 供歷史紀錄。
  */
@@ -43,14 +44,18 @@ class SelfAdjustPtaActivity : AppCompatActivity() {
     private val frequencies = listOf(1000, 2000, 3000, 4000, 6000, 8000, 500, 250)
     private val ears = listOf("Right", "Left")
 
+    // −100 dBFS 定義為「輸出振幅歸零」（真正無聲），可聽範圍為 −99 ~ −60；
+    // 這樣「完全聽不見」有明確端點，不會殘留微弱波形誘發幻聽。
     private val minDbfs = -100
     private val maxDbfs = -60
+    private val silentSentinel = minDbfs
 
     private var earIndex = 0
     private var freqIndex = 0
     private var phase = 1                    // 1 = 直接調整, 2 = 下-上折返
     private var phase1Dbfs = 0f
-    private var currentDbfs = -80
+    private var currentDbfs = -70
+    private var silent = false              // true = 目前為完全靜音
 
     // 每耳: freq → 閾值 dBFS（兩步平均）
     private val resultsDbfs = mutableMapOf<String, MutableMap<Int, Float>>(
@@ -69,9 +74,11 @@ class SelfAdjustPtaActivity : AppCompatActivity() {
     private lateinit var textInstruction: TextView
     private lateinit var seekLevel: SeekBar
     private lateinit var buttonConfirm: Button
+    private var originalMediaVolume = -1
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        disableSystemBackNavigation()
         setContentView(R.layout.activity_self_adjust_pta)
         window.statusBarColor = android.graphics.Color.parseColor("#F5F7FA")
         androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = true
@@ -85,13 +92,20 @@ class SelfAdjustPtaActivity : AppCompatActivity() {
 
         calibRepo = EarphoneCalibrationRepository(this)
         val repository = (application as HarkApplication).eqSettingsRepository
+        // 測試者測驗流程會直接帶入姓名/耳機型號 —— 必須優先採用這兩個值，
+        // 不能回頭讀 DataStore：呼叫端（SubjectSessionActivity）寫入
+        // DataStore 是非同步的，若在此改讀 Flow 會有競態，可能讀到「上一輪
+        // 選的耳機」而非「這一輪剛選的耳機」，導致說明頁顯示錯誤型號。
+        val extraSubject = intent.getStringExtra("EXTRA_SUBJECT")
+        val extraEarphone = intent.getStringExtra("EXTRA_EARPHONE_MODEL")
         lifecycleScope.launch {
-            subjectName = repository.getLastSubjectNameFlow().first().ifEmpty { "未填寫" }
-            earphoneModel = repository.getSelectedEarphoneFlow().first()
+            subjectName = extraSubject ?: repository.getLastSubjectNameFlow().first().ifEmpty { "未填寫" }
+            earphoneModel = extraEarphone ?: repository.getSelectedEarphoneFlow().first()
             calibTable = withContext(Dispatchers.IO) { calibRepo.getAllCalibrations(earphoneModel) }
             showIntroDialog()
         }
 
+        // progress 0 = −100 dBFS（真正靜音），1..N = −99..−60 dBFS
         seekLevel.max = maxDbfs - minDbfs
         seekLevel.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
@@ -100,9 +114,15 @@ class SelfAdjustPtaActivity : AppCompatActivity() {
             override fun onStartTrackingTouch(sb: SeekBar?) {}
             override fun onStopTrackingTouch(sb: SeekBar?) {}
         })
-        findViewById<Button>(R.id.buttonSaMinus).setOnClickListener { setLevel(currentDbfs - 1) }
-        findViewById<Button>(R.id.buttonSaPlus).setOnClickListener { setLevel(currentDbfs + 1) }
+        findViewById<Button>(R.id.buttonSaMinus).setOnClickListener { setLevel(effLevel() - 1) }
+        findViewById<Button>(R.id.buttonSaPlus).setOnClickListener { setLevel(effLevel() + 1) }
         buttonConfirm.setOnClickListener { onConfirm() }
+        findViewById<android.view.View>(R.id.buttonSaBack).setOnClickListener { confirmEndEarly() }
+
+        // 記下進場前的媒體音量：本測驗會把音量鎖到最大（校正表前提），
+        // 離開時務必還原，否則接下來的語詞測驗會以最大音量播放（過大聲）。
+        val am = getSystemService(AUDIO_SERVICE) as AudioManager
+        originalMediaVolume = am.getStreamVolume(AudioManager.STREAM_MUSIC)
     }
 
     private fun showIntroDialog() {
@@ -125,9 +145,13 @@ class SelfAdjustPtaActivity : AppCompatActivity() {
 
     private fun currentEar() = ears[earIndex]
 
+    /** 目前有效位準（靜音時回傳 sentinel，供 +/− 連續調整）。 */
+    private fun effLevel() = if (silent) silentSentinel else currentDbfs
+
     private fun startCurrentFrequency() {
         phase = 1
-        currentDbfs = -75    // 起始位準：多數人聽得到，往下調
+        silent = false
+        currentDbfs = -70    // 起始位準：多數人聽得到，往下調
         updateUi()
         playTone()
     }
@@ -142,8 +166,15 @@ class SelfAdjustPtaActivity : AppCompatActivity() {
     }
 
     private fun setLevel(dbfs: Int) {
-        currentDbfs = dbfs.coerceIn(minDbfs, maxDbfs)
-        toneGen.setVolumeDbfs(currentDbfs.toFloat())
+        if (dbfs <= silentSentinel) {
+            silent = true
+            currentDbfs = minDbfs
+            toneGen.mute()          // −100 dBFS = 輸出振幅歸零（真正無聲）
+        } else {
+            silent = false
+            currentDbfs = dbfs.coerceIn(minDbfs + 1, maxDbfs)
+            toneGen.setVolumeDbfs(currentDbfs.toFloat())
+        }
         updateUi()
     }
 
@@ -151,11 +182,16 @@ class SelfAdjustPtaActivity : AppCompatActivity() {
         val earLabel = if (currentEar() == "Right") "右耳" else "左耳"
         textProgress.text = "$earLabel · ${freqIndex + 1} / ${frequencies.size}"
         textFreq.text = "${frequencies[freqIndex]} Hz"
-        val hl = calibRepo.estimateOutputDbhlFromTable(calibTable, frequencies[freqIndex], currentDbfs.toFloat())
-        textLevel.text = if (hl != null)
-            "$currentDbfs dB FS（≈ ${hl.roundToInt()} dB HL）"
-        else "$currentDbfs dB FS"
-        seekLevel.progress = currentDbfs - minDbfs
+        if (silent) {
+            textLevel.text = "$minDbfs dB FS（靜音）"
+            seekLevel.progress = 0
+        } else {
+            val hl = calibRepo.estimateOutputDbhlFromTable(calibTable, frequencies[freqIndex], currentDbfs.toFloat())
+            textLevel.text = if (hl != null)
+                "$currentDbfs dB FS（≈ ${hl.roundToInt()} dB HL）"
+            else "$currentDbfs dB FS"
+            seekLevel.progress = currentDbfs - minDbfs
+        }
         if (phase == 1) {
             textInstruction.text = "步驟 1／2：拖動滑桿或按 +/−，把聲音調到「剛好聽得見」，然後按確認。"
             buttonConfirm.text = "確認：剛好聽得見"
@@ -165,7 +201,28 @@ class SelfAdjustPtaActivity : AppCompatActivity() {
         }
     }
 
+    private fun confirmEndEarly() {
+        AlertDialog.Builder(this)
+            .setTitle("提早結束測驗")
+            .setMessage("確定要結束目前的快速純音測驗嗎？尚未完成的頻率將不會有結果。")
+            .setPositiveButton("結束") { _, _ ->
+                toneGen.stop()
+                setResult(RESULT_CANCELED)
+                finish()
+            }
+            .setNegativeButton("繼續測驗", null)
+            .show()
+    }
+
     private fun onConfirm() {
+        if (silent) {
+            // 靜音狀態代表「聽不見」，不能作為「剛好聽得見」的確認點。
+            android.widget.Toast.makeText(
+                this, "目前是完全靜音，請往上調到「剛好聽得見」再確認。",
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
         if (phase == 1) {
             phase1Dbfs = currentDbfs.toFloat()
             phase = 2
@@ -210,18 +267,31 @@ class SelfAdjustPtaActivity : AppCompatActivity() {
         val leftHl = toHlMap("Left")
 
         val repository = (application as HarkApplication).eqSettingsRepository
+        // 重要：lifecycleScope 綁定本 Activity 的生命週期，若在寫入完成前就
+        // finish()，DataStore/CSV 寫入可能在 onDestroy 時被取消，導致下一步
+        // （測試者測驗流程套用 DSL v5）讀到舊資料。因此務必等寫入完成後才
+        // finish()，兩個分支皆同。
         lifecycleScope.launch(Dispatchers.IO) {
             // 存入聽力圖（供 DSL v5 / NAL-R 處方使用）
             rightHl.forEach { (f, t) -> t?.let { repository.saveAudiogramThreshold("right", f, it) } }
             leftHl.forEach { (f, t) -> t?.let { repository.saveAudiogramThreshold("left", f, it) } }
             saveCsv(rightHl, leftHl)
-        }
 
-        val intent = Intent(this, AudiogramActivity::class.java)
-        intent.putExtra("LEFT_EAR_RESULTS", leftHl as Serializable)
-        intent.putExtra("RIGHT_EAR_RESULTS", rightHl as Serializable)
-        startActivity(intent)
-        finish()
+            withContext(Dispatchers.Main) {
+                if (intent.getBooleanExtra("EXTRA_SESSION_FLOW", false)) {
+                    // 測試者測驗流程呼叫：直接回傳，由流程主控頁接續套用處方，
+                    // 不中途跳去看聽力圖畫面。
+                    setResult(RESULT_OK)
+                    finish()
+                } else {
+                    val resultIntent = Intent(this@SelfAdjustPtaActivity, AudiogramActivity::class.java)
+                    resultIntent.putExtra("LEFT_EAR_RESULTS", leftHl as Serializable)
+                    resultIntent.putExtra("RIGHT_EAR_RESULTS", rightHl as Serializable)
+                    startActivity(resultIntent)
+                    finish()
+                }
+            }
+        }
     }
 
     private fun saveCsv(rightHl: Map<Int, Int?>, leftHl: Map<Int, Int?>) {
@@ -269,5 +339,12 @@ class SelfAdjustPtaActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         toneGen.release()
+        // 還原進場前的媒體音量（onResume 曾鎖到最大）
+        if (originalMediaVolume >= 0) {
+            try {
+                val am = getSystemService(AUDIO_SERVICE) as AudioManager
+                am.setStreamVolume(AudioManager.STREAM_MUSIC, originalMediaVolume, 0)
+            } catch (e: Exception) { /* best effort */ }
+        }
     }
 }

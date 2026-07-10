@@ -12,4 +12,10 @@
     <external-files-path
         name="experiment_recordings"
         path="experiment_recordings/" />
+    <external-files-path
+        name="subject_exports"
+        path="subject_exports/" />
+    <external-files-path
+        name="external_root"
+        path="." />
 </paths>

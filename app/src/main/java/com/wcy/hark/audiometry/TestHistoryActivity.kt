@@ -92,7 +92,8 @@ data class SsnSessionItem(
     val timestamp: Long,
     val subjectName: String,
     val snrList: String,
-    val srt50: Float?    // null = 未能內插
+    val srt50: Float?,   // null = 未能內插
+    val isSl: Boolean = false   // true = 無噪音小聲（dB SL）；false = 噪音下（dB SNR）
 )
 
 // ── Activity 實作 ──────────────────────────────────────────────────────
@@ -446,9 +447,14 @@ fun TestHistoryScreen(
                         Text("使用者：${session.subjectName}", fontWeight = FontWeight.Bold)
                     }
                     Text("測試日期：$dateString", fontWeight = FontWeight.SemiBold)
-                    Text("SNR 條件：${session.snrList} dB", fontWeight = FontWeight.SemiBold)
+                    val unit = if (session.isSl) "dB SL" else "dB SNR"
                     Text(
-                        text = session.srt50?.let { "SRT50：${String.format(Locale.getDefault(), "%.1f", it)} dB SNR" }
+                        if (session.isSl) "音量條件：${session.snrList} dB SL（無噪音小聲）"
+                        else "SNR 條件：${session.snrList} dB",
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = session.srt50?.let { "50% 閾值：${String.format(Locale.getDefault(), "%.1f", it)} $unit" }
                             ?: "SRT50：無法內插（辨識率未跨越 50%）",
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
@@ -913,7 +919,10 @@ fun SsnSessionCard(session: SsnSessionItem, onDelete: (() -> Unit)? = null, onCl
                         }
                     }
                     Text(dateString, fontSize = 12.sp, color = Color.Gray)
-                    Text("SNR: ${session.snrList} dB", fontSize = 11.sp, color = Color.Gray)
+                    Text(
+                        if (session.isSl) "音量: ${session.snrList} dB SL" else "SNR: ${session.snrList} dB",
+                        fontSize = 11.sp, color = Color.Gray
+                    )
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1038,7 +1047,12 @@ private fun loadSsnSessions(dbHelper: SRTResultDbHelper): List<SsnSessionItem> {
                     timestamp = getLong(getColumnIndexOrThrow(SRTResultContract.SSNSessionEntry.COLUMN_NAME_TEST_TIMESTAMP)),
                     subjectName = getString(getColumnIndexOrThrow(SRTResultContract.SSNSessionEntry.COLUMN_NAME_SUBJECT_NAME)) ?: "未填寫",
                     snrList = getString(getColumnIndexOrThrow(SRTResultContract.SSNSessionEntry.COLUMN_NAME_SNR_LIST)) ?: "",
-                    srt50 = if (srtIdx >= 0 && !isNull(srtIdx)) getFloat(srtIdx) else null
+                    srt50 = if (srtIdx >= 0 && !isNull(srtIdx)) getFloat(srtIdx) else null,
+                    isSl = run {
+                        val mIdx = getColumnIndex(SRTResultContract.SSNSessionEntry.COLUMN_NAME_TEST_MODE)
+                        mIdx >= 0 && !isNull(mIdx) &&
+                            getString(mIdx) == SRTResultContract.SSNSessionEntry.MODE_SL
+                    }
                 ))
             }
             close()

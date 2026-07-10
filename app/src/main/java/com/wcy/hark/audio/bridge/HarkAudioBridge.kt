@@ -50,6 +50,12 @@ object HarkAudioBridge {
     external fun setLimiterEnabled(enabled: Boolean)
     external fun setTransientSuppressorEnabled(enabled: Boolean)
     external fun setOwnVoiceDetectorEnabled(enabled: Boolean)
+
+    // 非線性頻率壓縮（移頻）：使用者可選開關；cutoffHz 起始壓縮頻率、ratio 壓縮比
+    external fun setFrequencyLoweringEnabled(enabled: Boolean)
+    external fun setFrequencyLoweringParams(cutoffHz: Float, ratio: Float)
+    external fun isFrequencyLoweringEnabled(): Boolean
+
     external fun setWdrcExpanderThreshold(thresholdDb: Float)
     external fun setLimiterParameters(thresholdDb: Float, releaseMs: Float)
     external fun setStreamOverrides(sharingMode: Int, inputPreset: Int)

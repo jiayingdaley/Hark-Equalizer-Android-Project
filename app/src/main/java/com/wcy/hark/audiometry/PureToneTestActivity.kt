@@ -112,6 +112,7 @@ class PureToneTestActivity : ComponentActivity() {
     @SuppressLint("ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        disableSystemBackNavigation()
         setContentView(R.layout.activity_pure_tone_test)
         window.statusBarColor = android.graphics.Color.parseColor("#F5F7FA")
         androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = true
@@ -149,13 +150,37 @@ class PureToneTestActivity : ComponentActivity() {
             false
         }
 
+        // 已停用手勢/返回鍵，Pause 是測驗中唯一的離開入口 —— 暫停時順帶
+        // 提供「結束測驗」選項，避免使用者卡在測驗畫面出不去。
         pauseButton.setOnClickListener {
             isPaused = !isPaused
             if (isPaused) {
                 pauseTest()
+                AlertDialog.Builder(this)
+                    .setTitle("測驗已暫停")
+                    .setMessage("要繼續測驗，還是提早結束？")
+                    .setPositiveButton("繼續測驗") { _, _ -> resumeTest() }
+                    .setNegativeButton("結束測驗") { _, _ -> finish() }
+                    .setCancelable(false)
+                    .show()
             } else {
                 resumeTest()
             }
+        }
+
+        // 左上角返回箭頭：等同「暫停 + 詢問是否結束」
+        findViewById<android.view.View>(R.id.button_pt_back).setOnClickListener {
+            if (!isPaused) {
+                isPaused = true
+                pauseTest()
+            }
+            AlertDialog.Builder(this)
+                .setTitle("測驗已暫停")
+                .setMessage("要繼續測驗，還是提早結束？")
+                .setPositiveButton("繼續測驗") { _, _ -> isPaused = false; resumeTest() }
+                .setNegativeButton("結束測驗") { _, _ -> finish() }
+                .setCancelable(false)
+                .show()
         }
 
         audioManager = getSystemService(AUDIO_SERVICE) as AudioManager

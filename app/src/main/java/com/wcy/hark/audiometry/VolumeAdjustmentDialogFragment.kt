@@ -19,6 +19,16 @@ class VolumeAdjustmentDialogFragment : DialogFragment() {
 
     companion object {
         const val TAG = "VolumeAdjustmentDialog" // 新增 TAG
+        private const val ARG_SOUND = "arg_sound_res_name"
+
+        /**
+         * @param soundResName res/raw 內的參考音檔名（不含副檔名）。噪音下語詞測驗
+         *   應傳 "ssn_noise"，讓使用者直接對「實際會聽到的噪音」設定舒適音量，
+         *   如此測驗中的噪音位準就等於舒適音量。其餘測驗沿用預設 "adjust_mcl"。
+         */
+        fun newInstance(soundResName: String) = VolumeAdjustmentDialogFragment().apply {
+            arguments = android.os.Bundle().apply { putString(ARG_SOUND, soundResName) }
+        }
     }
 
     private lateinit var audioManager: AudioManager
@@ -26,7 +36,8 @@ class VolumeAdjustmentDialogFragment : DialogFragment() {
     private lateinit var seekBarSystemVolume: SeekBar
     private lateinit var callback: DialogNavCallback // 新增 callback 變數
 
-    private val soundResourceName = "adjust_mcl"
+    private val soundResourceName: String
+        get() = arguments?.getString(ARG_SOUND) ?: "adjust_mcl"
 
     override fun onAttach(context: Context) { // 新增 onAttach
         super.onAttach(context)

@@ -16,9 +16,11 @@ import kotlin.random.Random
  * SsnAudioMixer — sample-accurate speech + speech-shaped-noise mixing.
  *
  * Decodes the word WAV and the pre-generated SSN (res/raw/ssn_noise.wav,
- * offline-shaped to the corpus long-term average spectrum), scales the noise
- * segment so that SNR = 20·log10(rms_speech / rms_noise), then plays the mix
- * through a single AudioTrack. Noise leads/trails the word by [padMs].
+ * offline-shaped to the corpus long-term average spectrum). The noise keeps its
+ * original level (anchored to the user's comfortable volume) and the SPEECH is
+ * scaled so that SNR = 20·log10(rms_speech / rms_noise) — negative SNR makes
+ * the word quieter, never the noise louder. Mix plays through a single
+ * AudioTrack; noise leads/trails the word by PAD_MS.
  */
 class SsnAudioMixer(private val context: Context) {
 
@@ -102,8 +104,10 @@ class SsnAudioMixer(private val context: Context) {
 
             val speechRms = rms(speech).coerceAtLeast(1e-6)
             val noiseRms = rms(noise, start, totalLen).coerceAtLeast(1e-6)
-            // Scale noise so speechRms / (noiseRms*g) = 10^(snr/20)
-            val noiseGain = (speechRms / (noiseRms * 10.0.pow(snrDb / 20.0))).toFloat()
+            // 噪音固定在舒適音量（維持原始位準），依 SNR 調整「語音」相對大小：
+            //   speechRms_out / noiseRms_out = 10^(snr/20)
+            // 如此負 SNR 只是語音變更小、更難聽，噪音不會超過使用者設定的舒適音量。
+            val speechGain = (noiseRms * 10.0.pow(snrDb / 20.0) / speechRms).toFloat()
 
             // 固定呈現餘裕（全 trial 一致，不影響 SNR 也不影響 trial 間可比性）
             val presentGain = 10.0.pow(PRESENTATION_GAIN_DB / 20.0).toFloat()
@@ -114,7 +118,7 @@ class SsnAudioMixer(private val context: Context) {
             for (i in 0 until totalLen) {
                 val s = if (i in padSamples until padSamples + speech.size)
                     speech[i - padSamples].toFloat() else 0f
-                val v = (s + noise[start + i] * noiseGain) * presentGain
+                val v = (s * speechGain + noise[start + i]) * presentGain
                 mixF[i] = v
                 val a = if (v >= 0f) v else -v
                 if (a > peak) peak = a
@@ -132,29 +136,71 @@ class SsnAudioMixer(private val context: Context) {
                 mix[i] = mixF[i].toInt().coerceIn(-32768, 32767).toShort()
             }
 
-            stop()
-            audioTrack = AudioTrack(
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_MEDIA)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                    .build(),
-                AudioFormat.Builder()
-                    .setSampleRate(SAMPLE_RATE)
-                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                    .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
-                    .build(),
-                mix.size * 2,
-                AudioTrack.MODE_STATIC,
-                AudioManager.AUDIO_SESSION_ID_GENERATE
-            )
-            audioTrack?.write(mix, 0, mix.size)
-            audioTrack?.play()
-
+            playPcm(mix)
             MixResult(totalLen * 1000L / SAMPLE_RATE, normGainDb)
         } catch (e: Exception) {
             Log.e(TAG, "playWordInNoise failed: ${e.message}", e)
             MixResult(-1L, 0f)
         }
+    }
+
+    /**
+     * 無噪音的「小聲語詞」測驗：將語詞呈現於指定的絕對數位位準 levelDbfs（dBFS，
+     * 相對滿刻度）。levelDbfs 由施測端以「該受試者純音閾值 + 感覺級（dB SL）」換算
+     * 而得，故位準綁定個人聽力（見 SSNTestActivity）。無噪音、無 SNR 混音。
+     */
+    fun playWordQuiet(wordResId: Int, levelDbfs: Float): MixResult {
+        return try {
+            val speech = readWavResource(wordResId)
+            val padSamples = SAMPLE_RATE * PAD_MS / 1000
+            val totalLen = speech.size + 2 * padSamples
+
+            val speechRms = rms(speech).coerceAtLeast(1e-6)          // 正規化 (0..1)
+            val targetRms = 10.0.pow(levelDbfs / 20.0)               // 目標正規化 RMS
+            val gain = (targetRms / speechRms).toFloat()
+
+            val mixF = FloatArray(totalLen)
+            var peak = 0f
+            for (i in 0 until totalLen) {
+                val s = if (i in padSamples until padSamples + speech.size)
+                    speech[i - padSamples].toFloat() * gain else 0f
+                mixF[i] = s
+                val a = if (s >= 0f) s else -s
+                if (a > peak) peak = a
+            }
+            var normGainDb = 0f
+            if (peak > 32767f) {
+                val g = 32000f / peak
+                for (i in mixF.indices) mixF[i] *= g
+                normGainDb = (20.0 * log10(g.toDouble())).toFloat()
+            }
+            val mix = ShortArray(totalLen) { mixF[it].toInt().coerceIn(-32768, 32767).toShort() }
+            playPcm(mix)
+            MixResult(totalLen * 1000L / SAMPLE_RATE, normGainDb)
+        } catch (e: Exception) {
+            Log.e(TAG, "playWordQuiet failed: ${e.message}", e)
+            MixResult(-1L, 0f)
+        }
+    }
+
+    private fun playPcm(mix: ShortArray) {
+        stop()
+        audioTrack = AudioTrack(
+            AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                .build(),
+            AudioFormat.Builder()
+                .setSampleRate(SAMPLE_RATE)
+                .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                .build(),
+            mix.size * 2,
+            AudioTrack.MODE_STATIC,
+            AudioManager.AUDIO_SESSION_ID_GENERATE
+        )
+        audioTrack?.write(mix, 0, mix.size)
+        audioTrack?.play()
     }
 
     val audioSessionId: Int get() = audioTrack?.audioSessionId ?: 0

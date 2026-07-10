@@ -153,6 +153,8 @@ void HarkAudioEngine::updateDSPParameters() {
   mTransientSuppressorR.setSampleRate(sampleRate);
   mOwnVoiceDetectorL.setSampleRate(sampleRate);
   mOwnVoiceDetectorR.setSampleRate(sampleRate);
+  mFreqLowerL.setSampleRate(sampleRate);
+  mFreqLowerR.setSampleRate(sampleRate);
   recomputePrescriptionGains();
 }
 
@@ -934,6 +936,13 @@ HarkAudioEngine::onAudioReady(oboe::AudioStream * /*stream*/, void *audioData,
     sL = mNoiseSuppressorL.process(sL);
     sR = mNoiseSuppressorR.process(sR);
 
+    // [2] Frequency Lowering (NLFC) — 移頻置於降噪後、8 頻帶處方之前，
+    // 讓下移後的高頻能量落入使用者聽力較好的中頻並吃到處方增益。
+    if (mFrequencyLoweringEnabled.load(std::memory_order_relaxed)) {
+      sL = mFreqLowerL.process(sL);
+      sR = mFreqLowerR.process(sR);
+    }
+
     // [3] 8-Band Filterbank with Integrated UI Gain & Own Voice Detection
     if (mCrossoverWdrcEnabled.load(std::memory_order_relaxed)) {
       auto midL = mXoverMidL.process(sL);
@@ -1192,6 +1201,19 @@ void HarkAudioEngine::setOwnVoiceDetectorEnabled(bool enabled) {
   mOwnVoiceDetectorEnabled.store(enabled, std::memory_order_relaxed);
   mOwnVoiceDetectorL.setEnabled(enabled);
   mOwnVoiceDetectorR.setEnabled(enabled);
+}
+
+void HarkAudioEngine::setFrequencyLoweringEnabled(bool enabled) {
+  if (enabled && !mFrequencyLoweringEnabled.load(std::memory_order_relaxed)) {
+    mFreqLowerL.reset();   // 重新啟用時清空 STFT 緩衝，避免殘留舊音框
+    mFreqLowerR.reset();
+  }
+  mFrequencyLoweringEnabled.store(enabled, std::memory_order_relaxed);
+}
+
+void HarkAudioEngine::setFrequencyLoweringParams(float cutoffHz, float ratio) {
+  mFreqLowerL.setParameters(cutoffHz, ratio);
+  mFreqLowerR.setParameters(cutoffHz, ratio);
 }
 
 void HarkAudioEngine::setWdrcExpanderThreshold(float thresholdDb) {

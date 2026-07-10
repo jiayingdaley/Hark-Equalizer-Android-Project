@@ -130,8 +130,16 @@ class AudiometricToneGenerator(private val sampleRate: Int = 44100) {
      * Only meaningful after play(..., bakeVolume = false).
      */
     fun setVolumeDbfs(dbfs: Float) {
-        val v = 10.0.pow(dbfs / 20.0).toFloat().coerceIn(0.0f, 1.0f)
+        // 極低位準視為真正靜音（setVolume(0)），讓自調式測驗能有明確的
+        // 「完全聽不見」端點；否則 10^(dbfs/20) 永遠 > 0，殘存微弱波形會誘發幻聽。
+        val v = if (dbfs <= MUTE_DBFS) 0.0f
+                else 10.0.pow(dbfs / 20.0).toFloat().coerceIn(0.0f, 1.0f)
         try { audioTrack?.setVolume(v) } catch (e: Exception) { /* no-op */ }
+    }
+
+    /** 真正靜音（輸出振幅歸零）。 */
+    fun mute() {
+        try { audioTrack?.setVolume(0.0f) } catch (e: Exception) { /* no-op */ }
     }
 
     fun pause() {
@@ -152,5 +160,10 @@ class AudiometricToneGenerator(private val sampleRate: Int = 44100) {
         audioTrack?.release()
         audioTrack = null
         trackNumSamples = 0
+    }
+
+    companion object {
+        /** 低於此 dBFS 一律視為靜音（真正歸零輸出）。 */
+        private const val MUTE_DBFS = -119f
     }
 }

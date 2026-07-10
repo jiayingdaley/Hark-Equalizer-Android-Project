@@ -231,18 +231,26 @@ fun HarkEqualizerScreen(
                         .fillMaxSize()
                         .padding(12.dp)
                 ) {
-                    // 曲線永遠畫 16 段（真實 DSP 響應）；8 段模式下拖曳曲線
-                    // 會連動該點所屬 8 段群組的所有子頻段。
+                    // 曲線點數與下方顯示的頻段數一致（8 段模式只顯示 8 個點，
+                    // 對應該組平均增益；16 段模式一對一），不與實際調整的
+                    // 頻段數量脫節、造成畫面上多出對不上滑桿的點。
+                    val curveBandGains = if (show16) {
+                        activeBandGains
+                    } else {
+                        List(viewModel.centerFrequencies8.size) { i ->
+                            derivedStateOf { viewModel.band8Gain(activeBandGains, i) }
+                        }
+                    }
                     EqualizerCurveDisplay(
                         modifier = Modifier.fillMaxSize(),
-                        bandGains = activeBandGains,
-                        centerFrequencies = viewModel.centerFrequencies16,
+                        bandGains = curveBandGains,
+                        centerFrequencies = centerFrequencies,
                         lineColor = themeColorAnimated,
                         onDragBand = { index, gain ->
                             if (show16) {
                                 viewModel.updateBandGain(currentEar, index, gain)
                             } else {
-                                viewModel.updateBand8Gain(currentEar, viewModel.band16ToGroup8[index], gain)
+                                viewModel.updateBand8Gain(currentEar, index, gain)
                             }
                         }
                     )

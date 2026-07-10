@@ -25,6 +25,7 @@
 |------|------|
 | [SSN_GENERATION.md](SSN_GENERATION.md) | Speech-shaped noise 產生方法（LTAS 塑形）、SNR 混音公式、可重現腳本、論文方法段落建議 |
 | [FITTING_PRESCRIPTIONS.md](FITTING_PRESCRIPTIONS.md) | 聽力圖處方增益計算（DSL v5 by Hand 成人近似 / NAL-R）：公式、查表、內插、計算示例與引用文獻 |
+| [SUBJECT_MANUAL.md](SUBJECT_MANUAL.md) | 測試者測驗手冊（測試者測驗流程五步驟說明，施測前交給測試者參考） |
 
 ## 校正與實驗（程式內對應）
 

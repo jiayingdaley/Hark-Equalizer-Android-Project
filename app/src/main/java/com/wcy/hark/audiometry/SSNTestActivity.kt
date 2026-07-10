@@ -33,16 +33,23 @@ class SSNTestActivity : AppCompatActivity() {
     private lateinit var textViewSnr: TextView
     private lateinit var buttonOptions: List<Button>
     private lateinit var buttonNotSure: Button
-    private lateinit var buttonEndEarly: Button
+    private lateinit var buttonEndEarly: android.view.View   // 左上角返回箭頭（觸發提早結束確認）
     private lateinit var progressBar: ProgressBar
 
     private lateinit var wordProvider: WordProvider
     private lateinit var mixer: SsnAudioMixer
     private lateinit var dbHelper: SRTResultDbHelper
 
-    private var snrConditions: List<Float> = listOf(10f, 5f, 0f, -5f, -10f)
+    // 噪音固定在舒適音量、語音依 SNR 調小，故 SNR 皆為 0 或負值。
+    // 無噪音（小聲）模式時，此清單改代表「感覺級 dB SL」（越小越難）。
+    private var snrConditions: List<Float> = listOf(0f, -5f, -10f, -15f, -20f, -25f)
     private var questionsPerSnr = 5
+
+    // 無噪音「小聲語詞」模式：語詞呈現位準綁定受試者純音閾值 + dB SL。
+    private var noiseless = false
+    private var levelAnchorDbfs = SOFT_BASE_DBFS   // = SOFT_BASE_DBFS + 平均純音閾值(dB HL)
     private var subjectName = "未填寫"
+    private var earphoneModel: String? = null   // 測試者測驗流程帶入；一般測驗為 null
     private var isExperimentMode = false
 
     // Flat trial list: (snrDb, question)
@@ -58,15 +65,29 @@ class SSNTestActivity : AppCompatActivity() {
     private var applyDsp = true          // 是否對測驗音訊套用聽力補償（DSP EQ）
     private val handler = Handler(Looper.getMainLooper())
 
-    companion object { private const val TAG = "SSNTestActivity" }
+    // A/B 對照模式：由 SSNAbTestActivity 呼叫，結束時直接回傳 SRT50 而非
+    // 另開 SSNTestResultActivity，讓外層可合併顯示 OFF/ON 比較結果。
+    private var abMode = false
+    private var abCondition = ""         // "OFF" 或 "ON"
+
+    companion object {
+        private const val TAG = "SSNTestActivity"
+        // 無噪音小聲模式：正常聽力（0 dB HL）者於 0 dB SL 的呈現位準基準（dBFS）。
+        // 位準錨點 = 此值 + 受試者平均純音閾值(dB HL)，故等效以 dB SL 掃描。
+        private const val SOFT_BASE_DBFS = -55f
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        disableSystemBackNavigation()
         setContentView(R.layout.activity_ssn_test)
         window.statusBarColor = android.graphics.Color.parseColor("#F5F7FA")
         androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = true
 
-        // Same isolation as SRT test: mute + bypass the hearing-aid engine
+        // Same isolation as SRT test: mute + bypass the hearing-aid engine.
+        // 旗標讓服務端的自動解除靜音路徑（焦點恢復/耳機重連/音量同步）
+        // 在測驗期間維持靜音。
+        com.wcy.hark.audio.service.HarkAudioService.audiometryIsolationActive = true
         try {
             com.wcy.hark.audio.bridge.HarkAudioBridge.setMuted(true)
             com.wcy.hark.audio.bridge.HarkAudioBridge.setBypassMode(true)
@@ -84,7 +105,7 @@ class SSNTestActivity : AppCompatActivity() {
             findViewById(R.id.buttonSsnOption4)
         )
         buttonNotSure = findViewById(R.id.buttonSsnNotSure)
-        buttonEndEarly = findViewById(R.id.buttonSsnEndEarly)
+        buttonEndEarly = findViewById(R.id.buttonSsnBack)
         progressBar = findViewById(R.id.progressBarSsn)
 
         wordProvider = WordProvider(this)
@@ -100,21 +121,56 @@ class SSNTestActivity : AppCompatActivity() {
         // 設置全部來自 SSNExplanationActivity（說明與設置頁）
         applyDsp = intent.getBooleanExtra("EXTRA_APPLY_DSP", true)
         subjectName = intent.getStringExtra("EXTRA_SUBJECT") ?: "未填寫"
+        earphoneModel = intent.getStringExtra("EXTRA_EARPHONE_MODEL")
+        noiseless = intent.getBooleanExtra("EXTRA_NOISELESS", false)
+        // 無噪音模式若未指定條件，預設一組 dB SL sweep（越小越接近閾值、越難）
+        if (noiseless) snrConditions = listOf(25f, 20f, 15f, 10f, 5f)
         intent.getFloatArrayExtra("EXTRA_SNRS")?.toList()?.takeIf { it.isNotEmpty() }?.let {
             snrConditions = it
         }
         questionsPerSnr = intent.getIntExtra("EXTRA_QUESTIONS_PER_SNR", questionsPerSnr)
+        abMode = intent.getBooleanExtra("EXTRA_AB_MODE", false)
+        abCondition = intent.getStringExtra("EXTRA_AB_CONDITION") ?: ""
 
         val repository = (application as HarkApplication).eqSettingsRepository
         lifecycleScope.launch {
             isExperimentMode = repository.getExperimentModeFlow().first()
+            if (noiseless) {
+                // 位準錨點 = 固定軟基準 + 受試者平均純音閾值（dB HL）：
+                // 聽力損失越大、呈現越大聲，使掃描維持在「感覺級 dB SL」尺度上。
+                val ptaHl = loadSpeechPtaHl(repository)
+                levelAnchorDbfs = (SOFT_BASE_DBFS + ptaHl)
+            }
             startTest()
         }
     }
 
-    /** 與 SRT 測驗一致的 DSP 狀態標示。 */
+    /** 語音頻率（500/1k/2k Hz）雙耳平均純音閾值（dB HL）；無資料回 0。 */
+    private suspend fun loadSpeechPtaHl(
+        repository: com.wcy.hark.data.EqSettingsRepository
+    ): Float {
+        val freqs = listOf(500, 1000, 2000)
+        val vals = mutableListOf<Int>()
+        for (ear in listOf("left", "right")) {
+            for (f in freqs) {
+                val t = repository.getAudiogramThresholdFlow(ear, f).first()
+                if (t != 0) vals.add(t)   // 0 視為未測（DataStore 預設）
+            }
+        }
+        return if (vals.isEmpty()) 0f else vals.average().toFloat()
+    }
+
+    /**
+     * 與 SRT 測驗一致的 DSP 狀態標示。A/B 對照模式下**不可顯示**真實狀態
+     * ——否則等於直接告知測試者目前是哪個條件，破壞單盲比較的前提。
+     */
     private fun updateDspStatusBadge() {
         val badge = findViewById<TextView>(R.id.textViewSsnDspStatus)
+        if (abMode) {
+            badge.text = "測驗進行中"
+            badge.setTextColor(android.graphics.Color.parseColor("#757575"))
+            return
+        }
         if (applyDsp) {
             badge.text = "● DSP 聽力補償 已套用"
             badge.setTextColor(android.graphics.Color.parseColor("#2E7D32"))
@@ -180,7 +236,11 @@ class SSNTestActivity : AppCompatActivity() {
         }
         val (snr, q) = trials[trialIndex]
         textViewQuestionCount.text = String.format("%02d / %02d", trialIndex + 1, trials.size)
-        textViewSnr.text = if (isExperimentMode) "SNR: ${fmtSnr(snr)} dB" else "" // 使用者模式不顯示 SNR，避免暗示
+        textViewSnr.text = when {
+            !isExperimentMode -> ""                       // 使用者模式不顯示，避免暗示
+            noiseless -> "音量: ${fmtSnr(snr)} dB SL"
+            else -> "SNR: ${fmtSnr(snr)} dB"
+        }
         progressBar.progress = trialIndex
         q.options.forEachIndexed { i, w -> buttonOptions[i].text = w }
         enableButtons(false)
@@ -193,7 +253,13 @@ class SSNTestActivity : AppCompatActivity() {
                 enableButtons(true)
                 return@postDelayed
             }
-            val result = mixer.playWordInNoise(resId, R.raw.ssn_noise, snr)
+            val result = if (noiseless) {
+                // snr 於無噪音模式代表 dB SL：位準 = 錨點 + SL，夾在 −3 dBFS 以下防削波
+                val levelDbfs = (levelAnchorDbfs + snr).coerceAtMost(-3f)
+                mixer.playWordQuiet(resId, levelDbfs)
+            } else {
+                mixer.playWordInNoise(resId, R.raw.ssn_noise, snr)
+            }
             currentNormGainDb = result.normGainDb
             // 依設置對本題的 AudioTrack session 套用聽力補償（與 SRT 相同機制）
             if (applyDsp && result.durationMs > 0) {
@@ -287,6 +353,10 @@ class SSNTestActivity : AppCompatActivity() {
                 srt50?.let { put(SRTResultContract.SSNSessionEntry.COLUMN_NAME_SRT50, it) }
                 put(SRTResultContract.SSNSessionEntry.COLUMN_NAME_PHONE_VOLUME,
                     audioManager.getStreamVolume(android.media.AudioManager.STREAM_MUSIC))
+                earphoneModel?.let { put(SRTResultContract.SSNSessionEntry.COLUMN_NAME_EARPHONE_MODEL, it) }
+                put(SRTResultContract.SSNSessionEntry.COLUMN_NAME_TEST_MODE,
+                    if (noiseless) SRTResultContract.SSNSessionEntry.MODE_SL
+                    else SRTResultContract.SSNSessionEntry.MODE_SNR)
             })
             records.forEach { db.insert(SRTResultContract.SSNRecordEntry.TABLE_NAME, null, it) }
             db.setTransactionSuccessful()
@@ -303,6 +373,18 @@ class SSNTestActivity : AppCompatActivity() {
         val attenuatedCount = normValues.count { it < 0f }
         val maxAttenuationDb = normValues.minOrNull() ?: 0f
 
+        if (abMode) {
+            // A/B 對照模式：不另開結果頁，直接把本條件的 SRT50 回傳給
+            // SSNAbTestActivity 合併顯示。
+            setResult(RESULT_OK, Intent().apply {
+                putExtra("EXTRA_AB_CONDITION", abCondition)
+                putExtra("EXTRA_SRT50", srt50 ?: Float.NaN)
+                putExtra("EXTRA_SESSION_ID", sessionId)
+            })
+            finish()
+            return
+        }
+
         // Result screen
         val intent = Intent(this, SSNTestResultActivity::class.java).apply {
             putExtra("EXTRA_SNRS", points.map { it.first }.toFloatArray())
@@ -311,6 +393,7 @@ class SSNTestActivity : AppCompatActivity() {
             putExtra("EXTRA_SUBJECT", subjectName)
             putExtra("EXTRA_ATTENUATED_COUNT", attenuatedCount)
             putExtra("EXTRA_MAX_ATTENUATION_DB", maxAttenuationDb)
+            putExtra("EXTRA_NOISELESS", noiseless)
         }
         startActivity(intent)
         finish()
@@ -324,6 +407,7 @@ class SSNTestActivity : AppCompatActivity() {
             com.wcy.hark.audio.manager.SystemDspManager.detachFromSession(mixer.audioSessionId)
         } catch (e: Exception) { /* best effort */ }
         mixer.release()
+        com.wcy.hark.audio.service.HarkAudioService.audiometryIsolationActive = false
         try {
             com.wcy.hark.audio.bridge.HarkAudioBridge.setBypassMode(false)
             com.wcy.hark.audio.bridge.HarkAudioBridge.setMuted(false)

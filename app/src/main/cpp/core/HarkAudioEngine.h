@@ -13,6 +13,7 @@
 #include "NoiseSuppressor.h"
 #include "TransientSuppressor.h"
 #include "OwnVoiceDetector.h"
+#include "FrequencyLowering.h"
 #include "SituationalPresets.h"
 #include "PrescriptionFitting.h"
 #include "HarkDspConfig.h"
@@ -163,6 +164,7 @@ private:
   NoiseSuppressor mNoiseSuppressorL, mNoiseSuppressorR;
   TransientSuppressor mTransientSuppressorL, mTransientSuppressorR;
   OwnVoiceDetector mOwnVoiceDetectorL, mOwnVoiceDetectorR;
+  FrequencyLowering mFreqLowerL, mFreqLowerR;
 
   // DC Blocker state variables per channel
   float mDcLastInL = 0.0f;
@@ -220,6 +222,13 @@ public:
     return mOwnVoiceDetectorEnabled.load(std::memory_order_relaxed);
   }
 
+  // 非線性頻率壓縮（移頻）：預設關閉，使用者可選開啟。
+  void setFrequencyLoweringEnabled(bool enabled);
+  bool isFrequencyLoweringEnabled() const {
+    return mFrequencyLoweringEnabled.load(std::memory_order_relaxed);
+  }
+  void setFrequencyLoweringParams(float cutoffHz, float ratio);
+
   void setStreamOverrides(int sharingMode, int inputPreset);
   void getStreamOverrides(int &sharingMode, int &inputPreset) const;
 
@@ -268,6 +277,7 @@ private:
   std::atomic<bool> mTransientSuppressorEnabled{true};
   std::atomic<bool> mOwnVoiceDetectorEnabled{true};
   std::atomic<bool> mNoiseReductionEnabled{true};
+  std::atomic<bool> mFrequencyLoweringEnabled{false};   // 移頻預設關閉
   std::atomic<float> mCurrentExpanderThresholdDb{-72.0f};
 
   // Override settings - default to Default (0) and Unprocessed (4)

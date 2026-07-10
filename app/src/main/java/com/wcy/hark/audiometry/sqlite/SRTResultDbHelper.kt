@@ -8,7 +8,7 @@ class SRTResultDbHelper(context: Context) :
     SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
 
     companion object {
-        const val DATABASE_VERSION = 6 // v6: ssn_test_records.norm_gain_db（削波正規化衰減記錄）
+        const val DATABASE_VERSION = 9 // v9: ssn_sessions 新增 test_mode（SNR / SL 無噪音小聲）
         const val DATABASE_NAME = "SRTResults.db"
     }
 
@@ -17,10 +17,36 @@ class SRTResultDbHelper(context: Context) :
         db.execSQL(SRTResultContract.SQL_CREATE_SRT_RECORDS_TABLE)
         db.execSQL(SRTResultContract.SQL_CREATE_SSN_SESSIONS_TABLE)
         db.execSQL(SRTResultContract.SQL_CREATE_SSN_RECORDS_TABLE)
+        db.execSQL(SRTResultContract.SQL_CREATE_AB_SESSIONS_TABLE)
+        db.execSQL(SRTResultContract.SQL_CREATE_QUESTIONNAIRE_TABLE)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         // Non-destructive migration to preserve clinical testing results
+        if (oldVersion < 9) {
+            try {
+                // v9: 區分噪音下（SNR）與無噪音小聲（SL）場次；舊資料 NULL 視為 SNR
+                db.execSQL("ALTER TABLE ssn_sessions ADD COLUMN test_mode TEXT")
+            } catch (e: Exception) { e.printStackTrace() }
+        }
+        if (oldVersion < 8) {
+            try {
+                // v8: 同一測試者可能戴多副耳機分別測驗，加欄位以便匯出時區分
+                db.execSQL("ALTER TABLE ssn_sessions ADD COLUMN earphone_model TEXT")
+            } catch (e: Exception) { e.printStackTrace() }
+            try {
+                db.execSQL("ALTER TABLE questionnaire_responses ADD COLUMN earphone_model TEXT")
+            } catch (e: Exception) { e.printStackTrace() }
+        }
+        if (oldVersion < 7) {
+            try {
+                // v7: 測試者測驗流程新表（非破壞性，IF NOT EXISTS）
+                db.execSQL(SRTResultContract.SQL_CREATE_AB_SESSIONS_TABLE)
+                db.execSQL(SRTResultContract.SQL_CREATE_QUESTIONNAIRE_TABLE)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
         if (oldVersion < 3) {
             try {
                 // Ensure experiment_log table exists (added in version 3)

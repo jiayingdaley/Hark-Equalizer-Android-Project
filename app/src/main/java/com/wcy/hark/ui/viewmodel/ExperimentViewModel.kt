@@ -535,10 +535,14 @@ class ExperimentViewModel(
 
     override fun onCleared() {
         super.onCleared()
-        // Stop all experiment signals when ViewModel is destroyed
+        // Stop all experiment signals when ViewModel is destroyed.
+        // Also restore inject-DSP mode: WDRC sweep / tone burst enable it and a
+        // mid-run teardown would otherwise leave the engine injecting test
+        // signals into the DSP chain permanently.
         HarkAudioBridge.setCalibTone(0f, 0f, false)
         HarkAudioBridge.setLogChirp(250f, 8000f, 30f, 0f, false)
         HarkAudioBridge.setPinkNoise(0f, false)
+        HarkAudioBridge.setInjectDspMode(false)
     }
 
     // =========================================================================
@@ -555,32 +559,32 @@ class ExperimentViewModel(
         val byteRate   = sampleRate * channels * 2   // 16-bit = 2 bytes
         val dataSize   = pcm.size * 2
         val headerSize = 44
-        val fos        = FileOutputStream(file)
 
         fun Int.le4(): ByteArray = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(this).array()
         fun Short.le2(): ByteArray = ByteBuffer.allocate(2).order(ByteOrder.LITTLE_ENDIAN).putShort(this).array()
 
-        // RIFF header
-        fos.write("RIFF".toByteArray())
-        fos.write((headerSize - 8 + dataSize).le4())
-        fos.write("WAVE".toByteArray())
-        // fmt chunk
-        fos.write("fmt ".toByteArray())
-        fos.write(16.le4())                       // chunk size
-        fos.write(1.toShort().le2())              // PCM format
-        fos.write(channels.toShort().le2())
-        fos.write(sampleRate.le4())
-        fos.write(byteRate.le4())
-        fos.write((channels * 2).toShort().le2()) // block align
-        fos.write(16.toShort().le2())             // bits per sample
-        // data chunk
-        fos.write("data".toByteArray())
-        fos.write(dataSize.le4())
-        // PCM samples (little-endian)
-        val buf = ByteBuffer.allocate(dataSize).order(ByteOrder.LITTLE_ENDIAN)
-        for (s in pcm) buf.putShort(s)
-        fos.write(buf.array())
-        fos.close()
+        FileOutputStream(file).use { fos ->
+            // RIFF header
+            fos.write("RIFF".toByteArray())
+            fos.write((headerSize - 8 + dataSize).le4())
+            fos.write("WAVE".toByteArray())
+            // fmt chunk
+            fos.write("fmt ".toByteArray())
+            fos.write(16.le4())                       // chunk size
+            fos.write(1.toShort().le2())              // PCM format
+            fos.write(channels.toShort().le2())
+            fos.write(sampleRate.le4())
+            fos.write(byteRate.le4())
+            fos.write((channels * 2).toShort().le2()) // block align
+            fos.write(16.toShort().le2())             // bits per sample
+            // data chunk
+            fos.write("data".toByteArray())
+            fos.write(dataSize.le4())
+            // PCM samples (little-endian)
+            val buf = ByteBuffer.allocate(dataSize).order(ByteOrder.LITTLE_ENDIAN)
+            for (s in pcm) buf.putShort(s)
+            fos.write(buf.array())
+        }
     }
 }
 

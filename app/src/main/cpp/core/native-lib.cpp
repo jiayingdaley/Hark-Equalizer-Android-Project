@@ -192,6 +192,24 @@ Java_com_wcy_hark_audio_bridge_HarkAudioBridge_setOwnVoiceDetectorEnabled(
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_com_wcy_hark_audio_bridge_HarkAudioBridge_setFrequencyLoweringEnabled(
+        JNIEnv *env, jobject /* this */, jboolean enabled) {
+    engine.setFrequencyLoweringEnabled(enabled);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_wcy_hark_audio_bridge_HarkAudioBridge_setFrequencyLoweringParams(
+        JNIEnv *env, jobject /* this */, jfloat cutoffHz, jfloat ratio) {
+    engine.setFrequencyLoweringParams(cutoffHz, ratio);
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_wcy_hark_audio_bridge_HarkAudioBridge_isFrequencyLoweringEnabled(
+        JNIEnv *env, jobject /* this */) {
+    return engine.isFrequencyLoweringEnabled();
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_com_wcy_hark_audio_bridge_HarkAudioBridge_setWdrcExpanderThreshold(
         JNIEnv *env, jobject /* this */, jfloat thresholdDb) {
     engine.setWdrcExpanderThreshold(thresholdDb);

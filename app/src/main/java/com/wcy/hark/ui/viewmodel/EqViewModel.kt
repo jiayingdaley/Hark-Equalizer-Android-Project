@@ -54,6 +54,7 @@ class EqViewModel(private val repository: EqSettingsRepository) : ViewModel() {
     val testLimiterEnabled = mutableStateOf(true)
     val testTransientSuppressorEnabled = mutableStateOf(true)
     val testOwnVoiceDetectorEnabled = mutableStateOf(true)
+    val testFrequencyLoweringEnabled = mutableStateOf(false)   // 移頻預設關閉
 
     val testMasterGain = mutableStateOf(1.0f)
     val testInputGainOffset = mutableStateOf(0.0f)
@@ -219,6 +220,7 @@ fun refreshAllDspParameters() {
             testLimiterEnabled.value = HarkAudioBridge.isLimiterEnabled()
             testTransientSuppressorEnabled.value = HarkAudioBridge.isTransientSuppressorEnabled()
             testOwnVoiceDetectorEnabled.value = HarkAudioBridge.isOwnVoiceDetectorEnabled()
+            testFrequencyLoweringEnabled.value = HarkAudioBridge.isFrequencyLoweringEnabled()
 
             testMasterGain.value = HarkAudioBridge.getMasterGain()
             testInputGainOffset.value = HarkAudioBridge.getInputGainOffset()
@@ -233,7 +235,12 @@ fun refreshAllDspParameters() {
 
 fun selectSituationalMode(mode: SceneManager.Mode) {
     HarkAudioService.sceneManager?.selectModeManual(mode)
-    situationalMode.value = mode
+    if (mode == SceneManager.Mode.AUTO) {
+        isAutoLocked.value = false
+    } else {
+        isAutoLocked.value = true
+        situationalMode.value = mode
+    }
 }
 
 
@@ -336,6 +343,13 @@ fun selectSituationalMode(mode: SceneManager.Mode) {
     fun setTestOwnVoiceDetectorEnabled(enabled: Boolean) {
         testOwnVoiceDetectorEnabled.value = enabled
         HarkAudioBridge.setOwnVoiceDetectorEnabled(enabled)
+    }
+
+    fun setTestFrequencyLoweringEnabled(enabled: Boolean) {
+        testFrequencyLoweringEnabled.value = enabled
+        // 針對華語高頻擦音：cutoff 4.5 kHz、壓縮比 2:1
+        HarkAudioBridge.setFrequencyLoweringParams(4500f, 2.0f)
+        HarkAudioBridge.setFrequencyLoweringEnabled(enabled)
     }
 
     fun setTestMasterGain(gain: Float) {

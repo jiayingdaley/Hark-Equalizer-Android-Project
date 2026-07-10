@@ -7,14 +7,28 @@
     android:fitsSystemWindows="true"
     android:background="#F5F7FA">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center_horizontal"
-        android:text="噪音下語詞測驗"
-        android:textSize="22sp"
-        android:textStyle="bold"
-        android:textColor="#212121" />
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <ImageButton
+            android:id="@+id/buttonSsnBack"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="start|center_vertical"
+            android:src="@drawable/ic_arrow_back"
+            android:contentDescription="結束並返回"
+            android:background="?android:attr/selectableItemBackgroundBorderless" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="噪音下語詞測驗"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:textColor="#212121" />
+    </FrameLayout>
 
     <TextView
         android:id="@+id/textViewSsnQuestionCount"
@@ -111,20 +125,6 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:text="不確定"
-        android:background="@drawable/rounded_button" />
-
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1" />
-
-    <Button
-        android:id="@+id/buttonSsnEndEarly"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="提早結束測驗"
-        style="?android:attr/borderlessButtonStyle"
-        android:textColor="#D32F2F"
         android:background="@drawable/rounded_button" />
 
 </LinearLayout>

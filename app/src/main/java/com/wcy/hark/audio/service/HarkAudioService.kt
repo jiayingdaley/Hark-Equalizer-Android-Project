@@ -1,12 +1,18 @@
 package com.wcy.hark.audio.service
 
 import android.app.*
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
+import android.media.AudioDeviceCallback
+import android.media.AudioDeviceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.wcy.hark.R
@@ -41,6 +47,16 @@ class HarkAudioService : Service() {
         // Singleton access for the UI to observe SceneManager
         var sceneManager: SceneManager? = null
             private set
+
+        /**
+         * 聽力測驗隔離旗標：語詞/純音等測驗 Activity 進場時設 true（並自行
+         * setMuted(true)），離場還原時設 false。旗標為 true 期間，服務內任何
+         * 「自動解除靜音」路徑（AudioFocus 恢復、耳機重新接上、系統音量同步）
+         * 一律維持靜音——否則測驗中途的裝置/焦點事件會把輔聽麥克風透傳聲
+         * 混入測驗音，破壞測驗隔離。
+         */
+        @Volatile
+        var audiometryIsolationActive = false
     }
 
     // Service-level CoroutineScope tied to service lifecycle (Fix for KNOWN-ISSUE-007).
@@ -50,6 +66,14 @@ class HarkAudioService : Service() {
 
     private lateinit var audioManager: AudioManager
     private var audioFocusRequest: AudioFocusRequest? = null
+
+    // WakeLock to keep CPU alive during screen off (sleep mode)
+    private var wakeLock: PowerManager.WakeLock? = null
+    // Headset detection components to mute engine when unplugged
+    private var headsetPlugReceiver: HeadsetPlugReceiver? = null
+    private var audioDeviceCallback: AudioDeviceCallback? = null
+    private var isReceiverRegistered = false
+
 
     // AudioFocus change listener: handles interruptions from phone calls, other apps, etc.
     private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
@@ -70,9 +94,9 @@ class HarkAudioService : Service() {
                 HarkAudioBridge.setMuted(true)
             }
             AudioManager.AUDIOFOCUS_GAIN -> {
-                // Focus restored: unmute and resync system volume
+                // Focus restored: unmute — unless a hearing test is isolating the engine.
                 Log.d(TAG, "AudioFocus GAIN — restoring engine")
-                HarkAudioBridge.setMuted(false)
+                HarkAudioBridge.setMuted(audiometryIsolationActive)
             }
         }
     }
@@ -103,6 +127,16 @@ class HarkAudioService : Service() {
     }
 
     private fun startForegroundService() {
+        // Acquire WakeLock to keep CPU running during sleep mode
+        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        wakeLock = powerManager.newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK,
+            "Hark::AudioCpuWakeLock"
+        ).apply {
+            acquire()
+        }
+        Log.d(TAG, "WakeLock acquired for background audio stability")
+
         val notificationIntent = Intent(this, MainActivity::class.java)
         val pendingIntent = PendingIntent.getActivity(
             this, 0, notificationIntent,
@@ -131,6 +165,64 @@ class HarkAudioService : Service() {
             HarkAudioBridge.startEngine()
         }
         sceneManager?.start()
+
+        // Setup headset detection
+        headsetPlugReceiver = HeadsetPlugReceiver()
+        registerReceiver(headsetPlugReceiver, IntentFilter(Intent.ACTION_HEADSET_PLUG))
+        isReceiverRegistered = true
+        registerDeviceCallback()
+
+        // Perform initial check on connection
+        checkHeadphonesAndControlEngine()
+    }
+
+    private inner class HeadsetPlugReceiver : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == Intent.ACTION_HEADSET_PLUG) {
+                val state = intent.getIntExtra("state", -1)
+                Log.d(TAG, "HeadsetPlugReceiver: state changed to $state")
+                checkHeadphonesAndControlEngine()
+            }
+        }
+    }
+
+    private fun checkHeadphonesAndControlEngine() {
+        val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+        val isHeadphoneConnected = devices.any {
+            it.type in listOf(
+                AudioDeviceInfo.TYPE_WIRED_HEADSET,
+                AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
+                AudioDeviceInfo.TYPE_USB_HEADSET,
+                AudioDeviceInfo.TYPE_BLE_HEADSET,
+                AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+                AudioDeviceInfo.TYPE_BLUETOOTH_SCO
+            )
+        }
+        Log.d(TAG, "HarkAudioService: Headphone connected = $isHeadphoneConnected")
+        // Mute the audio engine instantly if headphones are disconnected, to prevent
+        // screeching feedback loop. Stay muted while a hearing test is isolating the engine.
+        HarkAudioBridge.setMuted(!isHeadphoneConnected || audiometryIsolationActive)
+    }
+
+    private fun registerDeviceCallback() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            audioDeviceCallback = object : AudioDeviceCallback() {
+                override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>?) {
+                    checkHeadphonesAndControlEngine()
+                }
+                override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>?) {
+                    checkHeadphonesAndControlEngine()
+                }
+            }
+            audioManager.registerAudioDeviceCallback(audioDeviceCallback, null)
+        }
+    }
+
+    private fun unregisterDeviceCallback() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && audioDeviceCallback != null) {
+            audioManager.unregisterAudioDeviceCallback(audioDeviceCallback)
+            audioDeviceCallback = null
+        }
     }
 
     /**
@@ -206,6 +298,26 @@ class HarkAudioService : Service() {
     }
 
     override fun onDestroy() {
+        // Release WakeLock safely
+        try {
+            wakeLock?.let {
+                if (it.isHeld) it.release()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error releasing WakeLock: ${e.message}")
+        }
+        wakeLock = null
+
+        // Unregister headphone listeners
+        if (isReceiverRegistered && headsetPlugReceiver != null) {
+            try {
+                unregisterReceiver(headsetPlugReceiver)
+            } catch (e: Exception) { /* no-op */ }
+            isReceiverRegistered = false
+            headsetPlugReceiver = null
+        }
+        unregisterDeviceCallback()
+
         abandonAudioFocus()
         sceneManager?.stop()
         sceneManager = null
@@ -216,3 +328,4 @@ class HarkAudioService : Service() {
         super.onDestroy()
     }
 }
+
