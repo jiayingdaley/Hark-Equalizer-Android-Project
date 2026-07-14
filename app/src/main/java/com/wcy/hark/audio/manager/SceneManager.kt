@@ -1,6 +1,5 @@
 package com.wcy.hark.audio.manager
 
-import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.*
 import kotlin.math.log10
@@ -8,15 +7,29 @@ import kotlin.math.sqrt
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import com.wcy.hark.audio.bridge.HarkAudioBridge
-import com.wcy.hark.audio.router.MediaSessionObserver
 
 /**
  * SceneManager: The intelligent hub for situational mode switching.
  *
  * Responsibilities:
  * 1. Periodic environmental analysis (using DSP spectral data).
- * 2. Media session monitoring (via MediaSessionObserver).
- * 3. Handling Manual Override (lock mode).
+ * 2. Handling Manual Override (lock mode).
+ *
+ * CINEMA (影音) is manual-only. Two auto-detection paths were considered and
+ * rejected:
+ *   - MediaSessionObserver (own-device media playback via Notification
+ *     Access): removed — if the phone is playing its own media, the user
+ *     already has a dedicated better path ("手機影音/內部音訊" tab, which
+ *     processes system output directly instead of picking it back up through
+ *     the mic), so this only covered a narrow "still on mic mode while phone
+ *     plays media in the background" case, at the cost of a permission most
+ *     users never grant.
+ *   - Spectral classification (same features as OUTDOOR/CONVERSATION):
+ *     rejected after field-recording validation
+ *     (tests/field_performance/raw/env_mode_classification) showed music's
+ *     envelope modulation (modStd) is statistically indistinguishable from
+ *     conversation (median 5.1 vs 5.3 dB) — a rule here would silently
+ *     misclassify concerts/ambient music as CONVERSATION.
  *
  * Lifecycle:
  * The caller (HarkAudioService) provides an external [scope] tied to the Service's lifecycle.
@@ -25,7 +38,6 @@ import com.wcy.hark.audio.router.MediaSessionObserver
  * Ref: SceneManager coroutine lifecycle alignment — .ai_collaboration/llm_bug_knowledge.md
  */
 class SceneManager(
-    private val context: Context,
     private val scope: CoroutineScope  // Must be the Service's scope, not a self-owned one
 ) {
 
@@ -45,24 +57,11 @@ class SceneManager(
 
     private var autoJob: Job? = null
 
-    private val mediaObserver = MediaSessionObserver(context) { isPlaying ->
-        if (!isAutoLocked.value) {
-            if (isPlaying) {
-                applyMode(Mode.CINEMA)
-            } else {
-                // Return to auto-analysis if music stops
-                startAutoAnalysis()
-            }
-        }
-    }
-
     fun start() {
-        mediaObserver.start()
         startAutoAnalysis()
     }
 
     fun stop() {
-        mediaObserver.stop()
         autoJob?.cancel()
         // Note: we do NOT cancel the external scope here — the caller (HarkAudioService) owns it
     }
@@ -81,23 +80,31 @@ class SceneManager(
         }
     }
 
-    // ── 自動環境分類（2026-07 實地錄音驗證後改版）──────────────────────────
+    // ── 自動環境分類（2026-07-14 二次改版：忠實重現後重新驗證）──────────────
     //
-    // 舊版每 5 秒取一次 5 頻段能量，用頻譜比例門檻分類（lowFreq>0.7 → 戶外、
-    // highFreq>0.4 → 對話）。實地錄音驗證（tests/field_performance/raw/
-    // env_mode_classification）顯示：語音能量本來就集中在 500–1k Hz，對話與
-    // 戶外的頻譜比例幾乎相同（low ratio 中位數 0.88 vs 0.84），highFreq>0.4
-    // 幾乎不會觸發（對話正確率 0–7%）。能區分兩者的是「時間包絡起伏」：
-    // 語音有 ~4 Hz 音節調變（5 秒窗內能量 dB 標準差 ~5 dB），風切/交通為
-    // 穩態（~3 dB）。因此改為每 250 ms 取樣、滾動 5 秒窗：
+    // 前一版改用 lowRatio（500+1k 佔總能量比例）判斷戶外，門檻依 Welch PSD
+    // 區塊平均得出（lowRatio 中位數 0.88 對 0.84、modStd 5.2 對 3.1 dB）。
+    // 但那組分析用的頻帶能量估計方式跟本引擎實際運作方式不同——
+    // getEnvironmentEnergy() 回傳的是 NoiseSuppressor 內部 5 顆 RBJ biquad
+    // 帶通濾波器整流後、以每取樣點 EMA（alpha=0.95，見 NS_ALPHA_SIGNAL）追蹤
+    // 的快速包絡瞬時值，不是整段訊號的頻譜功率平均。用同一條鏈路（RBJ
+    // biquad + 逐樣本 EMA）重新分析同一批錄音後（tests/field_performance/raw/
+    // env_mode_classification/code/env_mode_analysis_faithful.py）發現
+    // lowRatio 在四種模式間幾乎無法區分（中位數 0.44/0.44/0.45/0.36），套用
+    // 舊門檻之對話正確率僅 14%、戶外僅 2%——舊門檻並未驗證到實際會執行的程式碼。
+    //
+    // 忠實重算後改用「總能量高低」取代 lowRatio 作為戶外判準（戶外錄音之
+    // meanTotal 中位數比對話/影音高一個數量級以上，來自風切/交通之寬頻高能
+    // 量），modStd 門檻同時重新校正（2.4 dB，原 4 dB 過高）。三類（不含手動
+    // 限定之 CINEMA）網格搜尋後之準確率：透明 76%、對話 75%、戶外 68%。
     //
     //   安靜（平均總能量 < QUIET_TOTAL）        → TRANSPARENCY
+    //   總能量 > OUTDOOR_TOTAL                  → OUTDOOR（風切/交通之寬頻高能量）
     //   包絡調變（dB 標準差）> MOD_STD_CONV     → CONVERSATION
-    //   低頻佔比 > LOW_RATIO_OUTDOOR            → OUTDOOR
     //   其餘                                     → TRANSPARENCY
     //
     // 並加入遲滯：連續 HYSTERESIS_WINDOWS 個 5 秒窗判成同一模式才實際切換，
-    // 避免每個窗來回跳動。CINEMA 仍由 MediaSessionObserver 觸發，不走頻譜。
+    // 避免每個窗來回跳動。CINEMA 為手動限定模式，不參與自動判斷（見類別註解）。
 
     private val sampleTotalsDb = ArrayDeque<Float>()   // 每 250 ms 一筆：總能量 (dB)
     private val sampleBandSums = FloatArray(5)         // 窗內各頻段能量累加（線性）
@@ -134,8 +141,6 @@ class SceneManager(
 
     private fun evaluateWindow() {
         val meanTotal = sampleBandSums.sum() / samplesInWindow
-        val lowRatio = (sampleBandSums[0] + sampleBandSums[1]) /
-                       (sampleBandSums.sum() + 1e-12f)
 
         // 包絡調變：窗內總能量 (dB) 的標準差
         val meanDb = sampleTotalsDb.sum() / sampleTotalsDb.size
@@ -145,15 +150,15 @@ class SceneManager(
 
         val detected = when {
             meanTotal < QUIET_TOTAL -> Mode.TRANSPARENCY   // 極安靜
+            meanTotal > OUTDOOR_TOTAL -> Mode.OUTDOOR      // 風切/交通之寬頻高能量
             modStdDb > MOD_STD_CONV -> Mode.CONVERSATION   // 語音的音節調變
-            lowRatio > LOW_RATIO_OUTDOOR -> Mode.OUTDOOR   // 穩態低頻（風切/交通）
             else -> Mode.TRANSPARENCY
         }
 
-        // 校準用：QUIET_TOTAL 無法離線驗證（手機錄音有 AGC），需在實機安靜
-        // 環境下讀此 log 校定門檻。
-        Log.d(TAG, "window: meanTotal=%.3e lowRatio=%.2f modStd=%.1fdB → %s"
-            .format(meanTotal, lowRatio, modStdDb, detected))
+        // 校準用：QUIET_TOTAL／OUTDOOR_TOTAL 無法離線驗證（手機錄音有 AGC），
+        // 需在實機環境下讀此 log 校定門檻。
+        Log.d(TAG, "window: meanTotal=%.3e modStd=%.1fdB → %s"
+            .format(meanTotal, modStdDb, detected))
 
         // 遲滯：連續 HYSTERESIS_WINDOWS 個窗一致才切換
         if (detected == pendingMode) pendingCount++ else { pendingMode = detected; pendingCount = 1 }
@@ -179,11 +184,15 @@ class SceneManager(
         private const val HYSTERESIS_WINDOWS = 2           // 連續一致窗數才切換
 
         /** 極安靜門檻（平均總能量，線性）。離線錄音因 AGC 無法校此值，
-         *  需在實機安靜環境讀 window log 校定。 */
-        private const val QUIET_TOTAL = 0.001f
-        /** 對話門檻：5 秒窗內總能量 dB 標準差（實地資料：語音 ~5.2、穩態噪音 ~3.1）。 */
-        private const val MOD_STD_CONV = 4.0f
-        /** 戶外門檻：500+1k Hz 佔總能量比例（實地資料掃描結果）。 */
-        private const val LOW_RATIO_OUTDOOR = 0.6f
+         *  需在實機安靜環境讀 window log 校定。取自忠實重算之網格搜尋結果。 */
+        private const val QUIET_TOTAL = 0.0009f
+        /** 對話門檻：5 秒窗內總能量 dB 標準差。忠實重算後之實地資料中位數：
+         *  對話 3.0、戶外 2.0、影音 3.6——與舊版 Welch PSD 估計（5.2/3.1）不同，
+         *  因估計方法不同（見類別註解），門檻已重新網格搜尋校正。 */
+        private const val MOD_STD_CONV = 2.4f
+        /** 戶外門檻：平均總能量（線性），取代舊版 lowRatio（實地資料顯示 lowRatio
+         *  在四模式間幾乎無法區分，見類別註解）。戶外錄音之寬頻風切/交通能量
+         *  遠高於對話/影音，故改以總能量高低判斷。 */
+        private const val OUTDOOR_TOTAL = 0.0112f
     }
 }

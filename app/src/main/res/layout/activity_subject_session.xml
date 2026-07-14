@@ -25,7 +25,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="快速純音（自調式）→ 套用 DSL v5 → 噪音下語詞 A/B 對照 → 環境輔聽問卷 → 匯出"
+            android:text="基準純音 → 設定模擬聽損 → 模擬聽損純音測試 → 語詞測驗 A/B → 問卷／匯出"
             android:textSize="14sp"
             android:textColor="#666666" />
 
@@ -49,6 +49,38 @@
             android:id="@+id/spinnerSessionEarphone"
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="模擬聽力圖（步驟②才設定）"
+            android:textSize="14sp" />
+
+        <Spinner
+            android:id="@+id/spinnerSessionHlProfile"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:enabled="false" />
+
+        <Switch
+            android:id="@+id/switchSessionSmearing"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:checked="true"
+            android:enabled="false"
+            android:text="頻譜模糊（聽得見但聽不懂）"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/textSessionHlHint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="基準純音不模擬聽損 —— 測完①之後才會在此設定。"
+            android:textSize="12sp"
+            android:textColor="#B71C1C" />
 
         <!-- 流程整體進度（Goal-Gradient：看得到終點，完成率較高） -->
         <ProgressBar
@@ -78,15 +110,15 @@
             android:layout_marginTop="12dp">
 
             <TextView android:id="@+id/stepText1" android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="① 快速純音（自調式）" android:textSize="16sp" android:textStyle="bold" android:padding="4dp" />
+                android:text="① 基準純音（不模擬）— 測得本人聽閾＝dB SL 零點" android:textSize="16sp" android:textStyle="bold" android:padding="4dp" />
             <TextView android:id="@+id/stepText2" android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="② 套用 DSL v5 處方" android:textSize="16sp" android:textStyle="bold" android:padding="4dp" android:alpha="0.4" />
+                android:text="② 設定模擬聽損條件 — 自動補償處方" android:textSize="16sp" android:textStyle="bold" android:padding="4dp" android:alpha="0.4" />
             <TextView android:id="@+id/stepText3" android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="③ 噪音下語詞 A/B 對照" android:textSize="16sp" android:textStyle="bold" android:padding="4dp" android:alpha="0.4" />
+                android:text="③ 模擬聽損—純音測試（含聽損體驗）" android:textSize="16sp" android:textStyle="bold" android:padding="4dp" android:alpha="0.4" />
             <TextView android:id="@+id/stepText4" android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="④ 環境輔聽問卷" android:textSize="16sp" android:textStyle="bold" android:padding="4dp" android:alpha="0.4" />
+                android:text="④ 語詞測驗 A/B（安靜；噪音選用）" android:textSize="16sp" android:textStyle="bold" android:padding="4dp" android:alpha="0.4" />
             <TextView android:id="@+id/stepText5" android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="⑤ 完成 / 匯出" android:textSize="16sp" android:textStyle="bold" android:padding="4dp" android:alpha="0.4" />
+                android:text="⑤ 環境輔聽問卷 / 匯出" android:textSize="16sp" android:textStyle="bold" android:padding="4dp" android:alpha="0.4" />
         </LinearLayout>
 
         <TextView
@@ -102,7 +134,7 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:layout_marginTop="8dp"
-            android:weightSum="3">
+            android:weightSum="2">
 
             <Button
                 android:id="@+id/buttonRetestPta"
@@ -110,19 +142,38 @@
                 android:layout_height="52dp"
                 android:layout_weight="1"
                 android:layout_marginEnd="4dp"
-                android:text="重測①純音"
-                android:textSize="12sp"
+                android:text="重測①基準純音"
+                android:textSize="13sp"
                 android:background="@drawable/rounded_button"
                 android:enabled="false" />
+
+            <Button
+                android:id="@+id/buttonRetestHlSim"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="重測③模擬純音"
+                android:textSize="13sp"
+                android:background="@drawable/rounded_button"
+                android:enabled="false" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp"
+            android:weightSum="2">
 
             <Button
                 android:id="@+id/buttonRetestAb"
                 android:layout_width="0dp"
                 android:layout_height="52dp"
                 android:layout_weight="1"
-                android:layout_marginHorizontal="4dp"
-                android:text="重測③A/B"
-                android:textSize="12sp"
+                android:layout_marginEnd="4dp"
+                android:text="重測④語詞A/B"
+                android:textSize="13sp"
                 android:background="@drawable/rounded_button"
                 android:enabled="false" />
 
@@ -132,8 +183,8 @@
                 android:layout_height="52dp"
                 android:layout_weight="1"
                 android:layout_marginStart="4dp"
-                android:text="重測④問卷"
-                android:textSize="12sp"
+                android:text="重測⑤問卷"
+                android:textSize="13sp"
                 android:background="@drawable/rounded_button"
                 android:enabled="false" />
         </LinearLayout>
@@ -174,6 +225,15 @@
             android:layout_marginTop="12dp"
             android:text="測試者測驗歷史"
             android:textSize="15sp"
+            android:background="@drawable/rounded_button" />
+
+        <Button
+            android:id="@+id/buttonSessionRestart"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="12dp"
+            android:text="重新開始流程（換測試者）"
+            android:textSize="14sp"
             android:background="@drawable/rounded_button" />
     </LinearLayout>
 </ScrollView>

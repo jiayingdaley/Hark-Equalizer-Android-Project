@@ -11,9 +11,12 @@ add_library(hark SHARED
         dsp/DynamicsProcessor.cpp
         dsp/NoiseSuppressor.cpp
         dsp/LinkwitzRileyCrossover.cpp
+        dsp/CrossoverBank8.cpp
         dsp/TransientSuppressor.cpp
         dsp/OwnVoiceDetector.cpp
         dsp/FrequencyLowering.cpp
+        dsp/FrequencySmearing.cpp
+        dsp/HearingLossSimulator.cpp
         dsp/SituationalPresets.cpp
         dsp/PrescriptionFitting.cpp
         interaction/GestureDetector.cpp

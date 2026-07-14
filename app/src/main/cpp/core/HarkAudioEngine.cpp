@@ -80,20 +80,9 @@ void HarkAudioEngine::updateDSPParameters() {
       HarkDspConfig::XO_HMID_HZ,
       HarkDspConfig::XO_VHI_HZ
   };
-  mXoverMidL.setFrequency(xoFreqs[0], sampleRate);
-  mXoverMidR.setFrequency(xoFreqs[0], sampleRate);
-  mXoverLowL.setFrequency(xoFreqs[1], sampleRate);
-  mXoverLowR.setFrequency(xoFreqs[1], sampleRate);
-  mXoverHighL.setFrequency(xoFreqs[2], sampleRate);
-  mXoverHighR.setFrequency(xoFreqs[2], sampleRate);
-  mXoverVLowL.setFrequency(xoFreqs[3], sampleRate);
-  mXoverVLowR.setFrequency(xoFreqs[3], sampleRate);
-  mXoverLMidL.setFrequency(xoFreqs[4], sampleRate);
-  mXoverLMidR.setFrequency(xoFreqs[4], sampleRate);
-  mXoverHMidL.setFrequency(xoFreqs[5], sampleRate);
-  mXoverHMidR.setFrequency(xoFreqs[5], sampleRate);
-  mXoverVHiL.setFrequency(xoFreqs[6], sampleRate);
-  mXoverVHiR.setFrequency(xoFreqs[6], sampleRate);
+  (void)xoFreqs;   // 分頻點現由 CrossoverBank8 直接讀 HarkDspConfig
+  mBankL.setSampleRate(sampleRate);
+  mBankR.setSampleRate(sampleRate);
 
   // WDRC (8 bands)
   const DspParameterSnapshot &params =
@@ -300,8 +289,10 @@ bool HarkAudioEngine::setupStreams() {
 
   sampleRate = mOutputStream->getSampleRate();
   int32_t outBurst = mOutputStream->getFramesPerBurst();
-  // 4x burst size to tolerate scheduling jitter without underruns
-  mOutputStream->setBufferSizeInFrames(outBurst * 4);
+  // 預設 4x burst（≈8 ms）容忍排程抖動；UI 忙碌頁面（問卷）可調大換穩定
+  int bursts = mOutputBufferBursts.load(std::memory_order_relaxed);
+  if (bursts < 2) bursts = 2;
+  mOutputStream->setBufferSizeInFrames(outBurst * bursts);
 
   LOGD("Output: SR=%.0f, Burst=%d, Buffer=%d, API=%d, Usage=Game, Sharing=%d",
        sampleRate, outBurst, mOutputStream->getBufferSizeInFrames(),
@@ -562,6 +553,10 @@ float HarkAudioEngine::getInputGainOffset() const {
 
 void HarkAudioEngine::setUseHeadsetMic(bool useHeadset) {
   mUseHeadsetMic.store(useHeadset);
+}
+
+void HarkAudioEngine::setOutputBufferBursts(int bursts) {
+  mOutputBufferBursts.store(bursts);
 }
 
 inline float transparent_clip(float x) {
@@ -945,22 +940,17 @@ HarkAudioEngine::onAudioReady(oboe::AudioStream * /*stream*/, void *audioData,
 
     // [3] 8-Band Filterbank with Integrated UI Gain & Own Voice Detection
     if (mCrossoverWdrcEnabled.load(std::memory_order_relaxed)) {
-      auto midL = mXoverMidL.process(sL);
-      auto lowL = mXoverLowL.process(midL.low);
-      auto highL = mXoverHighL.process(midL.high);
-      auto vlL = mXoverVLowL.process(lowL.low);
-      auto lmL = mXoverLMidL.process(lowL.high);
-      auto hmL = mXoverHMidL.process(highL.low);
-      auto vhL = mXoverVHiL.process(highL.high);
-
-      float bandsL[8] = {vlL.low, vlL.high, lmL.low, lmL.high,
-                         hmL.low, hmL.high, vhL.low, vhL.high};
+      float bandsL[8];
+      mBankL.split(sL, bandsL);
 
       if (mOwnVoiceDetectorEnabled.load(std::memory_order_relaxed)) {
         mOwnVoiceDetectorL.updateEnergy(bandsL);
       }
 
-      sL = 0.0f;
+      // 重建務必走 recombine()：樹狀分頻的各支帶著不同的全通相位，直接把 8 個
+      // 頻帶加總會在 500 Hz 與 4500 Hz 交界處互相抵消（實測 −25.6 / −8.0 dB），
+      // 即使 EQ 全平、WDRC 旁通也一樣。詳見 CrossoverBank8.h。
+      float gainedL[8];
       for (int b = 0; b < 8; ++b) {
         // 將處方增益移至 WDRC 處理之後，避免底噪在 WDRC
         // 前被放大，從而正確觸發下擴展降噪
@@ -968,33 +958,27 @@ HarkAudioEngine::onAudioReady(oboe::AudioStream * /*stream*/, void *audioData,
         if (mOwnVoiceDetectorEnabled.load(std::memory_order_relaxed)) {
           processed *= mOwnVoiceDetectorL.getOcclusionGain(b);
         }
-        sL += processed;
+        gainedL[b] = processed;
       }
+      sL = mBankL.recombine(gainedL);
 
-      auto midR = mXoverMidR.process(sR);
-      auto lowR = mXoverLowR.process(midR.low);
-      auto highR = mXoverHighR.process(midR.high);
-      auto vlR = mXoverVLowR.process(lowR.low);
-      auto lmR = mXoverLMidR.process(lowR.high);
-      auto hmR = mXoverHMidR.process(highR.low);
-      auto vhR = mXoverVHiR.process(highR.high);
-
-      float bandsR[8] = {vlR.low, vlR.high, lmR.low, lmR.high,
-                         hmR.low, hmR.high, vhR.low, vhR.high};
+      float bandsR[8];
+      mBankR.split(sR, bandsR);
 
       if (mOwnVoiceDetectorEnabled.load(std::memory_order_relaxed)) {
         mOwnVoiceDetectorR.updateEnergy(bandsR);
       }
 
-      sR = 0.0f;
+      float gainedR[8];
       for (int b = 0; b < 8; ++b) {
         // 同步右聲道：將處方增益移至 WDRC 處理之後，確保雙耳處理一致性
         float processed = mWdrcR[b].process(bandsR[b]) * mPrescriptionGainsR[b];
         if (mOwnVoiceDetectorEnabled.load(std::memory_order_relaxed)) {
           processed *= mOwnVoiceDetectorR.getOcclusionGain(b);
         }
-        sR += processed;
+        gainedR[b] = processed;
       }
+      sR = mBankR.recombine(gainedR);
     }
 
     // [4] Limiter

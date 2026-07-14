@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F5F7FA"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="聽聽看：聽力損失是什麼感覺"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:textColor="#1A237E" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="接下來的測驗會模擬「聽力受損」的狀態。先聽聽看三種情況的差別，你會比較清楚等一下在做什麼。\n\n三段播放的音量完全一樣 —— 差別只來自處理，不是音量大小。"
+            android:textSize="16sp"
+            android:lineSpacingExtra="4dp"
+            android:textColor="#37474F" />
+
+        <TextView
+            android:id="@+id/textHlSimStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:padding="14dp"
+            android:background="#E8EAF6"
+            android:text="載入中…"
+            android:textSize="15sp"
+            android:lineSpacingExtra="3dp"
+            android:textColor="#283593" />
+
+        <Button
+            android:id="@+id/buttonDemoNormal"
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:layout_marginTop="24dp"
+            android:text="▶　1. 正常聽力"
+            android:textSize="18sp"
+            android:backgroundTint="#546E7A"
+            android:textColor="#FFFFFF" />
+
+        <Button
+            android:id="@+id/buttonDemoLoss"
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:layout_marginTop="12dp"
+            android:text="▶　2. 模擬聽損"
+            android:textSize="18sp"
+            android:backgroundTint="#C62828"
+            android:textColor="#FFFFFF" />
+
+        <Button
+            android:id="@+id/buttonDemoAided"
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:layout_marginTop="12dp"
+            android:text="▶　3. 模擬聽損 ＋ Hark 補償"
+            android:textSize="18sp"
+            android:backgroundTint="#2E7D32"
+            android:textColor="#FFFFFF" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="可以重複播放、來回切換。聽清楚差別之後再開始測驗。"
+            android:textSize="14sp"
+            android:textColor="#78909C" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="24dp"
+            android:background="#CFD8DC" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="接下來：模擬聽損—純音測試\n\n在「模擬聽損」的狀態下，重新測一次你聽得見的最小音量（4 個頻率，約 3 分鐘）。這是為了確認模擬器確實把你的聽力門檻抬高了預期的量。"
+            android:textSize="16sp"
+            android:lineSpacingExtra="4dp"
+            android:textColor="#37474F" />
+
+        <Button
+            android:id="@+id/buttonHlSimStart"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="16dp"
+            android:text="開始測驗"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:backgroundTint="#1565C0"
+            android:textColor="#FFFFFF" />
+
+    </LinearLayout>
+</ScrollView>

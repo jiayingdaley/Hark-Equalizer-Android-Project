@@ -90,7 +90,7 @@ fun HarkEqualizerScreen(
             previewingBand = bandIndex
             previewingLevel = level
             toneGen.play(freq, level, previewEar, pulsed = true, durationSec = 1.0f, loop = true,
-                         pulseOnMs = 150.0f, pulseOffMs = 100.0f, bakeVolume = false)
+                         pulseOnMs = 150.0f, pulseOffMs = 100.0f)
         } else if (level != previewingLevel) {
             previewingLevel = level
             toneGen.setVolumeDbfs(level)

@@ -291,7 +291,7 @@ class MainActivity : ComponentActivity() {
         
         val hasPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         viewModel.isMicrophonePermissionGranted.value = hasPermission
-        
+
         audioRouter.start()
         volumeSyncHelper.start()
 

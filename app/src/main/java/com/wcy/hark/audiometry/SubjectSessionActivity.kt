@@ -3,12 +3,14 @@ package com.wcy.hark.audiometry
 import android.content.Intent
 import android.media.AudioManager
 import android.os.Bundle
+import android.util.Log
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
 import android.widget.Spinner
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.wcy.hark.HarkApplication
@@ -16,6 +18,8 @@ import com.wcy.hark.R
 import com.wcy.hark.audio.bridge.HarkAudioBridge
 import com.wcy.hark.audio.fitting.Prescriptions
 import com.wcy.hark.audio.manager.SystemDspManager
+import com.wcy.hark.audiometry.sqlite.SRTResultContract
+import com.wcy.hark.audiometry.sqlite.SRTResultDbHelper
 import com.wcy.hark.data.experiment.EarphoneCalibrationRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -25,10 +29,16 @@ import kotlin.math.roundToInt
 /**
  * SubjectSessionActivity — 找人測試用的測試者測驗流程主控頁（實驗模式）。
  *
- * 依序引導：① 快速純音（自調式）→ ② 套用 DSL v5 處方（用剛測得的聽力圖）
- * → ③ 噪音下語詞 A/B 對照（固定模擬中度聽損處方 vs 無補償）→ ④ 環境輔聽
- * 問卷 → ⑤ 一鍵匯出。同一個測試者 ID 與耳機型號貫穿全程；換耳機重測時
- * 保留測試者 ID、重新走一次流程即可（支援「同一人戴多副耳機」的設計）。
+ * 依序引導：① 基準純音（不模擬）→ ② 設定模擬聽損條件（同時自動補償處方）
+ * → ③ 模擬聽損—純音測試（含聽損體驗）→ ④ 語詞測驗 A/B → ⑤ 環境輔聽問卷／匯出。
+ * 同一個測試者 ID 與耳機型號貫穿全程；換耳機重測時保留測試者 ID、重新走一次
+ * 流程即可（支援「同一人戴多副耳機」的設計）。
+ *
+ * ★ 設定的可編輯時機 ★
+ * 步驟①是「基準」——量的是測試者本人的真實聽閾，模擬器必須關閉，否則量到的是
+ * 模擬後的閾值，整個 dB SL 尺度的零點就歪了。因此模擬聽力圖在步驟①期間不可編輯
+ * （也用不到）。量完基準之後才輪到步驟②選條件；一旦步驟③的模擬器檢核跑過，
+ * 條件就鎖死——之後的 A/B 對照必須跟檢核時是同一個模擬條件，否則檢核不算數。
  *
  * 任一步驟測得不理想都可用底下的「重測①/③/④」按鈕單獨重做，不會影響
  * 已完成的其他步驟（重測①會自動重新套用 DSL v5，因為處方本就取決於
@@ -36,17 +46,36 @@ import kotlin.math.roundToInt
  */
 class SubjectSessionActivity : AppCompatActivity() {
 
+    companion object {
+        /**
+         * 模擬聽閾的可用上限（dBFS）：滑桿上限是 −5 dBFS，這裡再留 10 dB，
+         * 讓測試者在模擬聽閾之上還有調整空間（否則閾值卡在滑桿頂端，量不出來）。
+         */
+        private const val USABLE_CEILING_DBFS = -15f
+    }
+
     private var stage = 0
     private var subjectName = "未填寫"
+
+    /** stage 一律經此變更：同步持久化，app 關掉、當機、隔天續測都不用從①重來。 */
+    private fun setStage(v: Int) {
+        stage = v
+        val repo = (application as HarkApplication).eqSettingsRepository
+        lifecycleScope.launch { repo.saveSessionProgress(v, sessionId) }
+    }
     private var earphoneModel = "其他"
     private var sessionId = System.currentTimeMillis()
 
     private lateinit var editSubject: EditText
     private lateinit var spinnerEarphone: Spinner
+    private lateinit var spinnerHlProfile: Spinner
+    private lateinit var switchSmearing: android.widget.Switch
+    private lateinit var textHlHint: TextView
     private lateinit var textStatus: TextView
     private lateinit var buttonNext: Button
     private lateinit var buttonExport: Button
     private lateinit var buttonRetestPta: Button
+    private lateinit var buttonRetestHlSim: Button
     private lateinit var buttonRetestAb: Button
     private lateinit var buttonRetestQuestionnaire: Button
     private lateinit var stepViews: List<TextView>
@@ -59,23 +88,72 @@ class SubjectSessionActivity : AppCompatActivity() {
     //    開放問卷。取消一律退回該步驟的起點，讓實驗者重新開始該步驟。
     private val ptaLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == RESULT_OK) {
-            applyDslV5ThenAdvance()
+            // 基準純音完成 → 前進到步驟②，讓實驗者「現在」選模擬聽損條件。
+            // 處方不在這裡算：它取決於還沒選的那張聽力圖，現在算一定是舊的。
+            //
+            // 例外：若這是流程後段的「重測①」（條件早已鎖定），聽力圖沒得改，
+            // 就必須立刻用鎖定的條件重算處方——否則後面的 A/B 會沿用上一次
+            // 基準聽閾算出的舊增益，處方與實測聽閾對不上。
+            // 聽閾在 DataStore 不分人存——記下這份聽閾屬於誰，
+            // 換 ID 時 inferProgressFromExistingData 才不會張冠李戴
+            lifecycleScope.launch {
+                (application as HarkApplication).eqSettingsRepository
+                    .saveRawThresholdsOwner(subjectName)
+            }
+            if (stage >= 3) {
+                lifecycleScope.launch { applyPrescription() }
+            } else {
+                setStage(maxOf(stage, 2))
+            }
+            updateUi()
         } else {
-            if (stage == 1) stage = 0
+            if (stage == 1) setStage(0)
             updateUi()
         }
     }
+
+    /** 「中文語詞＋噪音語詞」被選時：安靜 A/B 完成後自動接噪音 A/B。 */
+    private var pendingNoiseAb = false
+
+    /** 模擬聽損—純音測試（含聽損體驗）的檢核結果。 */
+    private var hlSimCheckPassed: Boolean? = null
+    private var hlSimCheckMaxErr: Float = 0f
+
+    private val hlSimLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == RESULT_OK) {
+            hlSimCheckPassed = result.data?.getBooleanExtra("EXTRA_HLSIM_PASSED", false)
+            hlSimCheckMaxErr = result.data?.getFloatExtra("EXTRA_HLSIM_MAX_ERR", 0f) ?: 0f
+            // 持久化：語詞場次要把這個誤差寫進 hl_sim_check_err 欄；只放記憶體
+            // 的話 app 重啟續測後就遺失（實測：檢核做了、匯出欄位卻空白）
+            lifecycleScope.launch {
+                (application as HarkApplication).eqSettingsRepository
+                    .saveHlSimCheckErr(hlSimCheckMaxErr)
+            }
+            setStage(maxOf(stage, 3))
+        } else if (stage == 2) {
+            setStage(2)   // 取消 → 留在原步驟，可重來
+        }
+        updateUi()
+    }
+
     private val abLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == RESULT_OK) {
-            stage = maxOf(stage, 4)
-        } else if (stage == 3) {
-            stage = 2
+            if (pendingNoiseAb) {
+                // 「中文＋噪音」組合：安靜段完成 → 直接接噪音段（同一步驟內）
+                pendingNoiseAb = false
+                launchAb(noiseless = false)
+                return@registerForActivityResult
+            }
+            setStage(maxOf(stage, 4))
+        } else {
+            pendingNoiseAb = false   // 中途取消 → 放棄後續的噪音段
+            if (stage == 3) setStage(3)
         }
         updateUi()
     }
     private val questionnaireLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         // 問卷「略過」屬於測試者的正當選擇，略過與送出皆視為本步驟完成
-        stage = maxOf(stage, 5)
+        setStage(maxOf(stage, 5))
         updateUi()
     }
 
@@ -87,10 +165,14 @@ class SubjectSessionActivity : AppCompatActivity() {
 
         editSubject = findViewById(R.id.editSessionSubjectName)
         spinnerEarphone = findViewById(R.id.spinnerSessionEarphone)
+        spinnerHlProfile = findViewById(R.id.spinnerSessionHlProfile)
+        switchSmearing = findViewById(R.id.switchSessionSmearing)
+        textHlHint = findViewById(R.id.textSessionHlHint)
         textStatus = findViewById(R.id.textSessionStatus)
         buttonNext = findViewById(R.id.buttonSessionNext)
         buttonExport = findViewById(R.id.buttonSessionExport)
         buttonRetestPta = findViewById(R.id.buttonRetestPta)
+        buttonRetestHlSim = findViewById(R.id.buttonRetestHlSim)
         buttonRetestAb = findViewById(R.id.buttonRetestAb)
         buttonRetestQuestionnaire = findViewById(R.id.buttonRetestQuestionnaire)
         stepViews = listOf(
@@ -102,12 +184,47 @@ class SubjectSessionActivity : AppCompatActivity() {
         val models = calibRepo.getEarphoneModels()
         spinnerEarphone.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, models)
 
+        // 模擬聽力圖選單：測試者是聽力正常的人，不模擬聽損的話補償沒有對象，
+        // A/B 對照的期望效果是零。預設 S1（很輕度陡降）——陡降型才會讓高頻子音
+        // 真的掉到聽閾以下，補償把它救回來的效果才乾淨可測。
+        val profiles = HearingLossProfile.ALL
+        spinnerHlProfile.adapter = ArrayAdapter(
+            this, android.R.layout.simple_spinner_dropdown_item, profiles.map { it.label }
+        )
+
         val repository = (application as HarkApplication).eqSettingsRepository
         lifecycleScope.launch {
             editSubject.setText(repository.getLastSubjectNameFlow().first())
             val savedModel = repository.getSelectedEarphoneFlow().first()
             val idx = models.indexOf(savedModel)
             if (idx >= 0) spinnerEarphone.setSelection(idx)
+
+            val savedProfile = HearingLossProfile.fromKey(repository.getHlSimProfileFlow().first())
+            val pIdx = profiles.indexOfFirst { it.key == savedProfile.key }
+            spinnerHlProfile.setSelection(if (pIdx >= 0) pIdx else profiles.indexOf(HearingLossProfile.DEFAULT))
+            switchSmearing.isChecked = repository.getHlSimSmearingFlow().first()
+
+            // 續測：上次流程走到哪就從哪繼續（聽閾/處方/模擬條件本就各自持久化）。
+            // 換人請按「重新開始流程」。
+            val savedStage = repository.getSessionStageFlow().first().coerceIn(0, 5)
+            val savedSession = repository.getSessionIdFlow().first()
+            if (savedStage > 0 && savedSession > 0L && stage == 0) {
+                stage = savedStage
+                sessionId = savedSession
+                val savedErr = repository.getHlSimCheckErrFlow().first()
+                if (!savedErr.isNaN()) {
+                    hlSimCheckMaxErr = savedErr
+                    hlSimCheckPassed = savedErr <= 5f
+                }
+                android.widget.Toast.makeText(
+                    this@SubjectSessionActivity,
+                    "已還原上次進度（第 $savedStage 步完成）；換人請按「重新開始流程」",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+                updateUi()
+            }
+            // 註：沒存過進度時的「從既有資料反推」不在開頁時做——此刻 ID 欄
+            // 只是上次的預填值，測試者還沒確認是誰。改在按「開始」之後觸發。
             // 先套上次選擇，再依實際連接的耳機自動預選（官方 API 回報型號；
             // 對不上校正表就不動選單，仍可手動改選）
             earphoneCallback = EarphoneAutoDetect.register(
@@ -126,8 +243,10 @@ class SubjectSessionActivity : AppCompatActivity() {
             startActivity(Intent(this, SubjectTestHistoryActivity::class.java))
         }
         buttonRetestPta.setOnClickListener { launchPta() }
-        buttonRetestAb.setOnClickListener { launchAb() }
+        buttonRetestHlSim.setOnClickListener { launchHlSim() }
+        buttonRetestAb.setOnClickListener { askOverwriteThenRetestAb() }
         buttonRetestQuestionnaire.setOnClickListener { launchQuestionnaire() }
+        findViewById<Button>(R.id.buttonSessionRestart).setOnClickListener { confirmRestart() }
         updateUi()
     }
 
@@ -137,29 +256,64 @@ class SubjectSessionActivity : AppCompatActivity() {
         val done = stage.coerceIn(0, 5)
         findViewById<android.widget.ProgressBar>(R.id.progressSessionOverall).progress = done
         findViewById<TextView>(R.id.textSessionProgress).text = "\u5df2\u5b8c\u6210 $done / 5 \u6b65"
+        val checkNote = hlSimCheckPassed?.let {
+            if (it) "（模擬器檢核 ✅ 通過，最大誤差 %.1f dB）".format(hlSimCheckMaxErr)
+            else "（⚠️ 模擬器檢核未通過，最大誤差 %.1f dB — 建議重測步驟②）".format(hlSimCheckMaxErr)
+        } ?: ""
+
         textStatus.text = when (stage) {
-            0 -> "請輸入測試者 ID 並選擇耳機型號，按開始進行快速純音（自調式）。"
-            1 -> "快速純音進行中…"
-            2 -> "已套用 DSL v5 處方，準備開始噪音下語詞 A/B 對照。"
-            3 -> "A/B 對照進行中…"
-            4 -> "準備填寫環境輔聽問卷（請先用喇叭播放情境音，見 experiment_scenes/）。"
-            else -> "流程已完成。若同一位測試者要換另一副耳機再測一次，" +
+            0 -> "請輸入測試者 ID、選擇耳機型號，按開始進行基準純音。\n" +
+                    "這一步量的是測試者「本人」的真實聽閾，模擬器全程關閉——" +
+                    "它是後面所有 dB SL 位準的零點。模擬聽損等測完基準再設定。"
+            1 -> "基準純音進行中…"
+            2 -> "已測得測試者本人聽閾（dB SL 零點已建立）。\n" +
+                    "現在請選擇模擬聽力圖與頻譜模糊——按下一步時會依「實測聽閾 + 模擬損失」" +
+                    "自動補償處方，接著進入模擬聽損—純音測試。"
+            3 -> "模擬器檢核完成 $checkNote\n模擬條件已鎖定，準備開始語詞測驗 A/B 對照。"
+            4 -> "準備填寫環境輔聽問卷（請先用喇叭播放情境音，見 experiment_scenes/）。\n" +
+                    "註：此步驟走即時音訊路徑，未套用聽損模擬。"
+            else -> "流程已完成 $checkNote\n若同一位測試者要換另一副耳機再測一次，" +
                     "耳機選單改選新型號後按「開始下一輪」即可（ID 不用重打）；" +
                     "也可用下方按鈕單獨重測任一步驟。"
         }
         buttonNext.text = when (stage) {
-            0 -> "開始：快速純音"
-            2 -> "開始：A/B 對照"
+            0 -> "開始：基準純音（不模擬）"
+            2 -> "確認條件並處方 → 模擬聽損—純音測試"
+            3 -> "開始：語詞測驗 A/B"
             4 -> "開始：填寫問卷"
             5 -> "開始下一輪（可換耳機／新測試者）"
             else -> "進行中…"
         }
-        buttonNext.isEnabled = stage != 1 && stage != 3
+        buttonNext.isEnabled = stage != 1
         buttonExport.visibility = if (stage == 5) android.view.View.VISIBLE else android.view.View.GONE
+
+        // 測試者 ID／耳機：整輪流程的識別，開跑後不可改
+        val idEnabled = stage == 0
+        spinnerEarphone.isEnabled = idEnabled
+        editSubject.isEnabled = idEnabled
+
+        // 模擬聽損條件：步驟②才是設定它的時機。
+        //   stage 0/1 —— 基準純音刻意不模擬，這裡設了也不會用到，開放只會誤導；
+        //   stage 2   —— 唯一可編輯的視窗；
+        //   stage ≥3  —— 檢核已通過，鎖死。A/B 若用了跟檢核不同的模擬條件，
+        //                那份檢核就不能拿來背書 A/B 的結果。
+        val hlEditable = stage == 2
+        spinnerHlProfile.isEnabled = hlEditable
+        switchSmearing.isEnabled = hlEditable
+        textHlHint.text = when {
+            stage < 2 -> "基準純音不模擬聽損 —— 測完①之後才會在此設定。"
+            hlEditable -> "測試者是聽力正常的人：不模擬聽損，補償就沒有對象，A/B 對照必然無效果。"
+            else -> "🔒 已鎖定（模擬器檢核通過後不可更改，否則檢核無法背書 A/B 的結果）。"
+        }
 
         // 重測按鈕：只要該步驟做過一次（stage 已走到之後）就能單獨重做，
         // 不受目前處於哪一步的限制（進行中的活動全螢幕遮擋，不會誤觸）。
+        //
+        // 歷史紀錄注意：重測不會刪除先前的紀錄——每次都寫入一筆新的 session
+        // （匯出檔裡同一測試者會有多筆）。分析時取「最後一組完整的」即可；
+        // 時間戳與 session_id 足以分辨先後。
         buttonRetestPta.isEnabled = stage >= 2
+        buttonRetestHlSim.isEnabled = stage >= 3
         buttonRetestAb.isEnabled = stage >= 4
         buttonRetestQuestionnaire.isEnabled = stage >= 5
     }
@@ -168,34 +322,173 @@ class SubjectSessionActivity : AppCompatActivity() {
         when (stage) {
             0 -> {
                 captureSubjectInputs()
-                sessionId = System.currentTimeMillis() // 新測試者流程 → 新 session_id
-                setDefaultComfortVolume()
-                stage = 1; updateUi()
-                launchPta()
+                // ID 確認後才檢查此人是否已有舊資料（開頁時 ID 只是預填值，還不算數）
+                lifecycleScope.launch { inferProgressFromExistingData() }
             }
-            2 -> { stage = 3; updateUi(); launchAb() }
-            4 -> { stage = 4; updateUi(); launchQuestionnaire() }
+            2 -> launchHlSim()
+            3 -> askNoiseConditionThenLaunchAb()
+            4 -> { updateUi(); launchQuestionnaire() }
             5 -> {
                 // 重新開始：保留測試者 ID 輸入框內容，方便同一人換耳機重測；
                 // 換人時請自行清空/修改姓名欄後再按開始。
-                stage = 0; updateUi()
+                setStage(0); hlSimCheckPassed = null; clearHlSimCheckErr(); resetHlProfileToDefault(); updateUi()
             }
         }
     }
 
     /**
-     * 每輪流程開始前把媒體音量重設到最大音量的 1/3，作為統一、不過大聲的
-     * 起始點——手機原本的媒體音量可能殘留自其他 app（常偏大），若直接
-     * 沿用，快速純音（會鎖到最大音量做校正）結束、還原後仍可能太大聲，
-     * 後續 A/B 對照的舒適音量調整也會從一個過大的起點開始。
+     * 噪音情境是選用測項——由實驗者當場決定要不要做。
+     *
+     * 安靜情境是主要測項：聽損模擬以擴展器層為主，補償的機制就是「把落在模擬
+     * 聽閾下的語音線索拉回可聽」，安靜情境正可直接檢驗，效果大且可解釋。
+     * 噪音情境下增益同時作用於語音與噪音、不改變訊噪比，補償效益小得多，
+     * 在少量測試者身上很可能被個體變異蓋掉——但它才是「聽得到不等於聽得懂」
+     * 的對照觀察，時間與測試者的疲勞度允許時值得做。
      */
-    private fun setDefaultComfortVolume() {
+    private fun askNoiseConditionThenLaunchAb() {
+        // 兩顆真正的大按鈕（實測回饋：setItems 的文字列「不像可以按的東西」）。
+        val ctx = this
+        val container = android.widget.LinearLayout(ctx).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(48, 24, 48, 8)
+        }
+        val dialog = AlertDialog.Builder(ctx)
+            .setTitle("語詞測驗 A/B（兩階段：無補償/有補償，皆套用模擬聽損）")
+            .setView(container)
+            .setNegativeButton("取消", null)
+            .create()
+        fun bigButton(text: String, onClick: () -> Unit) = Button(ctx).apply {
+            this.text = text
+            textSize = 16f
+            isAllCaps = false
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT, 160
+            ).apply { topMargin = 16 }
+            setOnClickListener { dialog.dismiss(); onClick() }
+        }
+        container.addView(bigButton("中文語詞測驗") { launchAb(noiseless = true) })
+        container.addView(bigButton("中文語詞測驗 ＋ 噪音語詞測驗") {
+            pendingNoiseAb = true          // 安靜做完自動接噪音
+            launchAb(noiseless = true)
+        })
+        dialog.show()
+    }
+
+    /**
+     * 進度持久化上線前的舊測驗沒有存 stage，但證據都在：基準聽閾在 DataStore、
+     * 語詞 A/B 與問卷在 SQLite。反推出最遠進度後「詢問」是否續測——推斷可能
+     * 跨到別的測試者（聽閾不分人存），所以必須由實驗者確認，不能默默套用。
+     */
+    private fun startBaseline() {
+        sessionId = System.currentTimeMillis() // 新測試者流程 → 新 session_id
+        hlSimCheckPassed = null
+        clearHlSimCheckErr()
+        setStage(1); updateUi()
+        launchPta()
+    }
+
+    private suspend fun inferProgressFromExistingData() {
+        val repository = (application as HarkApplication).eqSettingsRepository
+        val thresholds = repository.getBinauralRawThresholdsFlow(
+            HearingLossProfile.AUDIOGRAM_FREQS.toList()
+        ).first()
+        if (thresholds.isEmpty()) { startBaseline(); return }   // 沒有任何舊資料 → 從①開始
+
+        val name = subjectName
+        // 聽閾不分人存：只有「主人 ID 相符」的聽閾才算此人的舊資料。
+        // 不相符（換了測試者）就直接從①開始，DataStore 聽閾會被新測驗覆蓋，
+        // SQLite 之歷史紀錄不受影響。
+        val owner = repository.getRawThresholdsOwnerFlow().first()
+        if (owner != name) {
+            android.widget.Toast.makeText(
+                this, "「$name」沒有可續用的基準聽閾（現存聽閾屬「${owner.ifEmpty { "未知" }}」），從步驟①開始",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+            startBaseline(); return
+        }
+        val inferred = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val db = SRTResultDbHelper(this@SubjectSessionActivity).readableDatabase
+            fun hasRows(table: String, subjectCol: String): Boolean =
+                db.rawQuery(
+                    "SELECT 1 FROM $table WHERE $subjectCol = ? LIMIT 1", arrayOf(name)
+                ).use { it.moveToFirst() }
+            when {
+                hasRows(SRTResultContract.QuestionnaireEntry.TABLE_NAME,
+                    SRTResultContract.QuestionnaireEntry.COLUMN_NAME_SUBJECT_NAME) -> 5
+                hasRows(SRTResultContract.AbSessionEntry.TABLE_NAME,
+                    SRTResultContract.AbSessionEntry.COLUMN_NAME_SUBJECT_NAME) -> 4
+                else -> 2   // 有基準聽閾 → ①已完成；②選條件很快，從②開始最安全
+            }
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("偵測到先前的測驗資料")
+            .setMessage(
+                "「$name」已有" + when (inferred) {
+                    5 -> "問卷紀錄（全流程大致完成）"
+                    4 -> "語詞 A/B 紀錄"
+                    else -> "基準純音聽閾"
+                } + "。\n\n要從步驟${listOf("②", "④", "⑤")[when (inferred) { 5 -> 2; 4 -> 1; else -> 0 }]}繼續，還是從頭開始？\n" +
+                        "（若換了測試者或換了耳機，請選從頭開始）"
+            )
+            .setPositiveButton("從步驟繼續") { _, _ -> setStage(inferred); updateUi() }
+            .setNegativeButton("從頭開始") { _, _ -> startBaseline() }
+            .setCancelable(false)
+            .show()
+    }
+
+    /** 重測④前先問要不要覆蓋——覆蓋會刪除「本測試者」所有語詞 A/B 相關紀錄。 */
+    private fun askOverwriteThenRetestAb() {
+        AlertDialog.Builder(this)
+            .setTitle("重測④語詞 A/B")
+            .setMessage("要如何處理「$subjectName」先前的語詞測驗紀錄？")
+            .setPositiveButton("覆蓋（刪除舊紀錄）") { _, _ ->
+                deletePreviousAbResults()
+                askNoiseConditionThenLaunchAb()
+            }
+            .setNeutralButton("保留（新增一筆）") { _, _ -> askNoiseConditionThenLaunchAb() }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun deletePreviousAbResults() {
+        val db = SRTResultDbHelper(this).writableDatabase
+        db.beginTransaction()
         try {
-            val am = getSystemService(AUDIO_SERVICE) as AudioManager
-            val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-            val target = (max / 3f).roundToInt().coerceAtLeast(1)
-            am.setStreamVolume(AudioManager.STREAM_MUSIC, target, 0)
-        } catch (e: Exception) { /* best effort */ }
+            db.execSQL(
+                "DELETE FROM ${SRTResultContract.SSNRecordEntry.TABLE_NAME} WHERE " +
+                        "${SRTResultContract.SSNRecordEntry.COLUMN_NAME_SESSION_ID_FK} IN " +
+                        "(SELECT ${SRTResultContract.SSNSessionEntry.COLUMN_NAME_SESSION_ID} FROM " +
+                        "${SRTResultContract.SSNSessionEntry.TABLE_NAME} WHERE " +
+                        "${SRTResultContract.SSNSessionEntry.COLUMN_NAME_SUBJECT_NAME} = ?)",
+                arrayOf(subjectName)
+            )
+            db.delete(
+                SRTResultContract.SSNSessionEntry.TABLE_NAME,
+                "${SRTResultContract.SSNSessionEntry.COLUMN_NAME_SUBJECT_NAME} = ?",
+                arrayOf(subjectName)
+            )
+            db.delete(
+                SRTResultContract.AbSessionEntry.TABLE_NAME,
+                "${SRTResultContract.AbSessionEntry.COLUMN_NAME_SUBJECT_NAME} = ?",
+                arrayOf(subjectName)
+            )
+            db.setTransactionSuccessful()
+            android.widget.Toast.makeText(this, "已刪除舊語詞紀錄", android.widget.Toast.LENGTH_SHORT).show()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    private fun confirmRestart() {
+        AlertDialog.Builder(this)
+            .setTitle("重新開始流程")
+            .setMessage("進度將歸零（從①基準純音開始）。已存的測驗紀錄不會被刪除。\n換測試者時請按此，並修改測試者 ID。")
+            .setPositiveButton("重新開始") { _, _ ->
+                setStage(0); hlSimCheckPassed = null; clearHlSimCheckErr(); resetHlProfileToDefault(); updateUi()
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     private fun captureSubjectInputs() {
@@ -206,6 +499,82 @@ class SubjectSessionActivity : AppCompatActivity() {
             repository.saveLastSubjectName(subjectName)
             repository.saveSelectedEarphone(earphoneModel)
         }
+    }
+
+    private fun selectedProfile(): HearingLossProfile.Profile =
+        HearingLossProfile.ALL.getOrNull(spinnerHlProfile.selectedItemPosition)
+            ?: HearingLossProfile.DEFAULT
+
+    /**
+     * 步驟②：確認模擬聽損條件 → 依「實測聽閾 + 模擬損失」補償處方 →
+     * 進入模擬聽損—純音測試（第一頁是聽損體驗，接著開模擬測 4 個頻率）。
+     *
+     * 開跑前先做數位餘裕檢查。模擬器只會衰減，要讓測試者在模擬聽閾之上還聽得到
+     * SL 分貝的語音，送進模擬器的數位位準必須是「本人聽閾 + 模擬損失 + SL」。
+     * 超過 0 dBFS 的頻帶，未輔助聽不見、輔助後仍然聽不見，對 A/B 對照零貢獻——
+     * 選了太重的聽力圖（如 S2 在 4 kHz 損失 95 dB）就會整批資料白做。
+     */
+    private fun launchHlSim() {
+        // 還原進度續測時不經過步驟⓪，subjectName 不補抓的話之後所有紀錄
+        // 都會掛在「未填寫」名下（實測踩到，歷史紀錄併不回原測試者）。
+        captureSubjectInputs()
+        val repository = (application as HarkApplication).eqSettingsRepository
+        val profile = selectedProfile()
+        val smearing = switchSmearing.isChecked
+
+        lifecycleScope.launch {
+            repository.saveHlSimProfile(profile.key)
+            repository.saveHlSimSmearing(smearing)
+
+            if (profile.isNone) {
+                AlertDialog.Builder(this@SubjectSessionActivity)
+                    .setTitle("未選擇模擬聽力圖")
+                    .setMessage(
+                        "目前是「不模擬」。測試者聽力正常，補償沒有作用對象，" +
+                                "A/B 對照的期望效果為零。\n\n請選一張模擬聽力圖再繼續。"
+                    )
+                    .setPositiveButton("知道了", null)
+                    .show()
+                return@launch
+            }
+
+            val thresholds = repository.getBinauralRawThresholdsFlow(
+                HearingLossProfile.AUDIOGRAM_FREQS.toList()
+            ).first()
+            val need = HearingLossProfile.requiredLevelDbfs(
+                profile, thresholds, SelfAdjustPtaActivity.CHECK_FREQS
+            )
+
+            // 需要留出「模擬聽閾之上還能再推高一些」的空間，測試者才調得出閾值
+            if (need > USABLE_CEILING_DBFS) {
+                AlertDialog.Builder(this@SubjectSessionActivity)
+                    .setTitle("⚠️ 數位餘裕不足")
+                    .setMessage(
+                        "以這位測試者的實測聽閾，${profile.label} 要把音量推到模擬聽閾" +
+                                "需要 %.1f dBFS，已逼近數位滿刻度（滑桿上限 %.0f dBFS）。\n\n"
+                                    .format(need, SelfAdjustPtaActivity.HL_SIM_MAX_DBFS.toFloat()) +
+                                "代表最重的那個頻帶推不上去：未輔助聽不見、輔助後仍然聽不見，" +
+                                "對 A/B 對照沒有任何貢獻。\n\n" +
+                                "建議改選較輕的聽力圖（S1 或 N2）。"
+                    )
+                    .setPositiveButton("改選", null)
+                    .setNegativeButton("仍要繼續") { _, _ ->
+                        lifecycleScope.launch { applyPrescription(); doLaunchHlSim() }
+                    }
+                    .show()
+                return@launch
+            }
+
+            applyPrescription()
+            doLaunchHlSim()
+        }
+    }
+
+    private fun doLaunchHlSim() {
+        hlSimLauncher.launch(Intent(this, HlSimIntroActivity::class.java).apply {
+            putExtra("EXTRA_SUBJECT", subjectName)
+            putExtra("EXTRA_EARPHONE_MODEL", earphoneModel)
+        })
     }
 
     private fun launchPta() {
@@ -219,14 +588,78 @@ class SubjectSessionActivity : AppCompatActivity() {
         })
     }
 
-    private fun launchAb() {
+    private fun launchAb(noiseless: Boolean = true) {
+        captureSubjectInputs()
+        if (!noiseless) {
+            // 噪音測驗的適用性檢查放在「進測驗之前」擋一次就好——
+            // 放在測驗裡會 A/B 兩階段各跳一次，干擾施測（實測回報）。
+            lifecycleScope.launch { checkNoiseFeasibilityThenLaunch() }
+            return
+        }
+        doLaunchAb(noiseless = true)
+    }
+
+    /**
+     * 混音總位準固定在一般交談音量（聽閾+55 dB SL，上限 −35 dBFS）。若模擬損失
+     * 重到讓總位準落在「模擬聽閾」以下，未輔助時連噪音都幾乎聽不見，兩條件都會
+     * 趴地板。此時給實驗者三個出口：改做安靜、仍要做、取消。
+     */
+    private suspend fun checkNoiseFeasibilityThenLaunch() {
+        val repository = (application as HarkApplication).eqSettingsRepository
+        val profile = HearingLossProfile.fromKey(repository.getHlSimProfileFlow().first())
+        val thresholds = repository.getBinauralRawThresholdsFlow(
+            listOf(500, 1000, 2000)
+        ).first()
+        val anchor = thresholds.values.takeIf { it.isNotEmpty() }?.average()?.toFloat() ?: -60f
+        val speechLoss = if (profile.isNone) 0f else listOf(500, 1000, 2000).map { f ->
+            val i = HearingLossProfile.AUDIOGRAM_FREQS.indexOf(f)
+            if (i >= 0) profile.thresholds[i] else 0f
+        }.average().toFloat()
+
+        val totalDbfs = (anchor + 55f).coerceAtMost(-35f)
+        val marginDb = totalDbfs - (anchor + speechLoss)
+        if (profile.isNone || marginDb >= 10f) { doLaunchAb(noiseless = false); return }
+
+        AlertDialog.Builder(this)
+            .setTitle("⚠️ ${profile.label} 不適合噪音測驗")
+            .setMessage(
+                "呈現總位準固定在一般交談音量（%.0f dBFS），但此模擬條件的聽閾約 %.0f dBFS，"
+                    .format(totalDbfs, anchor + speechLoss) +
+                        "總位準僅高出 %.0f dB——未輔助時連噪音都幾乎聽不見，".format(marginDb) +
+                        "兩條件都會趴地板、測不出差異。\n\n" +
+                        "建議改做安靜語詞，或換較輕的模擬聽力圖（如 S1）。"
+            )
+            .setPositiveButton("改做安靜語詞") { _, _ -> doLaunchAb(noiseless = true) }
+            .setNeutralButton("仍要做噪音") { _, _ -> doLaunchAb(noiseless = false) }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun clearHlSimCheckErr() {
+        lifecycleScope.launch {
+            (application as HarkApplication).eqSettingsRepository.saveHlSimCheckErr(Float.NaN)
+        }
+    }
+
+    /** 重新開始流程 → 模擬組態選單拉回預設 S1（主要條件），避免沿用上一輪的組態。 */
+    private fun resetHlProfileToDefault() {
+        val idx = HearingLossProfile.ALL.indexOf(HearingLossProfile.DEFAULT)
+        if (idx >= 0) spinnerHlProfile.setSelection(idx)
+    }
+
+    private fun doLaunchAb(noiseless: Boolean) {
         abLauncher.launch(Intent(this, SSNAbTestActivity::class.java).apply {
             putExtra("EXTRA_SUBJECT", subjectName)
             putExtra("EXTRA_EARPHONE_MODEL", earphoneModel)
+            putExtra("EXTRA_NOISELESS", noiseless)
+            // 步驟③檢核誤差 → 隨場次寫進資料庫（NaN = 本輪未檢核）
+            putExtra("EXTRA_HL_SIM_CHECK_ERR",
+                if (hlSimCheckPassed != null) hlSimCheckMaxErr else Float.NaN)
         })
     }
 
     private fun launchQuestionnaire() {
+        captureSubjectInputs()
         questionnaireLauncher.launch(Intent(this, QuestionnaireActivity::class.java).apply {
             putExtra("EXTRA_SUBJECT", subjectName)
             putExtra("EXTRA_SESSION_ID", sessionId)
@@ -234,45 +667,56 @@ class SubjectSessionActivity : AppCompatActivity() {
         })
     }
 
-    /** 讀取剛測得的聽力圖，計算 DSL v5 16 段增益並套用到即時 EQ（雙耳）。 */
-    private fun applyDslV5ThenAdvance() {
+    /**
+     * 讀取剛測得的聽力圖，計算 DSL v5 16 段增益並套用到即時 EQ（雙耳）。
+     *
+     * ★ 處方的輸入是「測試者實測聽閾 + 模擬損失量」，不是測試者本人的聽力圖 ★
+     *
+     * 測試者聽力正常，若逕以其本人的聽力圖算處方，DSL v5 對 ≤20 dB HL 給的增益
+     * 趨近於零——輔助與未輔助兩條件毫無差異，A/B 對照做出來一定是「沒有效果」。
+     * 補償要有可檢驗的對象，處方就必須針對「模擬器所實作的那張聽力圖」來開，
+     * 才構成「模擬損失 → 依損失開處方 → 檢驗處方能否還原可聽度」的內部一致閉環。
+     */
+    private suspend fun applyPrescription() {
         val repository = (application as HarkApplication).eqSettingsRepository
-        lifecycleScope.launch {
-            val testFrequencies = listOf(250, 500, 1000, 2000, 3000, 4000, 6000, 8000)
-            suspend fun loadAudiogram(ear: String): Map<Int, Float> = buildMap {
-                for (freq in testFrequencies) {
-                    val t = repository.getAudiogramThresholdFlow(ear, freq).first()
-                    if (t != -1) put(freq, t.toFloat())
+        val testFrequencies = listOf(250, 500, 1000, 2000, 3000, 4000, 6000, 8000)
+        val profile = HearingLossProfile.fromKey(repository.getHlSimProfileFlow().first())
+
+        suspend fun loadAudiogram(ear: String): Map<Int, Float> = buildMap {
+            for ((i, freq) in testFrequencies.withIndex()) {
+                val t = repository.getAudiogramThresholdFlow(ear, freq).first()
+                if (t != -1) {
+                    // 疊上模擬損失量 → 這才是處方該補償的那張聽力圖
+                    put(freq, t.toFloat() + profile.thresholds[i])
                 }
             }
-            val leftAudiogram = loadAudiogram("left")
-            val rightAudiogram = loadAudiogram("right")
-            val binaural = leftAudiogram.isNotEmpty() && rightAudiogram.isNotEmpty()
-
-            // 逐頻段「先寫入 DataStore、再更新即時 DSP」皆在同一協程內依序
-            // await，確保下一步（A/B 對照快照/還原增益）讀到的是本次結果，
-            // 不會被 Activity 生命週期提早取消而遺漏。
-            //
-            // 同時更新 HarkAudioBridge（真正即時麥克風收音處理引擎）與
-            // SystemDspManager（測驗播放音軌用的模擬路徑）——先前只更新
-            // 後者，導致問卷情境音環節的「即時輔聽」實際上從未套用過
-            // 這裡算出的 DSL v5 增益，是個潛在 bug。
-            suspend fun applyEar(earIndex: Int, ear: String, audiogram: Map<Int, Float>) {
-                if (audiogram.isEmpty()) return
-                Prescriptions.CENTER_FREQUENCIES_16.forEachIndexed { i, freq ->
-                    val threshold = interpolateThreshold(freq, audiogram) ?: return@forEachIndexed
-                    val gain = Prescriptions.dslV5Gain(freq, threshold, binaural).coerceIn(0f, 30f)
-                    repository.saveBandGain(ear, 0, i, gain)
-                    HarkAudioBridge.setBandGain(earIndex, i, gain)
-                    SystemDspManager.updateBandGain(earIndex, i, gain)
-                }
-            }
-            applyEar(0, "left", leftAudiogram)
-            applyEar(1, "right", rightAudiogram)
-
-            stage = maxOf(stage, 2)
-            updateUi()
         }
+        val leftAudiogram = loadAudiogram("left")
+        val rightAudiogram = loadAudiogram("right")
+        val binaural = leftAudiogram.isNotEmpty() && rightAudiogram.isNotEmpty()
+        Log.i("SubjectSession",
+            "DSL v5 處方輸入＝實測聽閾＋模擬損失（${profile.key}）: left=$leftAudiogram")
+
+        // 逐頻段「先寫入 DataStore、再更新即時 DSP」皆在同一協程內依序
+        // await，確保下一步（A/B 對照快照/還原增益）讀到的是本次結果，
+        // 不會被 Activity 生命週期提早取消而遺漏。
+        //
+        // 同時更新 HarkAudioBridge（真正即時麥克風收音處理引擎）與
+        // SystemDspManager（測驗播放音軌用的模擬路徑）——先前只更新
+        // 後者，導致問卷情境音環節的「即時輔聽」實際上從未套用過
+        // 這裡算出的 DSL v5 增益，是個潛在 bug。
+        suspend fun applyEar(earIndex: Int, ear: String, audiogram: Map<Int, Float>) {
+            if (audiogram.isEmpty()) return
+            Prescriptions.CENTER_FREQUENCIES_16.forEachIndexed { i, freq ->
+                val threshold = interpolateThreshold(freq, audiogram) ?: return@forEachIndexed
+                val gain = Prescriptions.dslV5Gain(freq, threshold, binaural).coerceIn(0f, 30f)
+                repository.saveBandGain(ear, 0, i, gain)
+                HarkAudioBridge.setBandGain(earIndex, i, gain)
+                SystemDspManager.updateBandGain(earIndex, i, gain)
+            }
+        }
+        applyEar(0, "left", leftAudiogram)
+        applyEar(1, "right", rightAudiogram)
     }
 
     private fun interpolateThreshold(freqHz: Int, audiogram: Map<Int, Float>): Float? {

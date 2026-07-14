@@ -66,6 +66,8 @@ class QuestionnaireActivity : ComponentActivity() {
     private var useHeadsetMic = true
     private var currentMode = SceneManager.Mode.CONVERSATION
     private var engineStarted = false
+    private var dspOn = false
+    private val uiHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -102,7 +104,33 @@ class QuestionnaireActivity : ComponentActivity() {
         val granted = ContextCompat.checkSelfPermission(
             this, Manifest.permission.RECORD_AUDIO
         ) == PackageManager.PERMISSION_GRANTED
-        if (!granted) return   // 無權限則保持靜默降級，開關不作用
+        if (!granted) {
+            android.widget.Toast.makeText(
+                this, "未取得麥克風權限，輔聽開關將無作用", android.widget.Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+
+        // ★ 主動解除測驗隔離 ★
+        // 前面的測驗步驟會設 audiometryIsolationActive=true + setMuted(true)，
+        // 而服務端的耳機偵測（HarkAudioService）只要看到這個旗標就會把引擎
+        // 重新靜音——所以本頁不能只被動假設「別人已還原」，必須自己斷言
+        // 「現在要出聲」。實測漏掉這段的症狀：問卷的輔聽怎麼切都完全無聲。
+        HarkAudioService.audiometryIsolationActive = false
+
+        // 問卷頁 UI（Compose 重組）會讓音訊 callback 遲到 20+ ms，
+        // 預設 4×burst（≈8 ms）緩衝必然 underrun——實測聲音斷斷續續。
+        // 只調大 bursts 不夠：耳機收音時輸出走 Exclusive/MMAP（logcat 可見
+        // "setHwVolume (mmap-playback)"），其緩衝容量硬體固定僅 2–3 burst，
+        // setBufferSizeInFrames(16×burst) 被靜默鉗到容量上限，斷續依舊
+        // （實測回報第二次）。本頁不需要極低延遲，強制 Shared 模式讓
+        // 16×burst（≈32 ms）真正生效；離頁還原。
+        HarkAudioBridge.setStreamOverrides(1, 0)   // sharing: 1 = 強制 Shared
+        // 32×burst ≈ 64 ms：實測本頁 callback 最大遲到 32.6 ms
+        // （mMaxMeasuredLatenessNanos），16×burst（32 ms）恰好被吃光仍會
+        // 斷音，需留一倍餘裕。
+        HarkAudioBridge.setOutputBufferBursts(32)
+
         ContextCompat.startForegroundService(
             this,
             Intent(this, HarkAudioService::class.java).apply { action = HarkAudioService.ACTION_START }
@@ -111,7 +139,33 @@ class QuestionnaireActivity : ComponentActivity() {
         HarkAudioBridge.setUseHeadsetMic(useHeadsetMic)
         HarkAudioBridge.setSituationalMode(currentMode.id)
         applyGains()
-        HarkAudioBridge.setBypassMode(true)   // 初始 OFF
+        // 初始 OFF = 引擎靜音。OFF 曾實作為 bypass 透傳（有聲音），測試者疑惑
+        // 「沒開輔聽怎麼有聲音」——未輔助狀態本來就該是耳機無聲、隔著耳機聽喇叭。
+        HarkAudioBridge.setBypassMode(true)
+        HarkAudioBridge.setMuted(true)
+
+        // 即時聆聽不是 dB SL 刺激，不需要鎖最大音量；反而必須調回舒適值——
+        // 前面測驗全程鎖最大，DSL 增益（高頻可達 +30 dB）疊上去會刺耳傷耳。
+        // 音量鍵開放，實驗者可隨時調整。
+        try {
+            val am = getSystemService(AUDIO_SERVICE) as android.media.AudioManager
+            val max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
+            am.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, (max / 3).coerceAtLeast(1), 0)
+        } catch (e: Exception) { /* best effort */ }
+
+        // 鎖定手動環境模式。服務啟動時 SceneManager 會開始「自動環境分類」，
+        // 每幾秒依現場聲音直接改寫引擎的環境模式——本頁若只對 bridge 設模式，
+        // 過一陣子就被自動分類蓋掉（實測：「明明選對話卻跳到別的模式」）。
+        // selectModeManual() 會鎖住自動偵測。服務是非同步啟動的，稍等再鎖。
+        uiHandler.postDelayed({
+            HarkAudioService.sceneManager?.selectModeManual(currentMode)
+        }, 800)
+
+        // ★ 搶回最後決定權 ★ 服務啟動（非同步）完成時會做耳機偵測，
+        // 「有耳機就解除靜音」——發生在上面 setMuted(true) 之後，OFF 狀態
+        // 被翻成有聲的原始透傳，ON/OFF 聽感幾乎沒差（實測回報：DSP 不工作）。
+        // 等服務就緒後把本頁的 ON/OFF 狀態重新套一次。
+        uiHandler.postDelayed({ applyDsp(dspOn) }, 1200)
     }
 
     private fun applyGains() {
@@ -120,29 +174,91 @@ class QuestionnaireActivity : ComponentActivity() {
         dspGainsRight.forEachIndexed { i, g -> HarkAudioBridge.setBandGain(1, i, g) }
     }
 
-    /** ON：套用 DSL v5 增益 + 所選環境模式；OFF：bypass 原樣透傳。 */
+    /** ON：出聲並套用 DSL v5 增益 + 環境模式；OFF：引擎靜音（耳機無聲）。 */
     private fun applyDsp(on: Boolean) {
+        dspOn = on
         if (!engineStarted) return
         if (on) {
+            HarkAudioBridge.setMuted(false)
             HarkAudioBridge.setBypassMode(false)
             HarkAudioBridge.setSituationalMode(currentMode.id)
             applyGains()
         } else {
             HarkAudioBridge.setBypassMode(true)
+            HarkAudioBridge.setMuted(true)
         }
     }
 
+    /**
+     * 切換收音來源。useHeadsetMic 旗標只在「開流」時被讀取（它決定 Oboe 的
+     * Exclusive/Shared 共享模式），引擎跑著的時候改旗標毫無作用——這正是
+     * 實測「切到手機收音卻還在耳機收音」的原因。必須重啟引擎讓它重新開流。
+     */
     private fun setMic(headset: Boolean) {
         useHeadsetMic = headset
-        if (engineStarted) HarkAudioBridge.setUseHeadsetMic(headset)
+        if (!engineStarted) return
+        HarkAudioBridge.setMuted(true)          // 重啟瞬間避免爆音
+        HarkAudioBridge.stopEngine()
+        HarkAudioBridge.setUseHeadsetMic(headset)
+        // ★ 光翻旗標不夠 ★ 手機收音模式下，引擎開流用的是 mInputDeviceId
+        // （內建麥克風實體 ID）。那個 ID 平時由 HarkAudioRouter 設定，而 router
+        // 上次選的是耳機麥——不在這裡塞入內建麥 ID，重啟後照樣是耳機收音。
+        if (!headset) {
+            val am = getSystemService(AUDIO_SERVICE) as android.media.AudioManager
+            am.getDevices(android.media.AudioManager.GET_DEVICES_INPUTS)
+                .firstOrNull { it.type == android.media.AudioDeviceInfo.TYPE_BUILTIN_MIC }
+                ?.let { HarkAudioBridge.setAudioInputDeviceId(it.id) }
+            HarkAudioBridge.setIsBluetoothInput(false)
+            // 與 router 的手機收音路徑一致：內建麥靈敏度較低，補 +15 dB 輸入增益
+            HarkAudioBridge.setInputGainOffset(15.0f)
+        } else {
+            HarkAudioBridge.setInputGainOffset(0.0f)
+        }
+        uiHandler.postDelayed({
+            HarkAudioBridge.startEngine()
+            // 引擎重啟後原生端狀態歸零，把本頁的狀態全部重新套上
+            applyGains()
+            HarkAudioService.sceneManager?.selectModeManual(currentMode)
+                ?: HarkAudioBridge.setSituationalMode(currentMode.id)
+            if (dspOn) {
+                HarkAudioBridge.setBypassMode(false)
+                HarkAudioBridge.setMuted(false)
+            } else {
+                HarkAudioBridge.setBypassMode(true)
+                HarkAudioBridge.setMuted(true)
+            }
+        }, 200)
     }
 
     private fun setMode(mode: SceneManager.Mode) {
         currentMode = mode
-        if (engineStarted) HarkAudioBridge.setSituationalMode(mode.id)
+        if (!engineStarted) return
+        // 走 SceneManager 的手動選擇（會鎖住自動分類），不要直接寫 bridge——
+        // 直接寫會在下一輪自動分類被蓋掉
+        HarkAudioService.sceneManager?.selectModeManual(mode)
+            ?: HarkAudioBridge.setSituationalMode(mode.id)
+        // 從引擎回讀狀態顯示——模式差異（壓縮參數、降噪開關）在安靜環境下
+        // 聽感很細微，實測者會以為「沒有作用」；用回讀值證明有套用。
+        uiHandler.postDelayed({
+            val nr = try { HarkAudioBridge.isNoiseReductionEnabled() } catch (e: Throwable) { false }
+            val desc = when (mode) {
+                SceneManager.Mode.TRANSPARENCY -> "透明｜壓縮 1.2:1"
+                SceneManager.Mode.CONVERSATION -> "對話｜壓縮 1.5:1＋下擴展降噪"
+                SceneManager.Mode.OUTDOOR -> "戶外｜壓縮 1.3:1＋抗風切"
+                SceneManager.Mode.CINEMA -> "影音｜壓縮 1.1:1（最接近原音）"
+                SceneManager.Mode.AUTO -> "自動判斷"
+            }
+            android.widget.Toast.makeText(
+                this, "已套用：$desc｜降噪 ${if (nr) "開" else "關"}",
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+        }, 150)
     }
 
     override fun onDestroy() {
+        // 還原輔聽的低延遲串流組態（本頁為防斷續改 Shared + 16×burst）
+        HarkAudioBridge.setStreamOverrides(0, 0)
+        HarkAudioBridge.setOutputBufferBursts(4)
         // 離開問卷即停止即時引擎，回復進場前狀態（進場前本流程並未啟用輔聽）。
         if (engineStarted) {
             startService(Intent(this, HarkAudioService::class.java).apply {
@@ -291,8 +407,8 @@ private fun QuestionnaireScreen(
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text("輔聽 DSP", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                                     Text(
-                                        "ON：即時麥克風收音 → DSL v5 補償 + 環境模式；OFF：原樣透傳。" +
-                                        "喇叭播放情境音時可即時切換比較。",
+                                        "OFF：耳機無聲（隔著耳機聽喇叭）；ON：即時收音 → DSL v5 補償 + 環境模式。" +
+                                        "覺得太大聲可用音量鍵調整。",
                                         fontSize = 12.sp,
                                         color = Color(0xFF757575)
                                     )

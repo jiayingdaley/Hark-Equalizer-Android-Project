@@ -18,10 +18,14 @@ SituationalPreset getPresetForMode(SituationalMode mode) {
                        HarkDspConfig::PRESET_OUT_EXP_THRESH, HarkDspConfig::PRESET_OUT_EXP_RATIO,
                        HarkDspConfig::PRESET_OUT_ATTACK_MS, HarkDspConfig::PRESET_OUT_RELEASE_MS}, true };
         case SituationalMode::CINEMA:
-            // Cinema mode with wider dynamic headroom, low compression
+            // Cinema mode with wider dynamic headroom, low compression.
+            // NR must stay OFF: the Wiener SNR-gate tracks a noise floor assuming
+            // speech-like pauses. Music has no true "silence" floor — quiet
+            // passages/decays get misread as noise floor and gated out, killing
+            // the melody. Same rationale as TRANSPARENCY (preserve the real signal).
             return { {HarkDspConfig::PRESET_CIN_COMP_THRESH, HarkDspConfig::PRESET_CIN_COMP_RATIO,
                        HarkDspConfig::PRESET_CIN_EXP_THRESH, HarkDspConfig::PRESET_CIN_EXP_RATIO,
-                       HarkDspConfig::PRESET_CIN_ATTACK_MS, HarkDspConfig::PRESET_CIN_RELEASE_MS}, true };
+                       HarkDspConfig::PRESET_CIN_ATTACK_MS, HarkDspConfig::PRESET_CIN_RELEASE_MS}, false };
         case SituationalMode::AUTO:
         default:
             // Default to transparency presets

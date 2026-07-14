@@ -108,12 +108,52 @@ class HarkAudioService : Service() {
         audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
         createNotificationChannel()
         // Pass the service-scoped coroutine scope to SceneManager (KNOWN-ISSUE-007 fix)
-        sceneManager = SceneManager(this, serviceScope)
+        sceneManager = SceneManager(serviceScope)
+
+        // 前景服務義務必須在 onCreate() 就無條件履行，不能等 onStartCommand 判斷完
+        // action 才呼叫——MainActivity.updateAudioStates() 會在耳機路由變動時反覆呼叫
+        // ContextCompat.startForegroundService()（例如藍牙瞬間斷連又重連），一旦兩次
+        // 呼叫之間出現 STOP/START 競爭，startForeground() 真正執行的時間點就可能被
+        // 排到系統限時（Android 15 起 5 秒）之外，導致
+        // ForegroundServiceDidNotStartInTimeException 讓整個 App 被砍。onCreate() 對
+        // 每個 Service 行程只會執行一次、且一定先於任何 onStartCommand，故在此立刻呼叫
+        // 可保證無論哪個 intent（含 null 重啟）觸發，時限都不會被搶佔的路由邏輯吃掉。
+        promoteToForeground()
+    }
+
+    /** 建立通知並呼叫 startForeground()；必須是 onCreate() 第一批動作之一（見上方註解）。 */
+    private fun promoteToForeground() {
+        val notificationIntent = Intent(this, MainActivity::class.java)
+        val pendingIntent = PendingIntent.getActivity(
+            this, 0, notificationIntent,
+            PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("Hark 輔助聽力運行中")
+            .setContentText("正在背景處理音訊以輔助您的聽力")
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentIntent(pendingIntent)
+            .build()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(
+                NOTIFICATION_ID, notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_START -> startForegroundService()
+            // intent == null 是 START_STICKY 被系統殺掉行程後自動重啟的情形（官方行為：
+            // 重啟時不會帶回原本的 intent）。這個 Service 先前是以前景服務身分在跑，重啟
+            // 後系統仍要求限時內呼叫 startForeground()，否則直接拋
+            // ForegroundServiceDidNotStartInTimeException 讓整個 App 當掉——因此 null 也要
+            // 走跟 ACTION_START 相同的路徑，而不是被 when 悄悄吃掉。
+            ACTION_START, null -> startForegroundService()
             ACTION_STOP -> {
                 abandonAudioFocus()
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -139,28 +179,8 @@ class HarkAudioService : Service() {
         }
         Log.d(TAG, "WakeLock acquired for background audio stability")
 
-        val notificationIntent = Intent(this, MainActivity::class.java)
-        val pendingIntent = PendingIntent.getActivity(
-            this, 0, notificationIntent,
-            PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Hark 輔助聽力運行中")
-            .setContentText("正在背景處理音訊以輔助您的聽力")
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentIntent(pendingIntent)
-            .build()
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(
-                NOTIFICATION_ID, notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
-            )
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
-        }
-
+        // startForeground() 已在 onCreate() 的 promoteToForeground() 呼叫過（見該處註解）；
+        // 這裡不需要也不應該重複呼叫。
         requestAudioFocus()
 
         if (!HarkAudioBridge.isEngineActuallyRunning()) {
@@ -177,7 +197,18 @@ class HarkAudioService : Service() {
         }
         sceneManager?.start()
 
-        // Setup headset detection
+        // Setup headset detection. startForegroundService() can run more than once per
+        // service lifetime (ACTION_START fires again on toggle-off/on), so unregister any
+        // previous receiver first — otherwise each restart leaks another registration
+        // (IntentReceiverLeaked) since only onDestroy() used to unregister.
+        if (isReceiverRegistered && headsetPlugReceiver != null) {
+            try {
+                unregisterReceiver(headsetPlugReceiver)
+            } catch (e: IllegalArgumentException) {
+                // already unregistered elsewhere; ignore
+            }
+            isReceiverRegistered = false
+        }
         headsetPlugReceiver = HeadsetPlugReceiver()
         registerReceiver(headsetPlugReceiver, IntentFilter(Intent.ACTION_HEADSET_PLUG))
         isReceiverRegistered = true
@@ -217,6 +248,9 @@ class HarkAudioService : Service() {
 
     private fun registerDeviceCallback() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            // Same leak shape as the headset receiver above: this can run more than once
+            // per service lifetime, so drop any previous callback before registering anew.
+            unregisterDeviceCallback()
             audioDeviceCallback = object : AudioDeviceCallback() {
                 override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>?) {
                     checkHeadphonesAndControlEngine()

@@ -8,7 +8,7 @@
 #include "DynamicsProcessor.h"
 #include "FilterChain.h"
 #include "GestureDetector.h"
-#include "LinkwitzRileyCrossover.h"
+#include "CrossoverBank8.h"
 #include "LockFreeQueue.h"
 #include "NoiseSuppressor.h"
 #include "TransientSuppressor.h"
@@ -78,6 +78,9 @@ public:
   void logLatencyStatistics();
   void setInputGainOffset(float gainDb);  // 調整輸入來源補償增益
   void setUseHeadsetMic(bool useHeadset); // 設定是否使用耳機麥克風
+  // 輸出緩衝大小（burst 倍數；下次開流生效）。預設 4（≈8 ms）追求低延遲；
+  // UI 忙碌的頁面（如問卷）callback 遲到可達 25 ms，需調大以免聲音斷續。
+  void setOutputBufferBursts(int bursts);
 
   // --- Media Capture Mode ---
   void setMediaCaptureMode(bool enabled);
@@ -113,6 +116,7 @@ private:
   std::atomic<bool> mAutoRecoveryEnabled{true};
   int32_t mInputDeviceId = oboe::kUnspecified;
   std::atomic<bool> mUseHeadsetMic{true};
+  std::atomic<int> mOutputBufferBursts{4};
 
   // --- Media Capture ---
   std::atomic<bool> mMediaCaptureMode{false};
@@ -148,13 +152,9 @@ private:
       HarkDspConfig::GAIN_SMOOTH_ALPHA; // 加快響應速度 (原為 0.9995f，導致更新過慢)
 
   // --- Crossover & WDRC ---
-  LinkwitzRileyCrossover mXoverMidL, mXoverMidR;
-  LinkwitzRileyCrossover mXoverLowL, mXoverLowR;
-  LinkwitzRileyCrossover mXoverHighL, mXoverHighR;
-  LinkwitzRileyCrossover mXoverVLowL, mXoverVLowR;
-  LinkwitzRileyCrossover mXoverLMidL, mXoverLMidR;
-  LinkwitzRileyCrossover mXoverHMidL, mXoverHMidR;
-  LinkwitzRileyCrossover mXoverVHiL, mXoverVHiR;
+  // 8 頻帶 LR4 分頻器組（含相位補償重建 —— 直接把頻帶加總會在 500 Hz
+  // 與 4500 Hz 交界處抵消，詳見 CrossoverBank8.h）
+  CrossoverBank8 mBankL, mBankR;
 
   DynamicsProcessor mWdrcL[NUM_INTERNAL_BANDS];
   DynamicsProcessor mWdrcR[NUM_INTERNAL_BANDS];

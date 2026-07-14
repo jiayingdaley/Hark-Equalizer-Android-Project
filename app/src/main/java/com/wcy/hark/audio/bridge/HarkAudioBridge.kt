@@ -38,6 +38,8 @@ object HarkAudioBridge {
     external fun setInputGainOffset(gainDb: Float)
     external fun setUseHeadsetMic(useHeadset: Boolean)
     external fun setIsBluetoothInput(isBluetooth: Boolean)
+    /** 輸出緩衝（burst 倍數；下次開流生效）。預設 4≈8ms；UI 忙碌頁面調大防斷續。 */
+    external fun setOutputBufferBursts(bursts: Int)
     external fun setHeadphonesConnected(connected: Boolean)
 
     // --- Media Capture Mode ---
@@ -63,6 +65,42 @@ object HarkAudioBridge {
     external fun nlfcProcessOffline(
         input: FloatArray, sampleRate: Int, cutoffHz: Float, ratio: Float
     ): FloatArray
+
+    // ── 聽損模擬（Hearing Loss Simulation）──────────────────────────────────
+    // 讓聽力正常的測試者體驗聽損者的知覺缺損，補償演算法才有可檢驗的對象。
+    // ★ 必須在 DSP 補償「之後」呼叫 ★——真實情境是助聽器先處理、聲音才進入
+    // 受損的耳蝸；順序反了，檢驗的就是「訊號還原」而非助聽器。
+
+    /**
+     * 離線聽損模擬（頻譜模糊 + 多頻帶擴展器）。輸入輸出等長、時間對齊。
+     *
+     * @param thresholdsDbfs 該測試者本人於 8 個 DSP 頻帶的聽閾（dBFS），自調式純音量得
+     * @param lossDb         各頻帶的模擬損失量（dB，≥0）
+     * @param uclDb          不舒適閾（dB SL），一般 100
+     * @param broadenFactor  聽覺濾波器加寬倍數（1.0 = 不做頻譜模糊）
+     */
+    external fun hlSimProcessOffline(
+        input: FloatArray, sampleRate: Int,
+        thresholdsDbfs: FloatArray, lossDb: FloatArray,
+        uclDb: Float, broadenFactor: Float
+    ): FloatArray
+
+    /**
+     * 離線 DSP 補償：16 頻段處方等化（與即時引擎同一組中心頻率）。
+     * 語詞測驗改走此路徑，才能在其後串接聽損模擬器
+     * （Android DynamicsProcessing 掛在 session 上，後面接不了東西）。
+     */
+    external fun dspProcessOffline(
+        input: FloatArray, sampleRate: Int, gainsDb16: FloatArray, qFactor: Float
+    ): FloatArray
+
+    /**
+     * 純音的閉式聽損模擬增益（dB，≤0）。純音是單一頻率的穩態訊號，經擴展器的作用
+     * 僅是位準映射，故可直接施加於音源振幅，不需跑濾波器組。
+     */
+    external fun hlSimToneGainDb(
+        levelDbfs: Float, thresholdDbfs: Float, lossDb: Float, uclDb: Float
+    ): Float
 
     external fun setWdrcExpanderThreshold(thresholdDb: Float)
     external fun setLimiterParameters(thresholdDb: Float, releaseMs: Float)

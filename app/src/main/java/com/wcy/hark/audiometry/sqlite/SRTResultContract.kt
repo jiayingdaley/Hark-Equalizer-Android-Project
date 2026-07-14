@@ -71,6 +71,25 @@ object SRTResultContract {
         const val MODE_SL = "SL"
         // 語音是否先經離線移頻（NLFC）處理（v10 新增；0/NULL = 否）
         const val COLUMN_NAME_NLFC = "nlfc"
+        // ── v11：聽損模擬（Hearing Loss Simulation）──────────────────────────
+        // 測試者是聽力正常的人；不模擬聽損，補償就沒有對象、A/B 對照必然無效果。
+        // 這三欄記錄本場次「模擬了什麼」，是結果可否解釋的前提，必須隨資料留存。
+        const val COLUMN_NAME_HL_SIM_PROFILE = "hl_sim_profile"    // "NONE"/"S2"/"N4"… (Bisgaard)
+        const val COLUMN_NAME_HL_SIM_SMEARING = "hl_sim_smearing"  // 頻譜模糊 0/1
+        const val COLUMN_NAME_HL_SIM_CHECK_ERR = "hl_sim_check_err" // 模擬器操作檢核最大誤差 (dB)
+        // ── v12：呈現條件完整留存（分析時每場次自足，不需回頭拼其他資料）────
+        // 個人位準錨點（dBFS）：本場次所有位準的基準（= 純音平均閾值換算）。
+        // 沒有它，事後無法重建「測試者實際聽到的絕對呈現位準」。
+        const val COLUMN_NAME_LEVEL_ANCHOR_DBFS = "level_anchor_dbfs"
+        // DSP 補償是否開啟（0/1）。A/B 條件原本只能經 ssn_ab_sessions 反查，
+        // 場次中斷未配對時便無從判別；此欄讓每場次自帶條件標記。
+        const val COLUMN_NAME_DSP_ON = "dsp_on"
+        // 實際套用的 16 段處方增益（dB，逗號分隔；dsp_on=0 時為 NULL）。
+        const val COLUMN_NAME_DSP_GAINS_DB = "dsp_gains_db"
+        // 噪音模式的固定混音總位準（dBFS；SL 模式為 NULL）。
+        const val COLUMN_NAME_TOTAL_LEVEL_DBFS = "total_level_dbfs"
+        // A/B 互斥詞表分半（0/1；-1 = 整個詞庫）——驗證兩階段詞表不重疊。
+        const val COLUMN_NAME_WORD_PARITY = "word_parity"
     }
 
     object SSNRecordEntry : BaseColumns {
@@ -97,7 +116,15 @@ object SRTResultContract {
                 SSNSessionEntry.COLUMN_NAME_PHONE_VOLUME + " INTEGER," +
                 SSNSessionEntry.COLUMN_NAME_EARPHONE_MODEL + " TEXT," +
                 SSNSessionEntry.COLUMN_NAME_TEST_MODE + " TEXT," +
-                SSNSessionEntry.COLUMN_NAME_NLFC + " INTEGER DEFAULT 0)"
+                SSNSessionEntry.COLUMN_NAME_NLFC + " INTEGER DEFAULT 0," +
+                SSNSessionEntry.COLUMN_NAME_HL_SIM_PROFILE + " TEXT," +
+                SSNSessionEntry.COLUMN_NAME_HL_SIM_SMEARING + " INTEGER DEFAULT 0," +
+                SSNSessionEntry.COLUMN_NAME_HL_SIM_CHECK_ERR + " REAL," +
+                SSNSessionEntry.COLUMN_NAME_LEVEL_ANCHOR_DBFS + " REAL," +
+                SSNSessionEntry.COLUMN_NAME_DSP_ON + " INTEGER," +
+                SSNSessionEntry.COLUMN_NAME_DSP_GAINS_DB + " TEXT," +
+                SSNSessionEntry.COLUMN_NAME_TOTAL_LEVEL_DBFS + " REAL," +
+                SSNSessionEntry.COLUMN_NAME_WORD_PARITY + " INTEGER DEFAULT -1)"
 
     const val SQL_CREATE_SSN_RECORDS_TABLE =
         "CREATE TABLE IF NOT EXISTS " + SSNRecordEntry.TABLE_NAME + " (" +

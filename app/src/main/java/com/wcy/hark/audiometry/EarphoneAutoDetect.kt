@@ -19,20 +19,33 @@ import android.widget.Spinner
  */
 object EarphoneAutoDetect {
 
-    /** 目前連接的外部耳機名稱（藍牙 / USB / 有線），無外部耳機回 null。 */
-    fun detectedHeadphoneName(context: Context): String? {
+    /** 外接耳機偵測結果：connected = 是否有外接輸出裝置；name = 可用的型號名（識別不到為 null）。 */
+    data class Detection(val connected: Boolean, val name: String?)
+
+    private val HEADPHONE_TYPES = setOf(
+        AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+        AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
+        AudioDeviceInfo.TYPE_WIRED_HEADSET,
+        AudioDeviceInfo.TYPE_USB_HEADSET,
+        AudioDeviceInfo.TYPE_USB_DEVICE,
+        26,  // TYPE_BLE_HEADSET（API 31+；直接用數值，舊系統只是比對不到）
+        30   // TYPE_BLE_BROADCAST（API 33+）
+    )
+
+    /** 偵測目前連接的外接耳機（藍牙 / BLE Audio / USB / 有線）。 */
+    fun detect(context: Context): Detection {
         val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        val device = am.getDevices(AudioManager.GET_DEVICES_OUTPUTS).firstOrNull {
-            it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
-            it.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES ||
-            it.type == AudioDeviceInfo.TYPE_WIRED_HEADSET ||
-            it.type == AudioDeviceInfo.TYPE_USB_HEADSET ||
-            it.type == AudioDeviceInfo.TYPE_USB_DEVICE
-        } ?: return null
+        val device = am.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+            .firstOrNull { it.type in HEADPHONE_TYPES }
+            ?: return Detection(false, null)
         val name = device.productName?.toString()?.trim()
-        // 有線耳機常回報手機本身型號，等於沒有識別資訊
-        return if (name.isNullOrEmpty() || name == android.os.Build.MODEL) null else name
+        // 有線耳機（含 USB-C 轉 3.5mm 轉接器）常回報手機本身型號，等於沒有識別資訊
+        val usable = if (name.isNullOrEmpty() || name == android.os.Build.MODEL) null else name
+        return Detection(true, usable)
     }
+
+    /** 目前連接的外部耳機名稱（藍牙 / USB / 有線），無外部耳機或識別不到回 null。 */
+    fun detectedHeadphoneName(context: Context): String? = detect(context).name
 
     private fun norm(s: String) = s.lowercase().replace(Regex("[\\s\\-_]"), "")
 
@@ -56,7 +69,12 @@ object EarphoneAutoDetect {
      * 對上型號時回「已偵測到耳機：X」；對不上回「偵測到耳機：X（無校正資料，請手動選擇）」。
      */
     fun autoSelect(context: Context, spinner: Spinner, models: List<String>): String? {
-        val name = detectedHeadphoneName(context) ?: return null
+        val det = detect(context)
+        if (!det.connected) return null
+        val name = det.name
+            // 有裝置但讀不到型號（典型：USB-C 轉 3.5mm 轉接器＋類比耳機）——
+            // 以前這裡默默回 null，使用者以為自動帶入功能不存在；改成明講。
+            ?: return "偵測到有線耳機（轉接器無法回報型號，請手動確認選單）"
         val idx = matchIndex(name, models)
         return if (idx >= 0) {
             spinner.setSelection(idx)

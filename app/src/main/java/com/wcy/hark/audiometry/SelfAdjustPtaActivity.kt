@@ -41,14 +41,57 @@ import kotlin.math.roundToInt
  */
 class SelfAdjustPtaActivity : AppCompatActivity() {
 
-    private val frequencies = listOf(1000, 2000, 3000, 4000, 6000, 8000, 500, 250)
+    companion object {
+        /** true = 開啟聽損模擬後再測一次（模擬聽損—純音測試 / 操作檢核）。 */
+        const val EXTRA_HL_SIM = "EXTRA_HL_SIM"
+
+        /** 完整測驗的 8 個頻率。 */
+        val FULL_FREQS = listOf(1000, 2000, 3000, 4000, 6000, 8000, 500, 250)
+
+        /**
+         * 模擬聽損—純音測試只跑 4 個頻率（500/1k/2k/4k）。
+         * 這一步的目的是「檢核模擬器確實把聽閾抬高了預期的量」，不是重測完整聽力圖；
+         * 4 個頻率已足以驗證，卻能省下一半時間——找人幫忙測試，時間是真實成本。
+         */
+        val CHECK_FREQS = listOf(1000, 2000, 4000, 500)
+
+        /**
+         * 聽損模擬模式的滑桿上限（dBFS）。模擬器把聽閾抬高 HL(f) dB，測試者必須把
+         * 音量開到「自身聽閾 + HL」才聽得見，故上限必須放寬到接近滿刻度。
+         * 主控頁的餘裕檢查以此為依據，兩者不可各自為政。
+         */
+        const val HL_SIM_MAX_DBFS = -5
+    }
+
+    private var hlSimMode = false
+    private var hlSim: HearingLossSim = HearingLossSim.none()
+    private var prevIsolation = false
+
+    private var frequencies = FULL_FREQS
     private val ears = listOf("Right", "Left")
 
-    // −100 dBFS 定義為「輸出振幅歸零」（真正無聲），可聽範圍為 −99 ~ −60；
-    // 這樣「完全聽不見」有明確端點，不會殘留微弱波形誘發幻聽。
-    private val minDbfs = -100
-    private val maxDbfs = -60
+    // 量程下端 −115 dBFS 定義為「輸出振幅歸零」（真正無聲），這樣「完全聽不見」
+    // 有明確端點，不會殘留微弱波形誘發幻聽。
+    //
+    // 為什麼下端要到 −115：位準帳（系統音量鎖最大，0 dBFS ≈ 95–105 dB SPL）下，
+    // −99 dBFS ≈ 0–6 dB SPL——年輕的好耳朵在 3–6 kHz「真的聽得到」這個位準
+    // （聽覺最敏感區的閾值可低於 0 dB HL）。實測就發生了：多個頻率在舊量程
+    // 底端 −99 仍可聽，閾值被地板截斷。截斷值當 dB SL 零點會把後續位準系統性
+    // 高估。取樣值烘入 float（24 bit 尾數）在 −115 仍精確可表示；再往下已低於
+    // 硬體底噪與聽覺極限，無意義。
+    //
+    // 基準測驗上限為 −45 dBFS。聽力正常者的聽閾約落在 −105 ~ −75 dBFS，
+    // 25 dB HL 約 −68 dBFS；−45 dBFS ≈ 55 dB SPL 仍屬舒適，天花板餘裕充足。
+    // 頂到上限會示警（見 ceilingHits）。
+    //
+    // 聽損模擬模式下上限再放寬到 HL_SIM_MAX_DBFS：模擬器把聽閾抬高了 HL(f) dB，
+    // 測試者需要把音量開到「自身閾值 + HL」才聽得見。
+    private val minDbfs = -115
+    private var maxDbfs = -45
     private val silentSentinel = minDbfs
+
+    /** 頂到滑桿上限的頻率（該次量測不是真正的聽閾，須提醒實驗者）。 */
+    private val ceilingHits = mutableListOf<String>()
 
     private var earIndex = 0
     private var freqIndex = 0
@@ -98,10 +141,38 @@ class SelfAdjustPtaActivity : AppCompatActivity() {
         // 選的耳機」而非「這一輪剛選的耳機」，導致說明頁顯示錯誤型號。
         val extraSubject = intent.getStringExtra("EXTRA_SUBJECT")
         val extraEarphone = intent.getStringExtra("EXTRA_EARPHONE_MODEL")
+        hlSimMode = intent.getBooleanExtra(EXTRA_HL_SIM, false)
+        // 隔離即時輔聽引擎：若使用者進流程前開著輔聽，麥克風透傳的環境音會
+        // 疊在測試音上，聽閾會被底噪墊高。稽核時發現本頁是全流程唯一漏掉
+        // 隔離的測驗頁。離場時還原成進場前的狀態（本頁可能被步驟③嵌套呼叫，
+        // 不可一律解除——否則會提前打開上一層刻意關閉的引擎）。
+        prevIsolation = com.wcy.hark.audio.service.HarkAudioService.audiometryIsolationActive
+        com.wcy.hark.audio.service.HarkAudioService.audiometryIsolationActive = true
+        try {
+            com.wcy.hark.audio.bridge.HarkAudioBridge.setMuted(true)
+            com.wcy.hark.audio.bridge.HarkAudioBridge.setBypassMode(true)
+        } catch (e: Exception) { /* 引擎未載入時忽略 */ }
+
+        frequencies = if (hlSimMode) CHECK_FREQS else FULL_FREQS
+        if (hlSimMode) maxDbfs = HL_SIM_MAX_DBFS   // 模擬損失可達 70 dB，上限必須放寬
+
         lifecycleScope.launch {
             subjectName = extraSubject ?: repository.getLastSubjectNameFlow().first().ifEmpty { "未填寫" }
             earphoneModel = extraEarphone ?: repository.getSelectedEarphoneFlow().first()
             calibTable = withContext(Dispatchers.IO) { calibRepo.getAllCalibrations(earphoneModel) }
+
+            if (hlSimMode) {
+                // 模擬聽損—純音測試：以測試者「未模擬時」剛量到的閾值為零點，
+                // 疊上模擬損失量。純音是單頻穩態訊號，擴展器的作用僅是位準映射，
+                // 故直接把增益算在音源振幅上即可，不需跑濾波器組。
+                val profile = HearingLossProfile.fromKey(repository.getHlSimProfileFlow().first())
+                val thresholds = repository.getBinauralRawThresholdsFlow(
+                    HearingLossProfile.AUDIOGRAM_FREQS.toList()
+                ).first()
+                val smearing = repository.getHlSimSmearingFlow().first()
+                hlSim = HearingLossSim(profile, thresholds, smearing)
+                Log.i("SelfAdjustPta", "HL-sim check: profile=${profile.key} thresholds=$thresholds")
+            }
             showIntroDialog()
         }
 
@@ -151,17 +222,41 @@ class SelfAdjustPtaActivity : AppCompatActivity() {
     private fun startCurrentFrequency() {
         phase = 1
         silent = false
-        currentDbfs = -70    // 起始位準：多數人聽得到，往下調
+        // 起始位準：一般模式從 −70 dBFS（多數人聽得到）往下調。
+        // 模擬模式下閾值被抬高了 HL(f)，故起點也要跟著上移，否則測試者要從
+        // 「完全聽不見」按幾十下才聽得到聲音。
+        currentDbfs = if (hlSimMode) {
+            val f = frequencies[freqIndex]
+            val base = hlSim.thresholdsDbfs[f] ?: -75f
+            (base + hlSim.targetLossDb(f) - 10f).toInt().coerceIn(minDbfs + 1, maxDbfs)
+        } else {
+            -70
+        }
         updateUi()
         playTone()
+    }
+
+    /**
+     * 施加聽損模擬後的實際輸出位準。
+     * 純音是單頻穩態訊號，擴展器的作用僅是位準映射，故可直接算在音源振幅上。
+     * 未啟用模擬時即原值。
+     */
+    private fun outputDbfs(dbfs: Int): Float {
+        if (!hlSimMode || !hlSim.isActive) return dbfs.toFloat()
+        val f = frequencies[freqIndex]
+        return dbfs + hlSim.toneGainDb(f, dbfs.toFloat())
     }
 
     private fun playTone() {
         val ear = if (currentEar() == "Right") AudiometricToneGenerator.Ear.RIGHT
                   else AudiometricToneGenerator.Ear.LEFT
+        // 150/250 ms：短促的「嗶、嗶」比 300/200 的長音好辨認，測試者不會
+        // 把殘響或耳鳴誤當刺激音（實測回饋：長音會懷疑自己幻聽）。
+        // durationSec 必須是脈衝週期（0.4 s）的整數倍，loop 回繞才不會斷拍。
         toneGen.play(
-            frequencies[freqIndex], currentDbfs.toFloat(), ear,
-            pulsed = true, durationSec = 1.0f, loop = true, bakeVolume = false
+            frequencies[freqIndex], outputDbfs(currentDbfs), ear,
+            pulsed = true, durationSec = 0.8f, loop = true,
+            pulseOnMs = 150.0f, pulseOffMs = 250.0f
         )
     }
 
@@ -173,7 +268,7 @@ class SelfAdjustPtaActivity : AppCompatActivity() {
         } else {
             silent = false
             currentDbfs = dbfs.coerceIn(minDbfs + 1, maxDbfs)
-            toneGen.setVolumeDbfs(currentDbfs.toFloat())
+            toneGen.setVolumeDbfs(outputDbfs(currentDbfs))
         }
         updateUi()
     }
@@ -233,6 +328,12 @@ class SelfAdjustPtaActivity : AppCompatActivity() {
         val threshold = (phase1Dbfs + currentDbfs) / 2f
         resultsDbfs[currentEar()]!![frequencies[freqIndex]] = threshold
 
+        // 頂到滑桿上限 → 記下的是被截斷的上限值，不是真正的聽閾。這個值是後面
+        // 所有 dB SL 的零點，靜默採用會毀掉整條位準鏈，必須讓實驗者知道。
+        if (threshold >= maxDbfs - 5f) {
+            ceilingHits += "${currentEar()} ${frequencies[freqIndex]} Hz"
+        }
+
         if (freqIndex < frequencies.size - 1) {
             freqIndex++
             startCurrentFrequency()
@@ -249,11 +350,42 @@ class SelfAdjustPtaActivity : AppCompatActivity() {
                 .show()
         } else {
             toneGen.stop()
-            finishTest()
+            warnCeilingHitsThen { finishTest() }
         }
     }
 
+    /**
+     * 有頻率頂到滑桿上限時先示警。這些頻率記下的是被截斷的上限值而非真正的聽閾，
+     * 而聽閾正是後面所有 dB SL 的零點——靜默採用會讓整條位準鏈偏掉且無從察覺。
+     * 頂到上限通常代表：該測試者的聽力不在正常範圍（本研究前提是聽力正常者），
+     * 或耳機輸出偏低／沒戴好。
+     */
+    private fun warnCeilingHitsThen(next: () -> Unit) {
+        if (ceilingHits.isEmpty()) { next(); return }
+        AlertDialog.Builder(this)
+            .setTitle("⚠️ 有頻率頂到音量上限")
+            .setMessage(
+                "下列頻率把音量推到滑桿頂端仍在「剛好聽得見」附近：\n\n" +
+                        ceilingHits.joinToString("\n") { "· $it" } +
+                        "\n\n這些數值不是真正的聽閾（被上限截斷），而聽閾是後續所有 " +
+                        "dB SL 位準的零點。可能原因：該測試者聽力不在正常範圍、" +
+                        "耳機沒戴好、或耳機輸出偏低。\n\n建議重測；若仍相同，" +
+                        "請考慮更換耳機或排除此測試者。"
+            )
+            .setPositiveButton("重測") { _, _ ->
+                ceilingHits.clear()
+                earIndex = 0; freqIndex = 0
+                resultsDbfs.values.forEach { it.clear() }
+                startCurrentFrequency()
+            }
+            .setNegativeButton("仍要採用") { _, _ -> next() }
+            .setCancelable(false)
+            .show()
+    }
+
     private fun finishTest() {
+        if (hlSimMode) { finishHlSimCheck(); return }
+
         // dBFS → dB HL（校正表；未校準退回 dbfs + 100 相對映射）
         fun toHlMap(ear: String): HashMap<Int, Int?> {
             val m = HashMap<Int, Int?>()
@@ -275,6 +407,13 @@ class SelfAdjustPtaActivity : AppCompatActivity() {
             // 存入聽力圖（供 DSL v5 / NAL-R 處方使用）
             rightHl.forEach { (f, t) -> t?.let { repository.saveAudiogramThreshold("right", f, it) } }
             leftHl.forEach { (f, t) -> t?.let { repository.saveAudiogramThreshold("left", f, it) } }
+
+            // 同時存原始 dBFS 閾值 —— 這是聽損模擬器的「零點」。
+            // 所有刺激位準以此為基準的感覺級（dB SL）計算，故整套行為實驗
+            // 完全不需要人工耳或聲級計做絕對聲學校正。
+            resultsDbfs["Right"]!!.forEach { (f, v) -> repository.saveRawThresholdDbfs("right", f, v) }
+            resultsDbfs["Left"]!!.forEach { (f, v) -> repository.saveRawThresholdDbfs("left", f, v) }
+
             saveCsv(rightHl, leftHl)
 
             withContext(Dispatchers.Main) {
@@ -292,6 +431,70 @@ class SelfAdjustPtaActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    /**
+     * 模擬聽損—純音測試的收尾（操作檢核 / manipulation check）。
+     *
+     * 檢核邏輯：模擬器把聽閾抬高了 HL(f)，所以「開了模擬後測得的閾值」減去
+     * 「未模擬時測得的閾值」應該恰好等於 HL(f)。
+     *   measured(f) − baseline(f) ≈ HL(f)，判準 ±5 dB。
+     *
+     * 這一步用本系統的純音測驗模組去驗證本系統的聽損模擬器，兩者互為交叉驗證：
+     * 既確認「模擬確實造成了預期的損失」，也確認「本系統確實量得出該損失」。
+     * 因果鏈就此閉合——如果這步過不了，後面的補償效益數字全部不可信。
+     *
+     * ★ 本模式不得寫入聽力圖或原始閾值 ★ 那會覆蓋掉未模擬時量到的基準線。
+     */
+    private fun finishHlSimCheck() {
+        val freqs = frequencies.sorted()
+        val measured = FloatArray(freqs.size)
+        val target = FloatArray(freqs.size)
+        val error = FloatArray(freqs.size)
+
+        freqs.forEachIndexed { i, f ->
+            val r = resultsDbfs["Right"]!![f]
+            val l = resultsDbfs["Left"]!![f]
+            val m = listOfNotNull(r, l).average().toFloat()
+            val base = hlSim.thresholdsDbfs[f] ?: 0f
+            measured[i] = m
+            target[i] = hlSim.targetLossDb(f)
+            error[i] = (m - base) - target[i]        // 實測抬升量 − 目標損失量
+        }
+
+        val maxAbsErr = error.maxOfOrNull { kotlin.math.abs(it) } ?: 0f
+        val passed = maxAbsErr <= 5f
+        Log.i("SelfAdjustPta",
+            "HL-sim check: freqs=$freqs target=${target.toList()} " +
+                    "error=${error.toList()} maxAbsErr=$maxAbsErr passed=$passed")
+
+        val summary = buildString {
+            append(if (passed) "✅ 模擬器檢核通過" else "⚠️ 模擬器檢核未通過")
+            append("（最大誤差 ${"%.1f".format(maxAbsErr)} dB，判準 ±5 dB）\n\n")
+            freqs.forEachIndexed { i, f ->
+                append("$f Hz：目標 ${"%.0f".format(target[i])} dB / ")
+                append("實測抬升 ${"%.0f".format(target[i] + error[i])} dB")
+                append("（誤差 ${"%+.1f".format(error[i])}）\n")
+            }
+            if (!passed) {
+                append("\n誤差偏大可能來自：測試者調整不穩、耳機漏音，或模擬器參數有誤。")
+                append("建議重測一次；若仍未通過，先不要繼續語詞測驗。")
+            }
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("模擬聽損—純音測試")
+            .setMessage(summary)
+            .setCancelable(false)
+            .setPositiveButton("完成") { _, _ ->
+                setResult(RESULT_OK, Intent().apply {
+                    putExtra("EXTRA_HLSIM_PASSED", passed)
+                    putExtra("EXTRA_HLSIM_MAX_ERR", maxAbsErr)
+                    putExtra("EXTRA_HLSIM_SUMMARY", summary)
+                })
+                finish()
+            }
+            .show()
     }
 
     private fun saveCsv(rightHl: Map<Int, Int?>, leftHl: Map<Int, Int?>) {
@@ -337,6 +540,14 @@ class SelfAdjustPtaActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        // 還原進場前的隔離狀態（嵌套呼叫時交還上一層決定）
+        com.wcy.hark.audio.service.HarkAudioService.audiometryIsolationActive = prevIsolation
+        if (!prevIsolation) {
+            try {
+                com.wcy.hark.audio.bridge.HarkAudioBridge.setBypassMode(false)
+                com.wcy.hark.audio.bridge.HarkAudioBridge.setMuted(false)
+            } catch (e: Exception) { /* no-op */ }
+        }
         super.onDestroy()
         toneGen.release()
         // 還原進場前的媒體音量（onResume 曾鎖到最大）

@@ -8,7 +8,8 @@ class SRTResultDbHelper(context: Context) :
     SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
 
     companion object {
-        const val DATABASE_VERSION = 10 // v10: ssn_sessions 新增 nlfc（語音是否經離線移頻）
+        // v12: ssn_sessions 新增呈現條件五欄（位準錨點、DSP 開關/增益、噪音總位準、詞表分半）
+        const val DATABASE_VERSION = 12
         const val DATABASE_NAME = "SRTResults.db"
     }
 
@@ -23,6 +24,31 @@ class SRTResultDbHelper(context: Context) :
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         // Non-destructive migration to preserve clinical testing results
+        if (oldVersion < 12) {
+            // v12: 呈現條件完整留存——位準錨點、DSP 開關與實際增益、噪音總位準、
+            // 詞表分半。讓每場次的 CSV 匯出自足，分析不需回頭拼其他資料來源。
+            for (sql in listOf(
+                "ALTER TABLE ssn_sessions ADD COLUMN level_anchor_dbfs REAL",
+                "ALTER TABLE ssn_sessions ADD COLUMN dsp_on INTEGER",
+                "ALTER TABLE ssn_sessions ADD COLUMN dsp_gains_db TEXT",
+                "ALTER TABLE ssn_sessions ADD COLUMN total_level_dbfs REAL",
+                "ALTER TABLE ssn_sessions ADD COLUMN word_parity INTEGER DEFAULT -1"
+            )) {
+                try { db.execSQL(sql) } catch (e: Exception) { e.printStackTrace() }
+            }
+        }
+        if (oldVersion < 11) {
+            // v11: 記錄本場次模擬了什麼聽損——這是結果可否解釋的前提。
+            // 沒有這三欄，事後根本分不出「補償有效」是因為處方好、還是因為
+            // 模擬條件不同；必須隨資料留存。
+            for (sql in listOf(
+                "ALTER TABLE ssn_sessions ADD COLUMN hl_sim_profile TEXT",
+                "ALTER TABLE ssn_sessions ADD COLUMN hl_sim_smearing INTEGER DEFAULT 0",
+                "ALTER TABLE ssn_sessions ADD COLUMN hl_sim_check_err REAL"
+            )) {
+                try { db.execSQL(sql) } catch (e: Exception) { e.printStackTrace() }
+            }
+        }
         if (oldVersion < 10) {
             try {
                 // v10: 記錄語音是否先經離線 NLFC 處理（移頻效益之行為驗證）

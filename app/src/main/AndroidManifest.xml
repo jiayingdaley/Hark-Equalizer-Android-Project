@@ -47,17 +47,6 @@
             android:name=".audio.service.FloatingEqService"
             android:exported="false" />
 
-        <!-- 媒體監測服務 (用於自動模式切換) -->
-        <service
-            android:name=".audio.service.HarkNotificationListener"
-            android:label="Hark 媒體監測"
-            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.service.notification.NotificationListenerService" />
-            </intent-filter>
-        </service>
-
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -86,6 +75,14 @@
 
         <activity
             android:name=".audiometry.SSNAbTestActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+
+        <!-- 模擬聽損—純音測試：第一頁是聽損體驗（正常/聽損/聽損+補償 三段對照），
+             接著開著模擬器測 4 個頻率，檢核聽閾是否確實抬高了預期的量 -->
+        <activity
+            android:name=".audiometry.HlSimIntroActivity"
             android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />

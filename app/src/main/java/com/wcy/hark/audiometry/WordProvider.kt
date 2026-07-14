@@ -89,7 +89,12 @@ class WordProvider(private val context: Context) {
 
     // getRandomQuestions, generateQuestionFromRow, getTotalAvailableUniqueQuestions 保持與上一版相同
     // (因為它們依賴於 loadWordsFromCSV 正確填充 allWordRowsWithOriginalIndex)
-    fun getRandomQuestions(count: Int): List<WordQuestion> {
+    /**
+     * @param parity 互斥詞表分半：0 = 偶數列、1 = 奇數列、-1 = 不分（整個詞庫）。
+     *   A/B 兩階段各用一半，保證同一個詞不會在兩階段重複出現——否則第二階段
+     *   會有「背答案」效應，練習效果與補償效果混在一起無法歸因。
+     */
+    fun getRandomQuestions(count: Int, parity: Int = -1): List<WordQuestion> {
         Log.d(TAG, "getRandomQuestions called. Requesting $count questions. Available unique rows from CSV: ${allWordRowsWithOriginalIndex.size}")
         if (allWordRowsWithOriginalIndex.isEmpty() || count <= 0) {
             Log.w(TAG, "No rows available or requested count is zero. Returning empty list.")
@@ -97,7 +102,9 @@ class WordProvider(private val context: Context) {
         }
 
         // 複製一份包含原始索引的資料列，以便隨機選取不重複
-        val availableRowsWithIndex = allWordRowsWithOriginalIndex.toMutableList()
+        val availableRowsWithIndex = (if (parity >= 0)
+            allWordRowsWithOriginalIndex.filterIndexed { i, _ -> i % 2 == parity }
+        else allWordRowsWithOriginalIndex).toMutableList()
         val selectedQuestions = mutableListOf<WordQuestion>()
 
         val numToSelect = if (count > availableRowsWithIndex.size) {

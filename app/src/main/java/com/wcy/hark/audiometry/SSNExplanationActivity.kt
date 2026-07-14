@@ -25,6 +25,7 @@ class SSNExplanationActivity : AppCompatActivity(), DialogNavCallback {
     private lateinit var nameInput: EditText
     private lateinit var snrInput: EditText
     private lateinit var countInput: EditText
+    private var isExperimentMode = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,7 +42,8 @@ class SSNExplanationActivity : AppCompatActivity(), DialogNavCallback {
         lifecycleScope.launch {
             nameInput.setText(repository.getLastSubjectNameFlow().first())
             // 實驗模式才顯示 SNR 條件與題數設定
-            if (repository.getExperimentModeFlow().first()) {
+            isExperimentMode = repository.getExperimentModeFlow().first()
+            if (isExperimentMode) {
                 findViewById<View>(R.id.layoutSsnExperimentConfig).visibility = View.VISIBLE
             }
         }
@@ -51,17 +53,25 @@ class SSNExplanationActivity : AppCompatActivity(), DialogNavCallback {
             if (entered.isNotEmpty()) {
                 lifecycleScope.launch { repository.saveLastSubjectName(entered) }
             }
-            // 先讓使用者選測驗類型：有噪音（SSN）或無噪音但小聲
-            android.app.AlertDialog.Builder(this)
-                .setTitle("選擇語詞測驗類型")
-                .setItems(arrayOf("有噪音的語詞（噪音下 SNR 掃描）", "無噪音、小聲的語詞（音量 dB SL 掃描）")) { _, which ->
-                    noiseless = (which == 1)
-                    // 無噪音模式對「小聲語詞」設定舒適音量，故參考音改用語音樣本
-                    val ref = if (noiseless) "adjust_mcl" else "ssn_noise"
-                    VolumeAdjustmentDialogFragment.newInstance(ref)
-                        .show(supportFragmentManager, VolumeAdjustmentDialogFragment.TAG)
-                }
-                .show()
+            // 使用者模式（非實驗模式）只提供「噪音下語詞」，不出選擇對話框——
+            // 「無噪音、小聲的語詞」為實驗模式限定測項。
+            if (!isExperimentMode) {
+                noiseless = false
+                VolumeAdjustmentDialogFragment.newInstance("ssn_noise")
+                    .show(supportFragmentManager, VolumeAdjustmentDialogFragment.TAG)
+            } else {
+                // 先讓使用者選測驗類型：有噪音（SSN）或無噪音但小聲
+                android.app.AlertDialog.Builder(this)
+                    .setTitle("選擇語詞測驗類型")
+                    .setItems(arrayOf("有噪音的語詞（噪音下 SNR 掃描）", "無噪音、小聲的語詞（音量 dB SL 掃描）")) { _, which ->
+                        noiseless = (which == 1)
+                        // 無噪音模式對「小聲語詞」設定舒適音量，故參考音改用語音樣本
+                        val ref = if (noiseless) "adjust_mcl" else "ssn_noise"
+                        VolumeAdjustmentDialogFragment.newInstance(ref)
+                            .show(supportFragmentManager, VolumeAdjustmentDialogFragment.TAG)
+                    }
+                    .show()
+            }
         }
     }
 
