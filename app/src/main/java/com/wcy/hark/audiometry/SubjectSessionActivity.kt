@@ -27,7 +27,7 @@ import kotlin.math.ln
 import kotlin.math.roundToInt
 
 /**
- * SubjectSessionActivity — 找人測試用的測試者測驗流程主控頁（實驗模式）。
+ * SubjectSessionActivity — 找人測試用的測試者實驗流程主控頁（實驗模式）。
  *
  * 依序引導：① 基準純音（不模擬）→ ② 設定模擬聽損條件（同時自動補償處方）
  * → ③ 模擬聽損—純音測試（含聽損體驗）→ ④ 語詞測驗 A/B → ⑤ 環境輔聽問卷／匯出。

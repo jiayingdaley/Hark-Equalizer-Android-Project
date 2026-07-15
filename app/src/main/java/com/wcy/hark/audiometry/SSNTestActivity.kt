@@ -50,7 +50,7 @@ class SSNTestActivity : AppCompatActivity() {
     private var noiseless = false
     private var levelAnchorDbfs = SOFT_BASE_DBFS   // = SOFT_BASE_DBFS + 平均純音閾值(dB HL)
     private var subjectName = "未填寫"
-    private var earphoneModel: String? = null   // 測試者測驗流程帶入；一般測驗為 null
+    private var earphoneModel: String? = null   // 測試者實驗流程帶入；一般測驗為 null
     private var isExperimentMode = false
 
     // Flat trial list: (snrDb, question)
@@ -172,7 +172,7 @@ class SSNTestActivity : AppCompatActivity() {
             // 補償改走離線原生處理（不再把 DynamicsProcessing 掛在 AudioTrack
             // session 上），因為系統音效掛上去之後就無從再插入任何處理級，
             // 聽損模擬器接不到它後面——而模擬器「必須」在補償之後。
-            // 聽損模擬只屬於測試者測驗流程（A/B）。從「聽力檢測」單獨進來的測驗
+            // 聽損模擬只屬於測試者實驗流程（A/B）。從「聽力檢測」單獨進來的測驗
             // 量的是這個人的真實聽力——若把 DataStore 殘留的模擬條件也套上去，
             // 資料就被上一場實驗污染了。
             mixer.hearingLossSim =
@@ -504,7 +504,7 @@ class SSNTestActivity : AppCompatActivity() {
                 if (!hlSimCheckErr.isNaN()) {
                     put(SRTResultContract.SSNSessionEntry.COLUMN_NAME_HL_SIM_CHECK_ERR, hlSimCheckErr)
                 }
-                // 只有「測試者測驗流程」(SSNAbTestActivity) 會帶 EXTRA_AB_MODE=true；
+                // 只有「測試者實驗流程」(SSNAbTestActivity) 會帶 EXTRA_AB_MODE=true；
                 // 一般模式測驗維持 NULL，讓一般模式的歷史紀錄能過濾掉這裡的資料。
                 if (abMode) {
                     put(SRTResultContract.SSNSessionEntry.COLUMN_NAME_SESSION_SOURCE,

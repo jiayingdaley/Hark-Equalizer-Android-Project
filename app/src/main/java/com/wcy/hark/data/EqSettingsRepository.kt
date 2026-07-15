@@ -202,7 +202,7 @@ class EqSettingsRepository(private val context: Context) {
         prefs[hlSimSmearingKey] ?: true
     }
 
-    // ── Subject Session Progress（測試者測驗流程續測）──────────────────────────
+    // ── Subject Session Progress（測試者實驗流程續測）──────────────────────────
     // 流程走到哪一步存起來：app 關掉、當機或隔天續測都不用從①重來。
     // 基準聽閾、處方、模擬條件本就各自持久化，stage 是唯一遺失的狀態。
     private val sessionStageKey = intPreferencesKey("subject_session_stage")

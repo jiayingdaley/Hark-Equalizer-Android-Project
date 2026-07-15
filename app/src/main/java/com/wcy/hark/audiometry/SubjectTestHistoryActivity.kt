@@ -21,9 +21,9 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * SubjectTestHistoryActivity — 測試者測驗歷史。
+ * SubjectTestHistoryActivity — 測試者實驗歷史。
  *
- * 以測試者為單位彙整「測試者測驗流程」產生的所有結果，供在 app 內直接
+ * 以測試者為單位彙整「測試者實驗流程」產生的所有結果，供在 app 內直接
  * 查看與匯出：
  *  - 快速純音（自調式）與標準純音 CSV（以檔案內容的 Subject Name 列比對）
  *  - 噪音下語詞 A/B 對照（ssn_ab_sessions：SRT50 OFF/ON 與 ΔSRT50）

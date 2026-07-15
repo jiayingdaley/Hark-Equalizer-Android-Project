@@ -22,7 +22,7 @@ object Prescriptions {
     enum class Method { DSL_V5, NAL_R }
 
     // 16 段 EQ 中心頻率（與 EqViewModel.centerFrequencies16 / SystemDspManager
-    // 一致）。獨立列於此供不持有 ViewModel 的情境（如測試者測驗流程 A/B 對照）
+    // 一致）。獨立列於此供不持有 ViewModel 的情境（如測試者實驗流程 A/B 對照）
     // 直接計算固定處方增益陣列。
     val CENTER_FREQUENCIES_16 = listOf(
         250, 315, 400, 500, 630, 800, 1000, 1250,
@@ -30,7 +30,7 @@ object Prescriptions {
     )
     private const val MAX_GAIN_DB = 30f
 
-    // 模擬中度聽損（測試者測驗流程「SSN A/B 對照」用）：平坦 50 dB HL、
+    // 模擬中度聽損（測試者實驗流程「SSN A/B 對照」用）：平坦 50 dB HL、
     // 雙耳皆有聽力圖之假設（binaural = true）。此為固定、非個人化之處方，
     // 目的僅是在正常聽力測試者身上建立一個穩定可重現的「有補償」條件，
     // 與「無補償（OFF）」比較語詞辨識表現差異（ΔSRT50），而非驗配其本人。

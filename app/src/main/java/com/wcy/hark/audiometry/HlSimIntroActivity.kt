@@ -66,7 +66,7 @@ class HlSimIntroActivity : AppCompatActivity() {
     private val ptaLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        // 把純音檢核的結果原樣往上回傳給測試者測驗流程主控頁
+        // 把純音檢核的結果原樣往上回傳給測試者實驗流程主控頁
         setResult(result.resultCode, result.data)
         finish()
     }

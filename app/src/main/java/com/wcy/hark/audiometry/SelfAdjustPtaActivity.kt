@@ -68,7 +68,7 @@ class SelfAdjustPtaActivity : AppCompatActivity() {
     private var prevIsolation = false
 
     /**
-     * true = 由「測試者測驗流程」呼叫（SubjectSessionActivity 的基準純音／
+     * true = 由「測試者實驗流程」呼叫（SubjectSessionActivity 的基準純音／
      * HlSimIntroActivity 的操作檢核），false = 使用者從「快速純音」按鈕直接進入。
      * 只用來在匯出的 CSV 檔名加註記，讓一般模式的「查看歷史紀錄」可以濾掉
      * 受試者測驗流程的資料——不影響任何測驗邏輯或量到的數值。
@@ -143,7 +143,7 @@ class SelfAdjustPtaActivity : AppCompatActivity() {
 
         calibRepo = EarphoneCalibrationRepository(this)
         val repository = (application as HarkApplication).eqSettingsRepository
-        // 測試者測驗流程會直接帶入姓名/耳機型號 —— 必須優先採用這兩個值，
+        // 測試者實驗流程會直接帶入姓名/耳機型號 —— 必須優先採用這兩個值，
         // 不能回頭讀 DataStore：呼叫端（SubjectSessionActivity）寫入
         // DataStore 是非同步的，若在此改讀 Flow 會有競態，可能讀到「上一輪
         // 選的耳機」而非「這一輪剛選的耳機」，導致說明頁顯示錯誤型號。
@@ -410,7 +410,7 @@ class SelfAdjustPtaActivity : AppCompatActivity() {
         val repository = (application as HarkApplication).eqSettingsRepository
         // 重要：lifecycleScope 綁定本 Activity 的生命週期，若在寫入完成前就
         // finish()，DataStore/CSV 寫入可能在 onDestroy 時被取消，導致下一步
-        // （測試者測驗流程套用 DSL v5）讀到舊資料。因此務必等寫入完成後才
+        // （測試者實驗流程套用 DSL v5）讀到舊資料。因此務必等寫入完成後才
         // finish()，兩個分支皆同。
         lifecycleScope.launch(Dispatchers.IO) {
             // 存入聽力圖（供 DSL v5 / NAL-R 處方使用）
@@ -427,7 +427,7 @@ class SelfAdjustPtaActivity : AppCompatActivity() {
 
             withContext(Dispatchers.Main) {
                 if (intent.getBooleanExtra("EXTRA_SESSION_FLOW", false)) {
-                    // 測試者測驗流程呼叫：直接回傳，由流程主控頁接續套用處方，
+                    // 測試者實驗流程呼叫：直接回傳，由流程主控頁接續套用處方，
                     // 不中途跳去看聽力圖畫面。
                     setResult(RESULT_OK)
                     finish()

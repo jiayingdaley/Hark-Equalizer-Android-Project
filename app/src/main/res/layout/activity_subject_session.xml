@@ -16,7 +16,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
-            android:text="測試者測驗流程"
+            android:text="測試者實驗流程"
             android:textSize="24sp"
             android:textStyle="bold"
             android:textColor="@android:color/black" />
@@ -223,7 +223,7 @@
             android:layout_width="match_parent"
             android:layout_height="52dp"
             android:layout_marginTop="12dp"
-            android:text="測試者測驗歷史"
+            android:text="測試者實驗歷史"
             android:textSize="15sp"
             android:background="@drawable/rounded_button" />
 

@@ -24,7 +24,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:text="測試者測驗歷史"
+            android:text="測試者實驗歷史"
             android:textSize="20sp"
             android:textStyle="bold"
             android:textColor="@android:color/black" />
@@ -36,7 +36,7 @@
         android:layout_height="wrap_content"
         android:padding="32dp"
         android:gravity="center"
-        android:text="尚無測試者測驗紀錄"
+        android:text="尚無測試者實驗紀錄"
         android:textSize="15sp"
         android:textColor="#888888"
         android:visibility="gone" />

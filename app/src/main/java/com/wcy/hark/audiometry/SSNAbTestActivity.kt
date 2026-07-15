@@ -20,7 +20,7 @@ import kotlinx.coroutines.launch
 import kotlin.random.Random
 
 /**
- * SSNAbTestActivity — 語詞測驗 A/B 對照（測試者測驗流程專用）。
+ * SSNAbTestActivity — 語詞測驗 A/B 對照（測試者實驗流程專用）。
  *
  * 比較「未輔助（OFF）」vs「輔助（ON）」的語詞辨識表現。順序隨機決定並交叉
  * 平衡（記錄 off_first），過程中不告知測試者目前是哪個條件，避免預期心理。

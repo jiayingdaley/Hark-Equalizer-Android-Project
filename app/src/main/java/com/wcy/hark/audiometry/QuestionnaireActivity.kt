@@ -43,7 +43,7 @@ private val SCENES = listOf(
 )
 
 /**
- * QuestionnaireActivity — 環境輔聽自編問卷（測試者測驗流程最後一步）。
+ * QuestionnaireActivity — 環境輔聽自編問卷（測試者實驗流程最後一步）。
  *
  * 每個情境以喇叭播放（見 experiment_scenes/），測試者先「輔聽 OFF」聆聽後
  * 填一組題，再「輔聽 ON」聆聽後再填一組（清晰度僅語音情境適用、舒適度、

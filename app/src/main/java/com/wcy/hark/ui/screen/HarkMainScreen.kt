@@ -411,7 +411,7 @@ fun HarkMainScreen(
                 )
 
                 LargeNavCard(
-                    label = "測試者測驗流程",
+                    label = "測試者實驗流程",
                     sublabel = "SUBJECT TEST SESSION",
                     icon = Icons.Default.Groups,
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -422,7 +422,7 @@ fun HarkMainScreen(
                 )
 
                 LargeNavCard(
-                    label = "測試者測驗歷史",
+                    label = "測試者實驗歷史",
                     sublabel = "SUBJECT TEST HISTORY",
                     icon = Icons.Default.History,
                     containerColor = MaterialTheme.colorScheme.secondaryContainer,

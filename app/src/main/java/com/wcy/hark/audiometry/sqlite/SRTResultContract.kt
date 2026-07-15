@@ -91,7 +91,7 @@ object SRTResultContract {
         // A/B 互斥詞表分半（0/1；-1 = 整個詞庫）——驗證兩階段詞表不重疊。
         const val COLUMN_NAME_WORD_PARITY = "word_parity"
         // ── v13：資料來源標記 ─────────────────────────────────────────────
-        // 一般模式與「測試者測驗流程」共用同一張表，過去無法區分，導致一般模式
+        // 一般模式與「測試者實驗流程」共用同一張表，過去無法區分，導致一般模式
         // 的「查看歷史紀錄」會混入受試者測驗流程的資料。此欄由 SSNAbTestActivity
         // （唯一會設定 EXTRA_AB_MODE=true 的呼叫端）寫入；一般模式測驗不寫此欄，
         // 維持 NULL。
@@ -147,7 +147,7 @@ object SRTResultContract {
                 "FOREIGN KEY(" + SSNRecordEntry.COLUMN_NAME_SESSION_ID_FK + ") REFERENCES " +
                 SSNSessionEntry.TABLE_NAME + "(" + SSNSessionEntry.COLUMN_NAME_SESSION_ID + "))"
 
-    // ── 測試者測驗流程：SSN A/B 對照（固定模擬中度聽損處方 vs 無補償）────────
+    // ── 測試者實驗流程：SSN A/B 對照（固定模擬中度聽損處方 vs 無補償）────────
     object AbSessionEntry : BaseColumns {
         const val TABLE_NAME = "ssn_ab_sessions"
         const val COLUMN_NAME_GROUP_ID = "group_id"           // 本次 A/B 對照的唯一 ID
@@ -175,7 +175,7 @@ object SRTResultContract {
                 AbSessionEntry.COLUMN_NAME_SRT50_ON + " REAL," +
                 AbSessionEntry.COLUMN_NAME_DELTA_SRT50 + " REAL)"
 
-    // ── 環境輔聽問卷（測試者測驗流程最後一步）────────────────────────────
+    // ── 環境輔聽問卷（測試者實驗流程最後一步）────────────────────────────
     object QuestionnaireEntry : BaseColumns {
         const val TABLE_NAME = "questionnaire_responses"
         const val COLUMN_NAME_SESSION_ID = "session_id"       // 本次問卷所屬測試者流程 ID

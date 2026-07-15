@@ -90,7 +90,7 @@ class SRTResultDbHelper(context: Context) :
         }
         if (oldVersion < 7) {
             try {
-                // v7: 測試者測驗流程新表（非破壞性，IF NOT EXISTS）
+                // v7: 測試者實驗流程新表（非破壞性，IF NOT EXISTS）
                 db.execSQL(SRTResultContract.SQL_CREATE_AB_SESSIONS_TABLE)
                 db.execSQL(SRTResultContract.SQL_CREATE_QUESTIONNAIRE_TABLE)
             } catch (e: Exception) {
