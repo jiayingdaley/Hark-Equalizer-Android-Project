@@ -504,6 +504,12 @@ class SSNTestActivity : AppCompatActivity() {
                 if (!hlSimCheckErr.isNaN()) {
                     put(SRTResultContract.SSNSessionEntry.COLUMN_NAME_HL_SIM_CHECK_ERR, hlSimCheckErr)
                 }
+                // 只有「測試者測驗流程」(SSNAbTestActivity) 會帶 EXTRA_AB_MODE=true；
+                // 一般模式測驗維持 NULL，讓一般模式的歷史紀錄能過濾掉這裡的資料。
+                if (abMode) {
+                    put(SRTResultContract.SSNSessionEntry.COLUMN_NAME_SESSION_SOURCE,
+                        SRTResultContract.SSNSessionEntry.SOURCE_SUBJECT)
+                }
             })
             records.forEach { db.insert(SRTResultContract.SSNRecordEntry.TABLE_NAME, null, it) }
             db.setTransactionSuccessful()

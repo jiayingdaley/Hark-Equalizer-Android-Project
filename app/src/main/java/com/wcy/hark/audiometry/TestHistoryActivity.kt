@@ -1035,8 +1035,13 @@ private fun loadSsnSessions(dbHelper: SRTResultDbHelper): List<SsnSessionItem> {
     val list = mutableListOf<SsnSessionItem>()
     try {
         val db = dbHelper.readableDatabase
+        // 排除「測試者測驗流程」(SSNAbTestActivity) 寫入的場次——一般模式的歷史
+        // 紀錄只顯示一般使用者自己做的測驗，不應該看到研究用的受試者資料。
         val cursor = db.query(
-            SRTResultContract.SSNSessionEntry.TABLE_NAME, null, null, null, null, null,
+            SRTResultContract.SSNSessionEntry.TABLE_NAME, null,
+            "${SRTResultContract.SSNSessionEntry.COLUMN_NAME_SESSION_SOURCE} IS NULL OR " +
+                "${SRTResultContract.SSNSessionEntry.COLUMN_NAME_SESSION_SOURCE} != ?",
+            arrayOf(SRTResultContract.SSNSessionEntry.SOURCE_SUBJECT), null, null,
             "${SRTResultContract.SSNSessionEntry.COLUMN_NAME_TEST_TIMESTAMP} DESC"
         )
         with(cursor) {
@@ -1264,8 +1269,10 @@ private fun loadSrtRecordsForSession(dbHelper: SRTResultDbHelper, sessionId: Lon
 
 private fun loadPureToneCsvs(directory: File?): List<PureToneCsvItem> {
     if (directory == null || !directory.exists()) return emptyList()
+    // "_SubjectFlow" 檔名是「測試者測驗流程」寫入的基準/驗證純音資料，
+    // 一般模式的歷史紀錄不應顯示。
     val files = directory.listFiles { _, name ->
-        name.contains("PureTone") && name.endsWith("_Results.csv")
+        name.contains("PureTone") && name.endsWith("_Results.csv") && !name.contains("_SubjectFlow")
     } ?: emptyArray()
     
     files.sortByDescending { it.lastModified() }

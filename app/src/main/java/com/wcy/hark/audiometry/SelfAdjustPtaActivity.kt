@@ -67,6 +67,14 @@ class SelfAdjustPtaActivity : AppCompatActivity() {
     private var hlSim: HearingLossSim = HearingLossSim.none()
     private var prevIsolation = false
 
+    /**
+     * true = 由「測試者測驗流程」呼叫（SubjectSessionActivity 的基準純音／
+     * HlSimIntroActivity 的操作檢核），false = 使用者從「快速純音」按鈕直接進入。
+     * 只用來在匯出的 CSV 檔名加註記，讓一般模式的「查看歷史紀錄」可以濾掉
+     * 受試者測驗流程的資料——不影響任何測驗邏輯或量到的數值。
+     */
+    private var sessionFlow = false
+
     private var frequencies = FULL_FREQS
     private val ears = listOf("Right", "Left")
 
@@ -142,6 +150,7 @@ class SelfAdjustPtaActivity : AppCompatActivity() {
         val extraSubject = intent.getStringExtra("EXTRA_SUBJECT")
         val extraEarphone = intent.getStringExtra("EXTRA_EARPHONE_MODEL")
         hlSimMode = intent.getBooleanExtra(EXTRA_HL_SIM, false)
+        sessionFlow = intent.getBooleanExtra("EXTRA_SESSION_FLOW", false)
         // 隔離即時輔聽引擎：若使用者進流程前開著輔聽，麥克風透傳的環境音會
         // 疊在測試音上，聽閾會被底噪墊高。稽核時發現本頁是全流程唯一漏掉
         // 隔離的測驗頁。離場時還原成進場前的狀態（本頁可能被步驟③嵌套呼叫，
@@ -498,7 +507,9 @@ class SelfAdjustPtaActivity : AppCompatActivity() {
     }
 
     private fun saveCsv(rightHl: Map<Int, Int?>, leftHl: Map<Int, Int?>) {
-        val filename = "${SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(Date())}_PureTone_SelfAdjust_Results.csv"
+        // sessionFlow=true 時檔名加註記，供一般模式「查看歷史紀錄」過濾掉受試者測驗流程資料
+        val flowTag = if (sessionFlow) "_SubjectFlow" else ""
+        val filename = "${SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(Date())}_PureTone_SelfAdjust${flowTag}_Results.csv"
         val filePath = "${getExternalFilesDir(null)?.absolutePath}/$filename"
         try {
             FileWriter(filePath).use { w ->

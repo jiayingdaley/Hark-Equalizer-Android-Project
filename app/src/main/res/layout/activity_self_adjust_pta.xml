@@ -89,6 +89,7 @@
             android:layout_height="72dp"
             android:text="−1 dB"
             android:textSize="18sp"
+            android:textAllCaps="false"
             android:background="@drawable/rounded_button" />
 
         <Space
@@ -101,6 +102,7 @@
             android:layout_height="72dp"
             android:text="+1 dB"
             android:textSize="18sp"
+            android:textAllCaps="false"
             android:background="@drawable/rounded_button" />
     </LinearLayout>
 

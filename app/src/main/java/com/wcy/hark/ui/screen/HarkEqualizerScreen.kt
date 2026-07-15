@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -201,11 +202,15 @@ fun HarkEqualizerScreen(
                         Tab(
                             selected = isSelected,
                             onClick = { viewModel.currentEarTab.value = earType },
+                            modifier = Modifier
+                                .padding(6.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (isSelected) color.copy(alpha = 0.18f) else Color.Transparent),
                             text = {
                                 Text(
                                     title,
-                                    style = MaterialTheme.typography.labelLarge.copy(
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
                                         color = if (isSelected) color else MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 )

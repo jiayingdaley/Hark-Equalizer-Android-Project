@@ -8,8 +8,9 @@ class SRTResultDbHelper(context: Context) :
     SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
 
     companion object {
-        // v12: ssn_sessions 新增呈現條件五欄（位準錨點、DSP 開關/增益、噪音總位準、詞表分半）
-        const val DATABASE_VERSION = 12
+        // v13: ssn_sessions 新增 session_source（資料來源標記），修正一般模式「查看歷史
+        // 紀錄」混入受試者測驗流程資料的問題；並回填既有的 A/B 場次
+        const val DATABASE_VERSION = 13
         const val DATABASE_NAME = "SRTResults.db"
     }
 
@@ -24,6 +25,23 @@ class SRTResultDbHelper(context: Context) :
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         // Non-destructive migration to preserve clinical testing results
+        if (oldVersion < 13) {
+            // v13：新增資料來源標記欄位，並回填既有資料——凡出現在 ssn_ab_sessions
+            // 的 off/on 場次，一律標記為 subject（這類場次本來就只可能由「測試者
+            // 測驗流程」(SSNAbTestActivity) 寫入）。回填規則完全基於既有的外鍵
+            // 關係，不改動任何既有欄位的數值，已收案資料不受影響，只是補上一個
+            // 新欄位的標記值，讓一般模式的「查看歷史紀錄」能正確排除這些場次。
+            try { db.execSQL("ALTER TABLE ssn_sessions ADD COLUMN session_source TEXT") }
+            catch (e: Exception) { e.printStackTrace() }
+            try {
+                db.execSQL(
+                    "UPDATE ssn_sessions SET session_source='subject' WHERE session_id IN (" +
+                        "SELECT session_id_off FROM ssn_ab_sessions WHERE session_id_off IS NOT NULL " +
+                        "UNION " +
+                        "SELECT session_id_on FROM ssn_ab_sessions WHERE session_id_on IS NOT NULL)"
+                )
+            } catch (e: Exception) { e.printStackTrace() }
+        }
         if (oldVersion < 12) {
             // v12: 呈現條件完整留存——位準錨點、DSP 開關與實際增益、噪音總位準、
             // 詞表分半。讓每場次的 CSV 匯出自足，分析不需回頭拼其他資料來源。

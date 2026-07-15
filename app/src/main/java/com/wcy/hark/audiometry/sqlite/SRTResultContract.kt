@@ -90,6 +90,13 @@ object SRTResultContract {
         const val COLUMN_NAME_TOTAL_LEVEL_DBFS = "total_level_dbfs"
         // A/B 互斥詞表分半（0/1；-1 = 整個詞庫）——驗證兩階段詞表不重疊。
         const val COLUMN_NAME_WORD_PARITY = "word_parity"
+        // ── v13：資料來源標記 ─────────────────────────────────────────────
+        // 一般模式與「測試者測驗流程」共用同一張表，過去無法區分，導致一般模式
+        // 的「查看歷史紀錄」會混入受試者測驗流程的資料。此欄由 SSNAbTestActivity
+        // （唯一會設定 EXTRA_AB_MODE=true 的呼叫端）寫入；一般模式測驗不寫此欄，
+        // 維持 NULL。
+        const val COLUMN_NAME_SESSION_SOURCE = "session_source"
+        const val SOURCE_SUBJECT = "subject"
     }
 
     object SSNRecordEntry : BaseColumns {
@@ -124,7 +131,8 @@ object SRTResultContract {
                 SSNSessionEntry.COLUMN_NAME_DSP_ON + " INTEGER," +
                 SSNSessionEntry.COLUMN_NAME_DSP_GAINS_DB + " TEXT," +
                 SSNSessionEntry.COLUMN_NAME_TOTAL_LEVEL_DBFS + " REAL," +
-                SSNSessionEntry.COLUMN_NAME_WORD_PARITY + " INTEGER DEFAULT -1)"
+                SSNSessionEntry.COLUMN_NAME_WORD_PARITY + " INTEGER DEFAULT -1," +
+                SSNSessionEntry.COLUMN_NAME_SESSION_SOURCE + " TEXT)"
 
     const val SQL_CREATE_SSN_RECORDS_TABLE =
         "CREATE TABLE IF NOT EXISTS " + SSNRecordEntry.TABLE_NAME + " (" +
