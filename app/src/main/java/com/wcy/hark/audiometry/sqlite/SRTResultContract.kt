@@ -77,6 +77,12 @@ object SRTResultContract {
         const val COLUMN_NAME_HL_SIM_PROFILE = "hl_sim_profile"    // "NONE"/"S2"/"N4"… (Bisgaard)
         const val COLUMN_NAME_HL_SIM_SMEARING = "hl_sim_smearing"  // 頻譜模糊 0/1
         const val COLUMN_NAME_HL_SIM_CHECK_ERR = "hl_sim_check_err" // 模擬器操作檢核最大誤差 (dB)
+        // ── v14：操作檢核逐頻原始資料（頻率固定為 500,1000,2000,4000 Hz，不另存頻率欄）──
+        // 原本只留 hl_sim_check_err 這個化約後的最大絕對誤差純量，逐頻細節算完即丟。
+        // 這三欄逗號分隔，依上述頻率順序留存，讓事後能檢視每頻誤差方向與大小。
+        const val COLUMN_NAME_HL_SIM_CHECK_MEASURED_DBFS = "hl_sim_check_measured_dbfs" // 逐頻實測值 (dBFS)
+        const val COLUMN_NAME_HL_SIM_CHECK_TARGET_DB = "hl_sim_check_target_db"         // 逐頻模擬目標損失 (dB)
+        const val COLUMN_NAME_HL_SIM_CHECK_ERROR_DB = "hl_sim_check_error_db"           // 逐頻誤差，有號 (dB)
         // ── v12：呈現條件完整留存（分析時每場次自足，不需回頭拼其他資料）────
         // 個人位準錨點（dBFS）：本場次所有位準的基準（= 純音平均閾值換算）。
         // 沒有它，事後無法重建「測試者實際聽到的絕對呈現位準」。
@@ -127,6 +133,9 @@ object SRTResultContract {
                 SSNSessionEntry.COLUMN_NAME_HL_SIM_PROFILE + " TEXT," +
                 SSNSessionEntry.COLUMN_NAME_HL_SIM_SMEARING + " INTEGER DEFAULT 0," +
                 SSNSessionEntry.COLUMN_NAME_HL_SIM_CHECK_ERR + " REAL," +
+                SSNSessionEntry.COLUMN_NAME_HL_SIM_CHECK_MEASURED_DBFS + " TEXT," +
+                SSNSessionEntry.COLUMN_NAME_HL_SIM_CHECK_TARGET_DB + " TEXT," +
+                SSNSessionEntry.COLUMN_NAME_HL_SIM_CHECK_ERROR_DB + " TEXT," +
                 SSNSessionEntry.COLUMN_NAME_LEVEL_ANCHOR_DBFS + " REAL," +
                 SSNSessionEntry.COLUMN_NAME_DSP_ON + " INTEGER," +
                 SSNSessionEntry.COLUMN_NAME_DSP_GAINS_DB + " TEXT," +
@@ -175,6 +184,40 @@ object SRTResultContract {
                 AbSessionEntry.COLUMN_NAME_SRT50_ON + " REAL," +
                 AbSessionEntry.COLUMN_NAME_DELTA_SRT50 + " REAL)"
 
+    // ── 測試者實驗流程：⑥ NLFC/DSP 效益驗證（C=純聽損／A=聽損+NLFC／B=聽損+NLFC+DSP）
+    // 固定呈現位準（同一個 dB SL 值套三格），單一變因依序為「移頻」「移頻+處方」，
+    // 藉此把 NLFC 本身的貢獻，與疊加 Hark 完整 DSP 後的額外貢獻分開來看。
+    // 每格底層仍是一筆 ssn_sessions（nlfc/dsp_on 已有欄位可用），本表只負責把
+    // 同一測試者、同一輪次的三格 session 綁在一起並存正確率，供歷史畫面彙總顯示。
+    object AbcSessionEntry : BaseColumns {
+        const val TABLE_NAME = "nlfc_dsp_abc_sessions"
+        const val COLUMN_NAME_GROUP_ID = "group_id"
+        const val COLUMN_NAME_TEST_TIMESTAMP = "test_timestamp"
+        const val COLUMN_NAME_SUBJECT_NAME = "subject_name"
+        const val COLUMN_NAME_EARPHONE_MODEL = "earphone_model"
+        const val COLUMN_NAME_LEVEL_SL_DB = "level_sl_db"           // 三格共用之固定呈現位準（dB SL）
+        const val COLUMN_NAME_SESSION_ID_C = "session_id_c"         // FK → SSNSessionEntry（純聽損，無 NLFC、無 DSP）
+        const val COLUMN_NAME_SESSION_ID_A = "session_id_a"         // FK → SSNSessionEntry（聽損 + NLFC）
+        const val COLUMN_NAME_SESSION_ID_B = "session_id_b"         // FK → SSNSessionEntry（聽損 + NLFC + DSP）
+        const val COLUMN_NAME_ACCURACY_C = "accuracy_c"             // 百分比正確率（0–100）
+        const val COLUMN_NAME_ACCURACY_A = "accuracy_a"
+        const val COLUMN_NAME_ACCURACY_B = "accuracy_b"
+    }
+
+    const val SQL_CREATE_ABC_SESSIONS_TABLE =
+        "CREATE TABLE IF NOT EXISTS " + AbcSessionEntry.TABLE_NAME + " (" +
+                AbcSessionEntry.COLUMN_NAME_GROUP_ID + " INTEGER PRIMARY KEY," +
+                AbcSessionEntry.COLUMN_NAME_TEST_TIMESTAMP + " INTEGER," +
+                AbcSessionEntry.COLUMN_NAME_SUBJECT_NAME + " TEXT," +
+                AbcSessionEntry.COLUMN_NAME_EARPHONE_MODEL + " TEXT," +
+                AbcSessionEntry.COLUMN_NAME_LEVEL_SL_DB + " REAL," +
+                AbcSessionEntry.COLUMN_NAME_SESSION_ID_C + " INTEGER," +
+                AbcSessionEntry.COLUMN_NAME_SESSION_ID_A + " INTEGER," +
+                AbcSessionEntry.COLUMN_NAME_SESSION_ID_B + " INTEGER," +
+                AbcSessionEntry.COLUMN_NAME_ACCURACY_C + " REAL," +
+                AbcSessionEntry.COLUMN_NAME_ACCURACY_A + " REAL," +
+                AbcSessionEntry.COLUMN_NAME_ACCURACY_B + " REAL)"
+
     // ── 環境輔聽問卷（測試者實驗流程最後一步）────────────────────────────
     object QuestionnaireEntry : BaseColumns {
         const val TABLE_NAME = "questionnaire_responses"
@@ -194,6 +237,18 @@ object SRTResultContract {
         const val COLUMN_NAME_WILLINGNESS = "willingness"      // 1-5，整體題
         const val COLUMN_NAME_FREE_TEXT = "free_text"
         const val COLUMN_NAME_EARPHONE_MODEL = "earphone_model" // 同一測試者測多副耳機時區分輪次
+
+        // ── v2（比較制問卷）新增欄位 ──────────────────────────────
+        // v1 的天花板問題：正常聽力測試者 OFF 分數頂天、ON 音色一變就掉分，
+        // 「各自絕對評分再相減」注定偏負。v2 改為每情境一題「ON 相對 OFF」
+        // 之直接比較（SSQ-B benefit 邏輯），並以 version 欄區分新舊資料
+        // （亦作為「此人已重測」之快速判別）。
+        const val COLUMN_NAME_VERSION = "questionnaire_version" // 1=舊版絕對評分；2=比較制
+        const val COLUMN_NAME_SCENE_DELTA = "scene_delta"       // v2 情境題：−3～+3（0=沒差別）；condition="DELTA"
+        const val COLUMN_NAME_OWN_VOICE = "own_voice"           // v2 整體題：自聲悶塞 1-5（5=完全正常）
+        const val COLUMN_NAME_LOUDNESS = "loudness"             // v2 整體題：音量合適度 1-5（3=剛好）
+
+        const val CURRENT_VERSION = 2
     }
 
     const val SQL_CREATE_QUESTIONNAIRE_TABLE =
@@ -214,7 +269,11 @@ object SRTResultContract {
                 QuestionnaireEntry.COLUMN_NAME_SATISFACTION + " INTEGER," +
                 QuestionnaireEntry.COLUMN_NAME_WILLINGNESS + " INTEGER," +
                 QuestionnaireEntry.COLUMN_NAME_FREE_TEXT + " TEXT," +
-                QuestionnaireEntry.COLUMN_NAME_EARPHONE_MODEL + " TEXT)"
+                QuestionnaireEntry.COLUMN_NAME_EARPHONE_MODEL + " TEXT," +
+                QuestionnaireEntry.COLUMN_NAME_VERSION + " INTEGER DEFAULT 1," +
+                QuestionnaireEntry.COLUMN_NAME_SCENE_DELTA + " INTEGER," +
+                QuestionnaireEntry.COLUMN_NAME_OWN_VOICE + " INTEGER," +
+                QuestionnaireEntry.COLUMN_NAME_LOUDNESS + " INTEGER)"
 
     // SQL statements for deleting tables (optional, for upgrades)
     const val SQL_DELETE_TEST_SESSIONS_TABLE = "DROP TABLE IF EXISTS " + TestSessionEntry.TABLE_NAME

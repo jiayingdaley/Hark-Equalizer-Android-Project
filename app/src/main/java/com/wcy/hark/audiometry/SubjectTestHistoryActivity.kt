@@ -35,11 +35,16 @@ class SubjectTestHistoryActivity : AppCompatActivity() {
     private data class AbRow(val ts: Long, val earphone: String?, val off: Float?, val on: Float?, val delta: Float?)
     private data class QRow(val ts: Long, val earphone: String?, val satisfaction: Int?, val willingness: Int?)
     private data class PtaRow(val fileName: String, val mode: String, val earphone: String?)
+    private data class AbcRow(
+        val ts: Long, val earphone: String?, val levelSlDb: Float?,
+        val accA: Float?, val accB: Float?, val accC: Float?
+    )
     private data class SubjectData(
         val name: String,
         val abRows: MutableList<AbRow> = mutableListOf(),
         val qRows: MutableList<QRow> = mutableListOf(),
-        val ptaRows: MutableList<PtaRow> = mutableListOf()
+        val ptaRows: MutableList<PtaRow> = mutableListOf(),
+        val abcRows: MutableList<AbcRow> = mutableListOf()
     )
 
     private val dateFmt = SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault())
@@ -119,6 +124,33 @@ class SubjectTestHistoryActivity : AppCompatActivity() {
             }
         } catch (e: Exception) { /* 舊資料庫可能無此表 */ }
 
+        // ⑥ NLFC/DSP 效益驗證
+        try {
+            db.rawQuery(
+                "SELECT ${SRTResultContract.AbcSessionEntry.COLUMN_NAME_SUBJECT_NAME}, " +
+                "${SRTResultContract.AbcSessionEntry.COLUMN_NAME_TEST_TIMESTAMP}, " +
+                "${SRTResultContract.AbcSessionEntry.COLUMN_NAME_EARPHONE_MODEL}, " +
+                "${SRTResultContract.AbcSessionEntry.COLUMN_NAME_LEVEL_SL_DB}, " +
+                "${SRTResultContract.AbcSessionEntry.COLUMN_NAME_ACCURACY_A}, " +
+                "${SRTResultContract.AbcSessionEntry.COLUMN_NAME_ACCURACY_B}, " +
+                "${SRTResultContract.AbcSessionEntry.COLUMN_NAME_ACCURACY_C} " +
+                "FROM ${SRTResultContract.AbcSessionEntry.TABLE_NAME} ORDER BY " +
+                SRTResultContract.AbcSessionEntry.COLUMN_NAME_TEST_TIMESTAMP + " DESC", null
+            ).use { c ->
+                while (c.moveToNext()) {
+                    val name = c.getString(0) ?: continue
+                    of(name).abcRows.add(AbcRow(
+                        ts = c.getLong(1),
+                        earphone = c.getString(2),
+                        levelSlDb = if (c.isNull(3)) null else c.getFloat(3),
+                        accA = if (c.isNull(4)) null else c.getFloat(4),
+                        accB = if (c.isNull(5)) null else c.getFloat(5),
+                        accC = if (c.isNull(6)) null else c.getFloat(6)
+                    ))
+                }
+            }
+        } catch (e: Exception) { /* 舊資料庫可能無此表 */ }
+
         // 純音 CSV（含標準與自調式）：讀前幾列取 Subject Name / Mode / Earphone
         getExternalFilesDir(null)?.listFiles { f ->
             f.isFile && f.name.contains("PureTone") && f.name.endsWith(".csv")
@@ -134,7 +166,15 @@ class SubjectTestHistoryActivity : AppCompatActivity() {
             } catch (e: Exception) { /* skip unreadable */ }
         }
 
-        return map.values.toList()
+        // 最新測過的人排最上面：依這位測試者「任何一筆紀錄」的最新時間戳排序，
+        // 而不是原本依表格查詢順序（等於是照④/問卷/⑥哪張表先查到就先出現，
+        // 跟實際測驗時間無關，找最近測的人時很不直覺）。
+        fun latestTs(s: SubjectData): Long = maxOf(
+            s.abRows.maxOfOrNull { it.ts } ?: 0L,
+            s.qRows.maxOfOrNull { it.ts } ?: 0L,
+            s.abcRows.maxOfOrNull { it.ts } ?: 0L
+        )
+        return map.values.sortedByDescending { latestTs(it) }
     }
 
     private fun renderSubjects(subjects: List<SubjectData>) {
@@ -196,6 +236,17 @@ class SubjectTestHistoryActivity : AppCompatActivity() {
                     line("・${dateFmt.format(Date(r.ts))}" +
                          (r.earphone?.let { "｜$it" } ?: "") +
                          "\n　OFF $off / ON $on dB SNR｜Δ $d dB")
+                }
+            }
+
+            if (s.abcRows.isNotEmpty()) {
+                section("⑥ NLFC/DSP 效益驗證（${s.abcRows.size} 輪）")
+                s.abcRows.forEach { r ->
+                    fun fmt(v: Float?) = v?.let { "%.0f%%".format(it) } ?: "缺"
+                    line("・${dateFmt.format(Date(r.ts))}" +
+                         (r.earphone?.let { "｜$it" } ?: "") +
+                         "｜%.0f dB SL".format(r.levelSlDb ?: 0f) +
+                         "\n　A(純聽損) ${fmt(r.accA)}／B(＋NLFC) ${fmt(r.accB)}／C(＋NLFC＋DSP) ${fmt(r.accC)}")
                 }
             }
 

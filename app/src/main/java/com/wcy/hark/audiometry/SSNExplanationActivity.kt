@@ -53,22 +53,22 @@ class SSNExplanationActivity : AppCompatActivity(), DialogNavCallback {
             if (entered.isNotEmpty()) {
                 lifecycleScope.launch { repository.saveLastSubjectName(entered) }
             }
-            // 使用者模式（非實驗模式）只提供「噪音下語詞」，不出選擇對話框——
-            // 「無噪音、小聲的語詞」為實驗模式限定測項。
+            // 不再做「舒適音量」調整：本測驗的呈現位準一律以 dB SL（測試者純音閾值
+            // 為零點）於數位域決定，測驗開始時系統音量鎖到最大（見 SSNTestActivity
+            // 與 AudiometryVolume）。舊的系統音量拉桿會在測驗一開始被 lockToMax 覆蓋，
+            // 造成「調的音量」與「測驗音量」不一致，且破壞 dB SL 基準——故直接進測驗。
+            // 使用者模式（非實驗模式）只提供「噪音下語詞」；「無噪音、小聲的語詞」
+            // 為實驗模式限定測項。
             if (!isExperimentMode) {
                 noiseless = false
-                VolumeAdjustmentDialogFragment.newInstance("ssn_noise")
-                    .show(supportFragmentManager, VolumeAdjustmentDialogFragment.TAG)
+                startSsnTest()
             } else {
                 // 先讓使用者選測驗類型：有噪音（SSN）或無噪音但小聲
                 android.app.AlertDialog.Builder(this)
                     .setTitle("選擇語詞測驗類型")
                     .setItems(arrayOf("有噪音的語詞（噪音下 SNR 掃描）", "無噪音、小聲的語詞（音量 dB SL 掃描）")) { _, which ->
                         noiseless = (which == 1)
-                        // 無噪音模式對「小聲語詞」設定舒適音量，故參考音改用語音樣本
-                        val ref = if (noiseless) "adjust_mcl" else "ssn_noise"
-                        VolumeAdjustmentDialogFragment.newInstance(ref)
-                            .show(supportFragmentManager, VolumeAdjustmentDialogFragment.TAG)
+                        startSsnTest()
                     }
                     .show()
             }
@@ -79,7 +79,7 @@ class SSNExplanationActivity : AppCompatActivity(), DialogNavCallback {
 
     private fun startSsnTest() {
         val entered = nameInput.text.toString().trim()
-        val qps = countInput.text.toString().toIntOrNull()?.coerceIn(1, 20) ?: 5
+        val qps = countInput.text.toString().toIntOrNull()?.coerceIn(1, 20) ?: 7
 
         val intent = Intent(this, SSNTestActivity::class.java).apply {
             putExtra("EXTRA_APPLY_DSP", switchApplyDsp.isChecked)
@@ -94,7 +94,7 @@ class SSNExplanationActivity : AppCompatActivity(), DialogNavCallback {
                 val snrs = snrInput.text.toString()
                     .split(",").mapNotNull { it.trim().toFloatOrNull() }
                     .distinct().sortedDescending()
-                    .ifEmpty { listOf(0f, -5f, -10f, -15f, -20f, -25f) }
+                    .ifEmpty { listOf(0f, -3f, -6f, -9f, -12f, -15f, -18f) }
                 putExtra("EXTRA_SNRS", snrs.toFloatArray())
             }
         }
@@ -103,16 +103,11 @@ class SSNExplanationActivity : AppCompatActivity(), DialogNavCallback {
     }
 
     // --- DialogNavCallback ---
-    // 音量對話框按 OK → 直接開始測驗（說明與設置已在本頁完成）
-    override fun onVolumeAdjustedShowInstructions() {
-        startSsnTest()
-    }
+    // 保留介面實作以滿足 DialogNavCallback，但本流程已不再做舒適音量調整
+    // （會破壞 dB SL 基準，見上方 onClick 註解與 AudiometryVolume）。
+    override fun onVolumeAdjustedShowInstructions() { startSsnTest() }
 
-    override fun onInstructionsDismissedShowVolume() {
-        VolumeAdjustmentDialogFragment.newInstance("ssn_noise").show(supportFragmentManager, VolumeAdjustmentDialogFragment.TAG)
-    }
+    override fun onInstructionsDismissedShowVolume() { /* 不再調整音量 */ }
 
-    override fun onStartSrtTestFromInstructions() {
-        startSsnTest()
-    }
+    override fun onStartSrtTestFromInstructions() { startSsnTest() }
 }

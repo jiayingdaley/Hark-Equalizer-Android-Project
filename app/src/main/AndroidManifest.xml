@@ -79,6 +79,12 @@
             android:screenOrientation="portrait"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
 
+        <activity
+            android:name=".audiometry.NlfcDspAbcTestActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+
         <!-- 模擬聽損—純音測試：第一頁是聽損體驗（正常/聽損/聽損+補償 三段對照），
              接著開著模擬器測 4 個頻率，檢核聽閾是否確實抬高了預期的量 -->
         <activity

@@ -500,6 +500,11 @@ class SelfAdjustPtaActivity : AppCompatActivity() {
                     putExtra("EXTRA_HLSIM_PASSED", passed)
                     putExtra("EXTRA_HLSIM_MAX_ERR", maxAbsErr)
                     putExtra("EXTRA_HLSIM_SUMMARY", summary)
+                    // 逐頻原始資料（500/1000/2000/4000 Hz 固定順序）——原本算完就丟，
+                    // 只留一個 maxAbsErr 純量；隨場次留存才能事後檢視每頻誤差方向與大小。
+                    putExtra("EXTRA_HLSIM_MEASURED_DBFS", measured.joinToString(",") { "%.2f".format(it) })
+                    putExtra("EXTRA_HLSIM_TARGET_DB", target.joinToString(",") { "%.2f".format(it) })
+                    putExtra("EXTRA_HLSIM_ERROR_DB", error.joinToString(",") { "%.2f".format(it) })
                 })
                 finish()
             }

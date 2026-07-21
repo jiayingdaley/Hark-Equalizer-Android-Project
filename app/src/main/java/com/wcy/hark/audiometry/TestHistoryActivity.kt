@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Hearing
 import androidx.compose.material.icons.filled.HearingDisabled
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,8 +35,11 @@ import com.wcy.hark.audiometry.sqlite.SRTResultContract
 import com.wcy.hark.audiometry.sqlite.SRTResultDbHelper
 import androidx.compose.ui.viewinterop.AndroidView
 import com.wcy.hark.ui.theme.HarkTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -134,6 +138,7 @@ fun TestHistoryScreen(
     val tabs = listOf("語詞辨識", "噪音語詞", "純音聽力")
 
     val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
     val srtDiagnosticMap = remember { loadSrtDiagnosticDatabase(context) }
 
     // 狀態讀取
@@ -180,10 +185,33 @@ fun TestHistoryScreen(
                         Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "返回")
                     }
                 },
+                actions = {
+                    // 分享目前分頁的資料：SRT/SSN 由 SQLite 匯成 CSV、純音打包 zip，
+                    // 以 FileProvider 分享（可送雲端，或選「儲存到檔案→下載」供 USB 取用）。
+                    IconButton(onClick = {
+                        scope.launch {
+                            val (uri, mime) = withContext(Dispatchers.IO) {
+                                when (selectedTab) {
+                                    0 -> HistoryExportUtil.exportSrt(context) to "text/csv"
+                                    1 -> HistoryExportUtil.exportSsn(context) to "text/csv"
+                                    else -> HistoryExportUtil.exportPureTone(context) to "application/zip"
+                                }
+                            }
+                            if (uri == null) {
+                                Toast.makeText(context, "這個分頁沒有可分享的資料", Toast.LENGTH_SHORT).show()
+                            } else {
+                                context.startActivity(HistoryExportUtil.shareIntent(context, uri, mime))
+                            }
+                        }
+                    }) {
+                        Icon(imageVector = Icons.Default.Share, contentDescription = "分享資料")
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             )
         }
@@ -1420,28 +1448,37 @@ private fun getAcousticDiagnostic(
     // 每個詞對的票數以 (1 − confusion_score) 加權：
     // 聲學上本來就極相似（confusion 高）的詞對，聽錯所提供的診斷資訊較少。
     val freqWeight = mutableMapOf<Double, Double>()
+    // 「隨機猜測」虛無假設下的期望頻帶分佈：對每一題答錯的題目，取該題全部
+    // 誘答詞對的風險頻率（同一套 1 − confusion 加權）平均累加為期望票數。
+    // 以受測題目自身的誘答組合為先驗，同時修正「單場僅施測部分題目」與
+    // 「各題誘答之頻率組成不均」兩種偏差（全題庫先驗無法反映前者）。
+    val freqExpected = mutableMapOf<Double, Double>()
     var validDataCount = 0
     substitutionRecords.forEach { record ->
-        val item = diagnosticMap["${record.correctWord},${record.userAnswer}"]
-        if (item != null) {
-            validDataCount++
-            val w = (1.0 - item.confusionScore).coerceAtLeast(0.1)
-            item.riskyFrequencies.forEach { freq ->
-                freqWeight[freq] = (freqWeight[freq] ?: 0.0) + w
+        val item = diagnosticMap["${record.correctWord},${record.userAnswer}"] ?: return@forEach
+        val alternatives = diagnosticMap.values.filter {
+            it.questionId == item.questionId && it.correctWord == record.correctWord
+        }
+        if (alternatives.isEmpty()) return@forEach
+        validDataCount++
+        val w = (1.0 - item.confusionScore).coerceAtLeast(0.1)
+        item.riskyFrequencies.forEach { freq ->
+            freqWeight[freq] = (freqWeight[freq] ?: 0.0) + w
+        }
+        alternatives.forEach { alt ->
+            val wa = (1.0 - alt.confusionScore).coerceAtLeast(0.1) / alternatives.size
+            alt.riskyFrequencies.forEach { freq ->
+                freqExpected[freq] = (freqExpected[freq] ?: 0.0) + wa
             }
         }
     }
 
-    // 先驗正規化：對照表中各頻帶本身出現次數不均（低頻與 8kHz 偏多），
-    // 直接比原始票數會系統性偏向低頻。以「觀察值 / 全表先驗」的過度代表比例比較。
-    val prior = mutableMapOf<Double, Int>()
-    diagnosticMap.values.forEach { it.riskyFrequencies.forEach { f -> prior[f] = (prior[f] ?: 0) + 1 } }
-    val priorTotal = prior.values.sum().toDouble().coerceAtLeast(1.0)
     val obsTotal = freqWeight.values.sum().coerceAtLeast(1e-9)
+    val expTotal = freqExpected.values.sum().coerceAtLeast(1e-9)
     fun overRepresentation(freqs: List<Double>): Double {
         val obs = freqs.sumOf { freqWeight[it] ?: 0.0 } / obsTotal
-        val pri = freqs.sumOf { (prior[it] ?: 0).toDouble() } / priorTotal
-        return if (pri > 0) obs / pri else 0.0
+        val exp = freqs.sumOf { freqExpected[it] ?: 0.0 } / expTotal
+        return if (exp > 0) obs / exp else 0.0
     }
 
     val lowFreqs = listOf(250.0, 315.0, 400.0, 500.0, 630.0, 800.0)
@@ -1466,12 +1503,12 @@ private fun getAcousticDiagnostic(
             // 前 3 名風險頻率（同樣以過度代表比例排序）
             val topFrequencies = freqWeight.keys
                 .sortedByDescending { f ->
-                    val p = (prior[f] ?: 0).toDouble() / priorTotal
-                    if (p > 0) (freqWeight[f]!! / obsTotal) / p else 0.0
+                    val e = (freqExpected[f] ?: 0.0) / expTotal
+                    if (e > 0) (freqWeight[f]!! / obsTotal) / e else 0.0
                 }
                 .take(3)
 
-            append("\n\n【混淆特徵分佈（相對於題庫先驗之過度代表比例）】")
+            append("\n\n【混淆特徵分佈（相對於猜測期望之過度代表比例）】")
             append(String.format(Locale.getDefault(), "\n  低頻共鳴區 (250-800Hz): %.0f%%", lowOR / orSum * 100))
             append(String.format(Locale.getDefault(), "\n  中頻人聲區 (1000-2500Hz): %.0f%%", midOR / orSum * 100))
             append(String.format(Locale.getDefault(), "\n  高頻摩擦音 (3150-8000Hz): %.0f%%", highOR / orSum * 100))
@@ -1482,9 +1519,15 @@ private fun getAcousticDiagnostic(
             }
 
             append("\n\n")
-            if (highOR >= lowOR && highOR >= midOR) {
+            // 三區過度代表比相近時不硬選主導頻帶——沒有頻譜集中卻給出頻段建議，
+            // 反而會誤導使用者調整不需要調整的頻率。
+            val noDominance = maxOf(lowOR, midOR, highOR) < 1.2
+            if (noDominance) {
+                append("📌 觀察：您的錯誤並未明顯集中於特定頻帶（三區之過度代表比例相近），較可能反映整體可聽度、詞彙熟悉度或注意力等因素，而非特定頻率的解析缺陷。\n\n")
+                append("💡 參考建議：請以純音聽力檢測結果為主要依據；可先確認音量設定與耳機配戴狀況，暫不建議針對單一頻段調整 EQ。")
+            } else if (highOR >= lowOR && highOR >= midOR) {
                 append("📌 觀察：您聽錯的詞對，其分辨線索多位於【高頻摩擦音區間】（如 ㄙ、ㄕ、ㄒ 等摩擦音，能量集中於 3150–8000Hz）。\n\n")
-                append("💡 參考建議：可對照純音聽力圖確認高頻閾值後，嘗試微調 4000Hz 與 8000Hz 的 EQ 增益，觀察辨識是否改善。")
+                append("💡 參考建議：可對照純音聽力圖確認高頻閾值後，嘗試微調 4000–8000Hz（尤其 6300Hz 與 8000Hz）的 EQ 增益，觀察辨識是否改善；若增益已達上限仍無改善，可考慮開啟高頻移頻（NLFC）。")
             } else if (midOR >= lowOR && midOR >= highOR) {
                 append("📌 觀察：您聽錯的詞對，其分辨線索多位於【中頻人聲核心區間】（1000–2500Hz，語音共振峰與語意理解的關鍵頻帶）。\n\n")
                 append("💡 參考建議：可對照純音聽力圖後，嘗試微調 1000Hz、1600Hz 與 2000Hz 的 EQ 增益。")

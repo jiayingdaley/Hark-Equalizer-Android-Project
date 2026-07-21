@@ -30,7 +30,7 @@
     <!-- ── 聽力測試 — 測試選擇 (TestSelectActivity) ── -->
     <string name="testSelect_title">選擇測試項目</string>
     <string name="testSelect_button_PureToneTest">純音聽力測試</string>
-    <string name="testSelect_button_SpeechAudiometry">語音辨識閾值測試</string>
+    <string name="testSelect_button_SpeechAudiometry">中文語詞測試</string>
     <string name="testSelect_button_ViewHistory">查看歷史紀錄</string>
 
     <!-- ── 聽力測試 — 耳別選擇 (SelectEarActivity) ── -->
@@ -46,10 +46,10 @@
     <string name="pureTest_btn_heard">我聽到了</string>
 
     <!-- ── 聽力測試 — 語音辨識說明 (SpeechAudiometryExplanationActivity) ── -->
-    <string name="speechExplain_title">語音辨識閾值測試說明</string>
+    <string name="speechExplain_title">中文語詞測試說明</string>
 
     <!-- ── 聽力測試 — 語音辨識測試 (SRTTestActivity) ── -->
-    <string name="srtTest_title">語音辨識閾值測試</string>
+    <string name="srtTest_title">中文語詞測試</string>
 
     <!-- ── 聽力測試 — 語音辨識結果 (SRTTestResultActivity) ── -->
     <string name="srtResult_title">測試結果</string>

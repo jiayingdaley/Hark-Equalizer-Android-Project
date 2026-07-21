@@ -27,7 +27,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
             android:layout_marginHorizontal="16dp"
-            android:text="這個測驗會在背景噪音中播放中文語詞，評估你在噪音環境下聽懂說話的能力。\n\n每一題會先聽到噪音，接著在噪音中出現一個語詞，請從四個選項中選出你聽到的詞；聽不清楚可按「不確定」。\n\n測驗過程中噪音大小會改變，這是正常的測驗設計。接下來會先調整舒適音量；測驗開始後音量將被鎖定。"
+            android:text="這個測驗會在背景噪音中播放中文語詞，評估你在噪音環境下聽懂說話的能力。\n\n每一題會先聽到噪音，接著在噪音中出現一個語詞，請從四個選項中選出你聽到的詞；聽不清楚可按「不確定」。\n\n測驗過程中噪音大小會改變，這是正常的測驗設計。測驗開始後音量會依你的聽力自動設定並鎖定，過程中請勿調整音量。"
             android:textSize="18sp"
             android:lineSpacingExtra="4dp" />
 
@@ -61,7 +61,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:singleLine="true"
-                android:text="10,5,0,-5,-10" />
+                android:text="0,-3,-6,-9,-12,-15,-18" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -75,7 +75,7 @@
                 android:layout_height="wrap_content"
                 android:inputType="number"
                 android:singleLine="true"
-                android:text="5" />
+                android:text="7" />
 
             <CheckBox
                 android:id="@+id/checkBoxSsnNlfc"

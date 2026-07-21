@@ -8,9 +8,14 @@ class SRTResultDbHelper(context: Context) :
     SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
 
     companion object {
-        // v13: ssn_sessions 新增 session_source（資料來源標記），修正一般模式「查看歷史
-        // 紀錄」混入受試者測驗流程資料的問題；並回填既有的 A/B 場次
-        const val DATABASE_VERSION = 13
+        // v14: ssn_sessions 新增操作檢核逐頻原始資料（實測/目標/誤差，逗號分隔，
+        // 500/1000/2000/4000 Hz 固定順序）。原本只留化約後的 hl_sim_check_err 最大
+        // 絕對誤差純量，逐頻細節算完即丟；此三欄補回，供事後檢視每頻誤差方向與大小。
+        // v15: questionnaire_responses 新增 v2 比較制問卷欄位（version / scene_delta /
+        // own_voice / loudness）。舊資料 version 預設 1，不受影響。
+        // v16: 新增⑥ NLFC/DSP 效益驗證彙總表（nlfc_dsp_abc_sessions），非破壞性、
+        // 新表不影響既有資料。
+        const val DATABASE_VERSION = 16
         const val DATABASE_NAME = "SRTResults.db"
     }
 
@@ -21,10 +26,33 @@ class SRTResultDbHelper(context: Context) :
         db.execSQL(SRTResultContract.SQL_CREATE_SSN_RECORDS_TABLE)
         db.execSQL(SRTResultContract.SQL_CREATE_AB_SESSIONS_TABLE)
         db.execSQL(SRTResultContract.SQL_CREATE_QUESTIONNAIRE_TABLE)
+        db.execSQL(SRTResultContract.SQL_CREATE_ABC_SESSIONS_TABLE)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         // Non-destructive migration to preserve clinical testing results
+        if (oldVersion < 16) {
+            try { db.execSQL(SRTResultContract.SQL_CREATE_ABC_SESSIONS_TABLE) }
+            catch (e: Exception) { e.printStackTrace() }
+        }
+        if (oldVersion < 15) {
+            listOf(
+                "ALTER TABLE questionnaire_responses ADD COLUMN questionnaire_version INTEGER DEFAULT 1",
+                "ALTER TABLE questionnaire_responses ADD COLUMN scene_delta INTEGER",
+                "ALTER TABLE questionnaire_responses ADD COLUMN own_voice INTEGER",
+                "ALTER TABLE questionnaire_responses ADD COLUMN loudness INTEGER"
+            ).forEach { sql -> try { db.execSQL(sql) } catch (e: Exception) { /* 欄位已存在 */ } }
+        }
+        if (oldVersion < 14) {
+            // v14: 操作檢核逐頻原始資料（測量/目標/誤差），取代原本算完即丟的做法。
+            for (sql in listOf(
+                "ALTER TABLE ssn_sessions ADD COLUMN hl_sim_check_measured_dbfs TEXT",
+                "ALTER TABLE ssn_sessions ADD COLUMN hl_sim_check_target_db TEXT",
+                "ALTER TABLE ssn_sessions ADD COLUMN hl_sim_check_error_db TEXT"
+            )) {
+                try { db.execSQL(sql) } catch (e: Exception) { e.printStackTrace() }
+            }
+        }
         if (oldVersion < 13) {
             // v13：新增資料來源標記欄位，並回填既有資料——凡出現在 ssn_ab_sessions
             // 的 off/on 場次，一律標記為 subject（這類場次本來就只可能由「測試者

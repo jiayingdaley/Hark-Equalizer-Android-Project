@@ -41,10 +41,12 @@ class SSNTestActivity : AppCompatActivity() {
     private lateinit var mixer: SsnAudioMixer
     private lateinit var dbHelper: SRTResultDbHelper
 
-    // 噪音固定在舒適音量、語音依 SNR 調小，故 SNR 皆為 0 或負值。
+    // 混音採「總位準恆定」：整體響度固定於錨點＋55 dB SL，SNR 只決定語音/噪音
+    // 的能量分配，故 SNR 皆為 0 或負值（語音沒入噪音）。此為 fallback 預設，一般
+    // 由 SSNExplanationActivity 以 EXTRA_SNRS 覆寫（預設 0～−18，每 3 dB 一階）。
     // 無噪音（小聲）模式時，此清單改代表「感覺級 dB SL」（越小越難）。
-    private var snrConditions: List<Float> = listOf(0f, -5f, -10f, -15f, -20f, -25f)
-    private var questionsPerSnr = 5
+    private var snrConditions: List<Float> = listOf(0f, -3f, -6f, -9f, -12f, -15f, -18f)
+    private var questionsPerSnr = 7
 
     // 無噪音「小聲語詞」模式：語詞呈現位準綁定受試者純音閾值 + dB SL。
     private var noiseless = false
@@ -61,6 +63,10 @@ class SSNTestActivity : AppCompatActivity() {
     private val records = mutableListOf<ContentValues>()
     private var sessionId = System.currentTimeMillis()
     private var isTestOver = false
+    // 使用者按「提早結束」主動中止（非自然跑完全部題目）。AB 模式下用來
+    // 分辨「這格提早結束」與「這格正常做完」，供呼叫端決定是否詢問要不要
+    // 直接放棄整個外層流程，而不是預設自動接下一格。
+    private var endedEarly = false
     private var isTestStarted = false
     private var currentNormGainDb = 0f   // 本題削波防護正規化增益（dB，≤0）
     private var applyDsp = true          // 是否對測驗音訊套用聽力補償（DSP EQ）
@@ -73,6 +79,10 @@ class SSNTestActivity : AppCompatActivity() {
     private var abCondition = ""         // "OFF" 或 "ON"
     private var wordParity = -1          // A/B 互斥詞表分半（0/1；-1 = 整個詞庫）
     private var hlSimCheckErr = Float.NaN  // 步驟③操作檢核最大誤差（NaN = 未檢核）
+    // 步驟③操作檢核逐頻原始資料（500/1000/2000/4000 Hz 固定順序，逗號分隔；空字串 = 未檢核）
+    private var hlSimCheckMeasuredDbfs = ""
+    private var hlSimCheckTargetDb = ""
+    private var hlSimCheckErrorDb = ""
 
     companion object {
         private const val TAG = "SSNTestActivity"
@@ -158,6 +168,9 @@ class SSNTestActivity : AppCompatActivity() {
         abCondition = intent.getStringExtra("EXTRA_AB_CONDITION") ?: ""
         wordParity = intent.getIntExtra("EXTRA_WORD_PARITY", -1)
         hlSimCheckErr = intent.getFloatExtra("EXTRA_HL_SIM_CHECK_ERR", Float.NaN)
+        hlSimCheckMeasuredDbfs = intent.getStringExtra("EXTRA_HLSIM_MEASURED_DBFS") ?: ""
+        hlSimCheckTargetDb = intent.getStringExtra("EXTRA_HLSIM_TARGET_DB") ?: ""
+        hlSimCheckErrorDb = intent.getStringExtra("EXTRA_HLSIM_ERROR_DB") ?: ""
 
         // 標題依模式切換。佈局預設寫「噪音下語詞測驗」，安靜模式進來若不改，
         // 測試者會以為跳錯測驗（實測真的被誤會了）。
@@ -430,7 +443,7 @@ class SSNTestActivity : AppCompatActivity() {
         AlertDialog.Builder(this)
             .setTitle("提早結束測驗")
             .setMessage("確定要結束目前的噪音下語詞測試嗎？已完成的題目仍會納入結果。")
-            .setPositiveButton("是") { _, _ -> endTest() }
+            .setPositiveButton("是") { _, _ -> endedEarly = true; endTest() }
             .setNegativeButton("否", null)
             .show()
     }
@@ -504,6 +517,11 @@ class SSNTestActivity : AppCompatActivity() {
                 if (!hlSimCheckErr.isNaN()) {
                     put(SRTResultContract.SSNSessionEntry.COLUMN_NAME_HL_SIM_CHECK_ERR, hlSimCheckErr)
                 }
+                if (hlSimCheckMeasuredDbfs.isNotEmpty()) {
+                    put(SRTResultContract.SSNSessionEntry.COLUMN_NAME_HL_SIM_CHECK_MEASURED_DBFS, hlSimCheckMeasuredDbfs)
+                    put(SRTResultContract.SSNSessionEntry.COLUMN_NAME_HL_SIM_CHECK_TARGET_DB, hlSimCheckTargetDb)
+                    put(SRTResultContract.SSNSessionEntry.COLUMN_NAME_HL_SIM_CHECK_ERROR_DB, hlSimCheckErrorDb)
+                }
                 // 只有「測試者實驗流程」(SSNAbTestActivity) 會帶 EXTRA_AB_MODE=true；
                 // 一般模式測驗維持 NULL，讓一般模式的歷史紀錄能過濾掉這裡的資料。
                 if (abMode) {
@@ -529,10 +547,17 @@ class SSNTestActivity : AppCompatActivity() {
         if (abMode) {
             // A/B 對照模式：不另開結果頁，直接把本條件的 SRT50 回傳給
             // SSNAbTestActivity 合併顯示。
+            // 固定單一位準（如⑥ NLFC/DSP 驗證）時 SRT50 內插不出（只有一個點），
+            // 額外回傳整體正確率，讓呼叫端可以用「% 正確」而非「50% 交叉點」比較。
+            val totalCorrect = results.values.sumOf { it[0] }
+            val totalCount = results.values.sumOf { it[1] }
+            val accuracy = if (totalCount > 0) totalCorrect * 100f / totalCount else Float.NaN
             setResult(RESULT_OK, Intent().apply {
                 putExtra("EXTRA_AB_CONDITION", abCondition)
                 putExtra("EXTRA_SRT50", srt50 ?: Float.NaN)
                 putExtra("EXTRA_SESSION_ID", sessionId)
+                putExtra("EXTRA_ACCURACY", accuracy)
+                putExtra("EXTRA_ENDED_EARLY", endedEarly)
             })
             finish()
             return

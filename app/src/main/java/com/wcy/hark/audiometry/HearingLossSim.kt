@@ -36,15 +36,27 @@ data class HearingLossSim(
     /**
      * 對整段音訊套用聽損模擬。務必在 DSP 補償之後呼叫。
      * 失敗時回傳原訊號（不靜默改變實驗條件——會寫進 log 供事後檢核）。
+     *
+     * ★ 位準尺度契約 ★ 模擬器的擴展器以「感覺級 dB SL」運作，其 sl 由
+     * 內部 envDb（訊號 RMS 之 dB）減 thresholdsPerBand（dBFS，0 dBFS = 滿刻度
+     * = 振幅 1.0）而得；故模擬器要求輸入以「0 dBFS = 1.0」正規化（單元測試即以
+     * 此尺度餵訊號）。但 SsnAudioMixer 的整條離線鏈以 short 尺度（±32768）運作，
+     * 若直接把 short 尺度餵進來，envDb 會比真實 dBFS 高出 20·log10(32768) ≈
+     * 90.3 dB，sl 隨之膨脹 90 dB，target 增益恆被夾到 0（全開）——擴展器對語音
+     * 完全不衰減，聽損模擬在語詞路徑上形同未作用（純音路徑走 toneGainDb 閉式，
+     * 不受影響）。故此處在邊界正規化：/32768 進、×32768 出。
      */
     fun processOffline(input: FloatArray, sampleRate: Int): FloatArray {
         if (!isActive) return input
         return try {
-            HarkAudioBridge.hlSimProcessOffline(
-                input, sampleRate,
+            val normalized = FloatArray(input.size) { input[it] / SHORT_FULL_SCALE }
+            val out = HarkAudioBridge.hlSimProcessOffline(
+                normalized, sampleRate,
                 thresholdsPerBand, lossPerBand,
                 HearingLossProfile.DEFAULT_UCL_DB, broadenFactor
             )
+            for (i in out.indices) out[i] *= SHORT_FULL_SCALE
+            out
         } catch (e: Throwable) {
             Log.e(TAG, "hlSimProcessOffline failed — 本 trial 未套用聽損模擬: ${e.message}", e)
             input
@@ -88,6 +100,9 @@ data class HearingLossSim(
 
     companion object {
         private const val TAG = "HearingLossSim"
+
+        /** short PCM 滿刻度：0 dBFS 對應之振幅，用於離線鏈 short↔正規化尺度換算。 */
+        private const val SHORT_FULL_SCALE = 32768f
 
         /** 未模擬（正常聽力）的空組態。 */
         fun none() = HearingLossSim(HearingLossProfile.NONE, emptyMap(), false)

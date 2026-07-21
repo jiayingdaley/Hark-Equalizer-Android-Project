@@ -45,15 +45,10 @@ object SubjectExportUtil {
             }
 
             // 2) SQLite 各表篩選匯出
+            // 註：test_sessions/srt_test_records（獨立的「語詞辨識測試」功能，與本流程
+            // 無關）不匯出——測試者實驗流程從未寫入這兩張表，匯出永遠是空檔案，只會
+            // 造成混淆。
             val db = SRTResultDbHelper(context).readableDatabase
-            writeQueryAsCsv(zip, "srt_word_test.csv", db.rawQuery(
-                "SELECT s.*, r.question_number, r.correct_word, r.user_answer, r.was_correct " +
-                "FROM ${SRTResultContract.TestSessionEntry.TABLE_NAME} s " +
-                "LEFT JOIN ${SRTResultContract.SRTRecordEntry.TABLE_NAME} r " +
-                "ON s.${SRTResultContract.TestSessionEntry.COLUMN_NAME_SESSION_ID} = r.${SRTResultContract.SRTRecordEntry.COLUMN_NAME_SESSION_ID_FK} " +
-                "WHERE s.${SRTResultContract.TestSessionEntry.COLUMN_NAME_SUBJECT_NAME} = ?",
-                arrayOf(subjectName)
-            ))
             writeQueryAsCsv(zip, "ssn_test.csv", db.rawQuery(
                 "SELECT s.*, r.snr_db, r.question_number, r.correct_word, r.user_answer, r.was_correct, r.norm_gain_db " +
                 "FROM ${SRTResultContract.SSNSessionEntry.TABLE_NAME} s " +
@@ -68,6 +63,10 @@ object SubjectExportUtil {
             ))
             writeQueryAsCsv(zip, "questionnaire.csv", db.rawQuery(
                 "SELECT * FROM ${SRTResultContract.QuestionnaireEntry.TABLE_NAME} WHERE ${SRTResultContract.QuestionnaireEntry.COLUMN_NAME_SUBJECT_NAME} = ?",
+                arrayOf(subjectName)
+            ))
+            writeQueryAsCsv(zip, "nlfc_dsp_abc.csv", db.rawQuery(
+                "SELECT * FROM ${SRTResultContract.AbcSessionEntry.TABLE_NAME} WHERE ${SRTResultContract.AbcSessionEntry.COLUMN_NAME_SUBJECT_NAME} = ?",
                 arrayOf(subjectName)
             ))
         }
@@ -136,6 +135,11 @@ object SubjectExportUtil {
             db.delete(
                 SRTResultContract.QuestionnaireEntry.TABLE_NAME,
                 "${SRTResultContract.QuestionnaireEntry.COLUMN_NAME_SUBJECT_NAME} = ?",
+                arrayOf(subjectName)
+            )
+            db.delete(
+                SRTResultContract.AbcSessionEntry.TABLE_NAME,
+                "${SRTResultContract.AbcSessionEntry.COLUMN_NAME_SUBJECT_NAME} = ?",
                 arrayOf(subjectName)
             )
             db.setTransactionSuccessful()

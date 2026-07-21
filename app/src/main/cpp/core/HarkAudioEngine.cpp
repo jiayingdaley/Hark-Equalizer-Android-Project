@@ -268,8 +268,12 @@ bool HarkAudioEngine::setupStreams() {
   }
 
   oboe::AudioStreamBuilder outBuilder;
+  oboe::PerformanceMode outPerf =
+      mOutputPerfModeOverride.load(std::memory_order_relaxed) == 1
+          ? oboe::PerformanceMode::PowerSaving
+          : oboe::PerformanceMode::LowLatency;
   outBuilder.setDirection(oboe::Direction::Output)
-      ->setPerformanceMode(oboe::PerformanceMode::LowLatency)
+      ->setPerformanceMode(outPerf)
       ->setSharingMode(targetSharingMode)
       ->setAudioApi(oboe::AudioApi::AAudio)
       ->setFormat(oboe::AudioFormat::Float)
@@ -352,12 +356,21 @@ bool HarkAudioEngine::setupStreams() {
         targetPreset = oboe::InputPreset::Unprocessed;
     }
 
+    // 輸入流的共享模式獨立決定，不吃 mSharingModeOverride：
+    // 該覆蓋是問卷頁為了解決「輸出」mmap-playback 緩衝過小的斷續問題而設，
+    // 若連輸入一起強制 Shared，USB 耳機麥會被系統踢到 Legacy 路徑
+    // （perf=NONE、burst=960 ≈ 20 ms/塊、緩衝 85 ms），與 2 ms/塊的低延遲
+    // 輸出完全不合拍——實測聲音嚴重異常。耳機收音維持 Exclusive 低延遲，
+    // 手機收音維持 Shared（跨時鐘源，見上方註解）。
+    oboe::SharingMode inputSharingMode =
+        useHeadset ? oboe::SharingMode::Exclusive : oboe::SharingMode::Shared;
+
     oboe::AudioStreamBuilder inBuilder;
     inBuilder.setDirection(oboe::Direction::Input)
         ->setDeviceId(targetInputDeviceId)
         ->setInputPreset(targetPreset)
         ->setPerformanceMode(oboe::PerformanceMode::LowLatency)
-        ->setSharingMode(targetSharingMode)
+        ->setSharingMode(inputSharingMode)
         ->setAudioApi(oboe::AudioApi::AAudio)
         ->setFormat(oboe::AudioFormat::Float)
         ->setChannelCount(oboe::ChannelCount::Mono)
@@ -403,13 +416,33 @@ bool HarkAudioEngine::setupStreams() {
 
     if (result == oboe::Result::OK) {
       int32_t inBurst = mInputStream->getFramesPerBurst();
-      // Set input buffer size to a safe value (e.g., 8 bursts) to allow room
-      // for jitter while preventing excessive buffering latency.
-      int32_t targetBufferSize = inBurst * 8;
+      // Input buffer sizing: at least 8 bursts for jitter, but never smaller
+      // than the output-side burst count — the input FIFO is drained inside the
+      // output callback, so any callback stall the output buffer is sized to
+      // absorb will hit the input buffer just as hard. With output at 32 bursts
+      // (questionnaire page) and input fixed at 8 (16 ms), a measured 16.6 ms
+      // stall overflowed the input FIFO (read/write counters 768 frames apart)
+      // → periodic overrun glitches after minutes of runtime.
+      int32_t inBursts = bursts > 8 ? bursts : 8;
+      int32_t targetBufferSize = inBurst * inBursts;
       if (targetBufferSize > mInputStream->getBufferCapacityInFrames()) {
         targetBufferSize = mInputStream->getBufferCapacityInFrames();
       }
       mInputStream->setBufferSizeInFrames(targetBufferSize);
+      // 全雙工啟動的輸入緩衝墊（cushion）依「實際輸入塊大小」自適應。
+      // 預設 2 個輸出回呼（192 frames ≈ 4 ms）只適用於低延遲輸入（burst 96）。
+      // USB 耳機麥在部分裝置只給 Legacy 路徑（burst 960 = 20 ms/塊）：塊間
+      // 間隔遠大於 4 ms 緩衝墊，FIFO 每 20 ms 見底一次、輸出被迫補靜音——
+      // 聽感為規律斷續（實測）。墊高到「一個輸入塊 + 2 回呼」的量，代價是
+      // 等量的額外延遲（僅慢速輸入路徑會發生，低延遲路徑不受影響）。
+      {
+        int32_t outB = mOutputStream ? mOutputStream->getFramesPerBurst() : 96;
+        int cushion = (inBurst + outB - 1) / outB + 2;
+        if (cushion < 2) cushion = 2;
+        mCountInputBurstsCushion.store(cushion, std::memory_order_relaxed);
+        LOGD("Input cushion set to %d output callbacks (inBurst=%d)", cushion,
+             inBurst);
+      }
       LOGD("Input opened successfully: SR=%d, Burst=%d, Buffer=%d, "
            "Capacity=%d, API=%d, Sharing=%d",
            mInputStream->getSampleRate(), inBurst,

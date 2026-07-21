@@ -230,6 +230,28 @@ class EqSettingsRepository(private val context: Context) {
     fun getHlSimCheckErrFlow(): Flow<Float> =
         context.dataStore.data.map { it[hlSimCheckErrKey] ?: Float.NaN }
 
+    // 步驟③操作檢核的逐頻原始資料（500/1000/2000/4000 Hz 固定順序，逗號分隔字串）。
+    // 與 hlSimCheckErrKey 同理由持久化：主控頁記憶體變數在 app 重啟續測後會遺失，
+    // 語詞場次的逐頻欄位就寫不進去。空字串 = 本輪尚未檢核。
+    private val hlSimCheckMeasuredKey = stringPreferencesKey("hl_sim_check_measured_dbfs")
+    private val hlSimCheckTargetKey = stringPreferencesKey("hl_sim_check_target_db")
+    private val hlSimCheckErrorKey = stringPreferencesKey("hl_sim_check_error_db")
+
+    suspend fun saveHlSimCheckDetail(measuredDbfs: String, targetDb: String, errorDb: String) {
+        context.dataStore.edit {
+            it[hlSimCheckMeasuredKey] = measuredDbfs
+            it[hlSimCheckTargetKey] = targetDb
+            it[hlSimCheckErrorKey] = errorDb
+        }
+    }
+
+    fun getHlSimCheckMeasuredFlow(): Flow<String> =
+        context.dataStore.data.map { it[hlSimCheckMeasuredKey] ?: "" }
+    fun getHlSimCheckTargetFlow(): Flow<String> =
+        context.dataStore.data.map { it[hlSimCheckTargetKey] ?: "" }
+    fun getHlSimCheckErrorFlow(): Flow<String> =
+        context.dataStore.data.map { it[hlSimCheckErrorKey] ?: "" }
+
     // 基準聽閾（raw thresholds）的「主人」。聽閾在 DataStore 不分人存，
     // 換測試者時若不比對這個欄位，流程主控頁會把上一位的聽閾誤判成
     // 新測試者「已有純音結果」（實測踩到：ID 5+1 改 5+2 仍跳續測詢問）。

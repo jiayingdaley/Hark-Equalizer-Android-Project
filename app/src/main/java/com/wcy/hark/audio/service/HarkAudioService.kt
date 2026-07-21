@@ -59,6 +59,18 @@ class HarkAudioService : Service() {
          */
         @Volatile
         var audiometryIsolationActive = false
+
+        /**
+         * 實驗手動控制旗標：問卷頁（環境輔聽比較）進場時設 true。與隔離旗標
+         * 不同——引擎要出聲，但 ON/OFF、模式、路由全由該頁掌控。旗標為 true
+         * 期間：(1) 服務的耳機偵測/AudioFocus 不得改動靜音狀態（僅保留「耳機
+         * 拔除即靜音」的回授保護）；(2) HarkAudioRouter 的裝置重設
+         * （setCommunicationDevice、清系統 DSP、音量同步）一律跳過。實測未
+         * 加此旗標時，背景 MainActivity 的路由重檢每兩秒打斷串流一次——
+         * 聽感嚴重斷續，且反覆 ACTION_START 抹掉手動模式鎖。
+         */
+        @Volatile
+        var experimentManualControl = false
     }
 
     // Service-level CoroutineScope tied to service lifecycle (Fix for KNOWN-ISSUE-007).
@@ -98,7 +110,7 @@ class HarkAudioService : Service() {
             AudioManager.AUDIOFOCUS_GAIN -> {
                 // Focus restored: unmute — unless a hearing test is isolating the engine.
                 Log.d(TAG, "AudioFocus GAIN — restoring engine")
-                HarkAudioBridge.setMuted(audiometryIsolationActive)
+                if (!experimentManualControl) HarkAudioBridge.setMuted(audiometryIsolationActive)
             }
         }
     }
@@ -136,13 +148,18 @@ class HarkAudioService : Service() {
             .setContentIntent(pendingIntent)
             .build()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(
-                NOTIFICATION_ID, notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
-            )
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startForeground(
+                    NOTIFICATION_ID, notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start foreground service (probably in background): ${e.message}")
+            stopSelf()
         }
     }
 
@@ -170,6 +187,9 @@ class HarkAudioService : Service() {
 
     private fun startForegroundService() {
         // Acquire WakeLock to keep CPU running during sleep mode
+        // startForegroundService() 每個 ACTION_START 都會執行；不先釋放舊鎖
+        // 就覆蓋參照會洩漏（logcat: "WakeLock finalized while still held"）。
+        wakeLock?.takeIf { it.isHeld }?.release()
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(
             PowerManager.PARTIAL_WAKE_LOCK,
@@ -243,6 +263,9 @@ class HarkAudioService : Service() {
         Log.d(TAG, "HarkAudioService: Headphone connected = $isHeadphoneConnected")
         // Mute the audio engine instantly if headphones are disconnected, to prevent
         // screeching feedback loop. Stay muted while a hearing test is isolating the engine.
+        // 實驗手動控制期間，靜音狀態由問卷頁掌控（OFF=靜音），服務不得代為解除
+        // ——僅保留「耳機拔除即靜音」的回授保護。
+        if (experimentManualControl && isHeadphoneConnected) return
         HarkAudioBridge.setMuted(!isHeadphoneConnected || audiometryIsolationActive)
     }
 

@@ -28,7 +28,9 @@ International Journal of Audiology, 49(12), 891–903.
 
 ## 施測建議
 - 喇叭與測試者距離固定（建議 1 m、正前方），播放裝置音量固定並記錄。
-- 每個情境：先「輔聽 OFF」聽 30 秒填題，再「輔聽 ON」聽 30 秒填題。
+- 每個情境（v2 比較制問卷）：先「輔聽 OFF」聽約 30 秒 → 切「輔聽 ON」聽約 30 秒 →
+  立即回答該情境一題「ON 相對 OFF」比較題（−3～+3，0＝沒差別）。情境 4 由實驗者
+  於固定距離現場拍手（不播 scene4 檔亦可，兩者擇一並記錄）。
 - 產生腳本：`scratchpad/gen_scenes.py` + `scratchpad/gen_scenes_v2.py`（conda Datamining 環境）。
 - 母源檔 `ISTS - International Speech Test Signal (10 minutes).mp3` 僅供產生素材使用，
   不隨 App 散布；正式論文方法段落可直接引用上述文獻與 EHIMA 標準訊號來源。

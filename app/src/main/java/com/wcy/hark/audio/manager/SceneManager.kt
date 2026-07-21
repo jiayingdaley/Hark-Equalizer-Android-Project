@@ -58,6 +58,10 @@ class SceneManager(
     private var autoJob: Job? = null
 
     fun start() {
+        // start() 會被重複呼叫（服務的 startForegroundService() 對每個 ACTION_START
+        // 都執行一次）。若使用者已手動鎖定模式，重跑 start() 不得重啟自動分類，
+        // 否則手動鎖被靜默抹掉（實測：問卷頁鎖「對話」仍被自動分類切走）。
+        if (_isAutoLocked.value) return
         startAutoAnalysis()
     }
 

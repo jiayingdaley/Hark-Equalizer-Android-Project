@@ -40,6 +40,8 @@ object HarkAudioBridge {
     external fun setIsBluetoothInput(isBluetooth: Boolean)
     /** 輸出緩衝（burst 倍數；下次開流生效）。預設 4≈8ms；UI 忙碌頁面調大防斷續。 */
     external fun setOutputBufferBursts(bursts: Int)
+    /** 輸出效能模式覆蓋：0 = LowLatency（預設）、1 = PowerSaving（Legacy 大緩衝）。下次開流生效。 */
+    external fun setOutputPerfModeOverride(mode: Int)
     external fun setHeadphonesConnected(connected: Boolean)
 
     // --- Media Capture Mode ---

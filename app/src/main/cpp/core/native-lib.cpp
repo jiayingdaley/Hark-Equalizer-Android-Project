@@ -149,6 +149,12 @@ Java_com_wcy_hark_audio_bridge_HarkAudioBridge_setOutputBufferBursts(
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_com_wcy_hark_audio_bridge_HarkAudioBridge_setOutputPerfModeOverride(
+        JNIEnv *env, jobject /* this */, jint mode) {
+    engine.setOutputPerfModeOverride(mode);
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_com_wcy_hark_audio_bridge_HarkAudioBridge_setIsBluetoothInput(
         JNIEnv *env, jobject /* this */, jboolean isBluetooth) {
     engine.setIsBluetoothInput(isBluetooth);

@@ -119,6 +119,13 @@ class HarkAudioRouter(
     }
 
     private suspend fun checkAndSetAudioDevice() {
+        // 實驗手動控制期間（問卷頁），路由重設一律跳過：背景 MainActivity 的
+        // onResume／前景切換／裝置回呼都會打進來，setCommunicationDevice＋
+        // 清系統 DSP＋音量同步會在串流運作中反覆改路由（實測：聲音嚴重斷續）。
+        if (com.wcy.hark.audio.service.HarkAudioService.experimentManualControl) {
+            Log.d(TAG, "checkAndSetAudioDevice: skipped (experimentManualControl)")
+            return
+        }
         deviceChangeMutex.withLock {
             Log.d(TAG, "checkAndSetAudioDevice: running under lock")
 

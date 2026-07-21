@@ -81,6 +81,13 @@ public:
   // 輸出緩衝大小（burst 倍數；下次開流生效）。預設 4（≈8 ms）追求低延遲；
   // UI 忙碌的頁面（如問卷）callback 遲到可達 25 ms，需調大以免聲音斷續。
   void setOutputBufferBursts(int bursts);
+  // 輸出效能模式覆蓋（下次開流生效）：0 = LowLatency（預設）；1 = PowerSaving
+  // （Legacy 大緩衝路徑）。問卷頁用——MMAP 輸出容量硬上限 ~1536 frames
+  // （30 ms），Compose UI 停頓 40–56 ms 必破音；Legacy 容量 ~4096（85 ms）
+  // 換穩定，該頁不需低延遲。
+  void setOutputPerfModeOverride(int mode) {
+    mOutputPerfModeOverride.store(mode, std::memory_order_relaxed);
+  }
 
   // --- Media Capture Mode ---
   void setMediaCaptureMode(bool enabled);
@@ -117,6 +124,7 @@ private:
   int32_t mInputDeviceId = oboe::kUnspecified;
   std::atomic<bool> mUseHeadsetMic{true};
   std::atomic<int> mOutputBufferBursts{4};
+  std::atomic<int> mOutputPerfModeOverride{0};
 
   // --- Media Capture ---
   std::atomic<bool> mMediaCaptureMode{false};

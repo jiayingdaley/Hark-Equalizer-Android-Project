@@ -32,24 +32,60 @@ import com.wcy.hark.audiometry.sqlite.SRTResultDbHelper
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-private data class Scene(val key: String, val title: String, val hasClarity: Boolean)
-
-private val SCENES = listOf(
-    Scene("scene1_babble", "情境 1：多人交談背景", hasClarity = false),
-    Scene("scene2_speech_quiet", "情境 2：安靜下的語音", hasClarity = true),
-    Scene("scene3_steady_noise", "情境 3：穩態噪音（冷氣/車流）", hasClarity = false),
-    Scene("scene4_transients", "情境 4：突發聲響", hasClarity = false),
-    Scene("scene5_speech_in_babble", "情境 5：語音＋交談背景", hasClarity = true),
+/**
+ * v2 比較制情境題：每情境一題「開啟輔聽（ON）相對關閉（OFF）」之 −3～+3 直接比較。
+ * scene key 沿用 v1（對應 experiment_scenes/ 之情境音檔），每題對準該情境
+ * 最相關的處理機制，anchor 文字為量表兩端之語意。
+ */
+private data class Scene(
+    val key: String, val title: String, val question: String,
+    val negLabel: String, val posLabel: String, val note: String? = null
 )
 
+private val SCENES = listOf(
+    Scene(
+        "scene1_babble", "情境 1：多人交談背景",
+        "開啟輔聽後，周圍交談聲的吵雜／干擾感？",
+        negLabel = "更吵、更干擾", posLabel = "明顯較不吵"
+    ),
+    Scene(
+        "scene2_speech_quiet", "情境 2：安靜下的語音",
+        "開啟輔聽後，語音聽起來的清楚程度（輪廓與細節）？",
+        negLabel = "更不清楚", posLabel = "明顯更清楚",
+        note = "情境音為 ISTS 多語混剪、無法聽懂內容，請純就聲音清楚程度判斷。"
+    ),
+    Scene(
+        "scene3_steady_noise", "情境 3：穩態噪音（冷氣/車流感）",
+        "開啟輔聽後，持續噪音的干擾程度？",
+        negLabel = "更干擾", posLabel = "明顯較不干擾"
+    ),
+    Scene(
+        "scene4_transients", "情境 4：突發聲（現場拍手）",
+        "開啟輔聽後，拍手等突發聲聽起來？",
+        negLabel = "更刺耳／有爆音", posLabel = "明顯較不刺耳",
+        note = "由實驗者於固定距離拍手數次。"
+    ),
+    Scene(
+        "scene5_speech_in_babble", "情境 5：語音＋交談背景",
+        "開啟輔聽後，交談背景中主要語音的突出程度？",
+        negLabel = "更難分辨", posLabel = "明顯更突出"
+    ),
+)
+
+/** 情境題未作答之哨兵值（0 是合法答案「沒差別」，不能拿 0 當未答）。 */
+private const val DELTA_UNANSWERED = -99
+
 /**
- * QuestionnaireActivity — 環境輔聽自編問卷（測試者實驗流程最後一步）。
+ * QuestionnaireActivity — 環境輔聽問卷 v2（測試者實驗流程最後一步）。
  *
- * 每個情境以喇叭播放（見 experiment_scenes/），測試者先「輔聽 OFF」聆聽後
- * 填一組題，再「輔聽 ON」聆聽後再填一組（清晰度僅語音情境適用、舒適度、
- * 噪音干擾），結束後填一組整體題（延遲感、異音、自然度、滿意度、使用
- * 意願、開放意見）。全部存入 SQLite questionnaire_responses 表，綁定
- * session_id 供匯出。
+ * 每個情境以喇叭播放情境音（見 experiment_scenes/；情境 4 為實驗者現場拍手）：
+ * 先 OFF 聆聽約 30 秒 → 切 ON 聆聽約 30 秒 → 立即回答該情境「一題」比較題
+ * （ON 相對 OFF，−3～+3，0＝沒差別；SSQ-B benefit 邏輯）。v1 的「OFF/ON 各自
+ * 絕對評分」對正常聽力測試者有天花板效應（OFF 頂天、ON 音色一變就掉分），
+ * v2 直接量差異、且每情境問對準的處理機制。整體題保留 v1 四題（延遲感、
+ * 自然度、滿意度、使用意願，跨版可比）並新增自聲悶塞與音量合適度。
+ * 全部存入 SQLite questionnaire_responses 表（questionnaire_version=2），
+ * 綁定 session_id 供匯出。
  *
  * 畫面頂部提供環境輔聽控制：DSP 開關、收音來源（手機／耳機麥克風）與環境
  * 模式（透明／對話／戶外／影音）。DSP 開關會真正啟動 Hark 的即時麥克風收音
@@ -63,10 +99,28 @@ class QuestionnaireActivity : ComponentActivity() {
     private var dspGainsLeft: List<Float> = emptyList()
     private var dspGainsRight: List<Float> = emptyList()
 
-    private var useHeadsetMic = true
+    // 預設手機收音：本機 USB 耳機麥只有 Legacy 慢路徑（burst 960），順暢與
+    // 低延遲不可兼得；內建麥 MMAP 低延遲、實測零 stall。施測全員一致即可。
+    private var useHeadsetMic = false
     private var currentMode = SceneManager.Mode.CONVERSATION
     private var engineStarted = false
     private var dspOn = false
+
+    /**
+     * 麥克風權限請求。重灌 app 後權限會被系統重置，而本頁是測試者流程中
+     * 第一個（也是唯一）需要麥克風的步驟——先前只檢查＋Toast 不請求，
+     * 症狀是「輔聽 DSP 切開完全無聲」（實測踩到）。改為主動請求，核准
+     * 後接著啟動引擎。
+     */
+    private val micPermissionLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) startLiveEngine()
+        else android.widget.Toast.makeText(
+            this, "未取得麥克風權限，輔聽開關將無作用（問卷仍可作答）",
+            android.widget.Toast.LENGTH_LONG
+        ).show()
+    }
     private val uiHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -89,8 +143,8 @@ class QuestionnaireActivity : ComponentActivity() {
                 onDspToggle = { on -> applyDsp(on) },
                 onMicToggle = { headset -> setMic(headset) },
                 onModeSelect = { mode -> setMode(mode) },
-                onSubmit = { sceneAnswers, overall ->
-                    saveToDb(sessionId, subjectName, earphoneModel, sceneAnswers, overall)
+                onSubmit = { sceneDeltas, overall ->
+                    saveToDb(sessionId, subjectName, earphoneModel, sceneDeltas, overall)
                     setResult(RESULT_OK)
                     finish()
                 },
@@ -105,9 +159,7 @@ class QuestionnaireActivity : ComponentActivity() {
             this, Manifest.permission.RECORD_AUDIO
         ) == PackageManager.PERMISSION_GRANTED
         if (!granted) {
-            android.widget.Toast.makeText(
-                this, "未取得麥克風權限，輔聽開關將無作用", android.widget.Toast.LENGTH_LONG
-            ).show()
+            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
             return
         }
 
@@ -117,6 +169,34 @@ class QuestionnaireActivity : ComponentActivity() {
         // 重新靜音——所以本頁不能只被動假設「別人已還原」，必須自己斷言
         // 「現在要出聲」。實測漏掉這段的症狀：問卷的輔聽怎麼切都完全無聲。
         HarkAudioService.audiometryIsolationActive = false
+        // ★ 宣告本頁全權掌控 ★ 服務端的耳機偵測/AudioFocus 不得改動靜音、
+        // HarkAudioRouter 的裝置重設全部跳過（背景 MainActivity 會反覆觸發，
+        // 實測造成嚴重斷續）。離頁於 onDestroy 還原。
+        HarkAudioService.experimentManualControl = true
+
+        // ★ 自行設定耳機旗標 ★ native 端 setupStreams 在 mHeadphonesConnected
+        // = false 時直接拒開串流（防喇叭外放回授）。此旗標平時由
+        // HarkAudioRouter 設定，但本頁把路由整個跳過（experimentManualControl）
+        // 且實驗流程進場已停掉引擎——冷啟動時沒人設旗標，startEngine 被
+        // 靜默擋下，整頁無聲（實測踩到，logcat: "setupStreams blocked"）。
+        // 這裡只取路由「偵測耳機→設旗標」這一個必要動作。
+        run {
+            val am = getSystemService(AUDIO_SERVICE) as android.media.AudioManager
+            val hp = am.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS).any {
+                it.type in listOf(
+                    android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET,
+                    android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
+                    android.media.AudioDeviceInfo.TYPE_USB_HEADSET,
+                    android.media.AudioDeviceInfo.TYPE_BLE_HEADSET,
+                    android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+                    android.media.AudioDeviceInfo.TYPE_BLUETOOTH_SCO
+                )
+            }
+            HarkAudioBridge.setHeadphonesConnected(hp)
+            if (!hp) android.widget.Toast.makeText(
+                this, "⚠️ 未偵測到耳機——請接上耳機後重進本頁", android.widget.Toast.LENGTH_LONG
+            ).show()
+        }
 
         // 問卷頁 UI（Compose 重組）會讓音訊 callback 遲到 20+ ms，
         // 預設 4×burst（≈8 ms）緩衝必然 underrun——實測聲音斷斷續續。
@@ -125,7 +205,12 @@ class QuestionnaireActivity : ComponentActivity() {
         // setBufferSizeInFrames(16×burst) 被靜默鉗到容量上限，斷續依舊
         // （實測回報第二次）。本頁不需要極低延遲，強制 Shared 模式讓
         // 16×burst（≈32 ms）真正生效；離頁還原。
-        HarkAudioBridge.setStreamOverrides(1, 0)   // sharing: 1 = 強制 Shared
+        // ★ 串流組態與主頁一致 ★ 本頁早期疊過強制 Shared／Legacy PS 輸出／
+        // ×4 輸入容量等特殊組態，都是在追「斷續」的症狀；真正根因（路由
+        // 重入、自動分類搶模式、耳機旗標、服務重啟——見 BUG-012～016）修掉
+        // 後全數撤除。與主頁僅存兩個差異：(1) 輸出緩衝請求 32×burst（本頁
+        // 有 Compose UI，防偶發重組停頓；MMAP 會鉗到硬體上限 ~30 ms）；
+        // (2) 預設手機收音（本機 USB 耳機麥僅有 Legacy 慢路徑，DECISION-001）。
         // 32×burst ≈ 64 ms：實測本頁 callback 最大遲到 32.6 ms
         // （mMaxMeasuredLatenessNanos），16×burst（32 ms）恰好被吃光仍會
         // 斷音，需留一倍餘裕。
@@ -137,6 +222,16 @@ class QuestionnaireActivity : ComponentActivity() {
         )
         engineStarted = true
         HarkAudioBridge.setUseHeadsetMic(useHeadsetMic)
+        if (!useHeadsetMic) {
+            // 與 setMic(false) 相同的手機收音組態：內建麥實體 ID（否則沿用
+            // router 上次選的耳機麥 ID）＋內建麥靈敏度補償
+            val am = getSystemService(AUDIO_SERVICE) as android.media.AudioManager
+            am.getDevices(android.media.AudioManager.GET_DEVICES_INPUTS)
+                .firstOrNull { it.type == android.media.AudioDeviceInfo.TYPE_BUILTIN_MIC }
+                ?.let { HarkAudioBridge.setAudioInputDeviceId(it.id) }
+            HarkAudioBridge.setIsBluetoothInput(false)
+            HarkAudioBridge.setInputGainOffset(15.0f)
+        }
         HarkAudioBridge.setSituationalMode(currentMode.id)
         applyGains()
         // 初始 OFF = 引擎靜音。OFF 曾實作為 bypass 透傳（有聲音），測試者疑惑
@@ -153,19 +248,40 @@ class QuestionnaireActivity : ComponentActivity() {
             am.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, (max / 3).coerceAtLeast(1), 0)
         } catch (e: Exception) { /* best effort */ }
 
-        // 鎖定手動環境模式。服務啟動時 SceneManager 會開始「自動環境分類」，
-        // 每幾秒依現場聲音直接改寫引擎的環境模式——本頁若只對 bridge 設模式，
-        // 過一陣子就被自動分類蓋掉（實測：「明明選對話卻跳到別的模式」）。
-        // selectModeManual() 會鎖住自動偵測。服務是非同步啟動的，稍等再鎖。
-        uiHandler.postDelayed({
-            HarkAudioService.sceneManager?.selectModeManual(currentMode)
-        }, 800)
+        // 鎖定手動環境模式＋搶回 ON/OFF 決定權。兩個服務端動作都是非同步晚到：
+        //   (a) SceneManager 就緒後開始「自動環境分類」，安靜室內的判準就是
+        //       TRANSPARENCY，每 5 秒窗改寫引擎模式（實測：明明選對話，聽起來
+        //       卻是通透；模式被反覆改寫也造成參數跳動的斷續感）。
+        //   (b) 服務就緒時的耳機偵測「有耳機就解除靜音」，翻掉本頁 OFF 靜音。
+        // 舊版用一次性 postDelayed(800/1200ms) 賭時間，冷啟動（尤其剛授權完
+        // 麥克風那次）服務更慢，sceneManager 仍為 null → 鎖永遠沒上。改為
+        // 輪詢直到 sceneManager 就緒才鎖，鎖上後再重申兩次以覆蓋 (b)。
+        assertQuestionnaireState()
+    }
 
-        // ★ 搶回最後決定權 ★ 服務啟動（非同步）完成時會做耳機偵測，
-        // 「有耳機就解除靜音」——發生在上面 setMuted(true) 之後，OFF 狀態
-        // 被翻成有聲的原始透傳，ON/OFF 聽感幾乎沒差（實測回報：DSP 不工作）。
-        // 等服務就緒後把本頁的 ON/OFF 狀態重新套一次。
-        uiHandler.postDelayed({ applyDsp(dspOn) }, 1200)
+    /** 每 300ms 輪詢服務就緒；就緒後鎖手動模式＋重套 ON/OFF，共成功重申 3 次。 */
+    private fun assertQuestionnaireState(attempt: Int = 0, asserted: Int = 0) {
+        if (!engineStarted || isDestroyed) return
+        // 實驗流程進場會把引擎與服務整個停掉（防測驗嘯叫），本頁是冷啟動；
+        // 若服務起來了引擎卻沒跑（前景服務啟動失敗等），直接補啟動，
+        // 否則整頁無聲。
+        try {
+            if (!HarkAudioBridge.isEngineActuallyRunning()) {
+                android.util.Log.w("Questionnaire", "engine not running — starting directly")
+                HarkAudioBridge.startEngine()
+                applyGains()
+            }
+        } catch (e: Throwable) { /* bridge not ready yet */ }
+        val sm = HarkAudioService.sceneManager
+        if (sm == null) {
+            if (attempt < 40) uiHandler.postDelayed(
+                { assertQuestionnaireState(attempt + 1, asserted) }, 300)
+            return
+        }
+        sm.selectModeManual(currentMode)
+        applyDsp(dspOn)
+        if (asserted < 2) uiHandler.postDelayed(
+            { assertQuestionnaireState(attempt, asserted + 1) }, 1000)
     }
 
     private fun applyGains() {
@@ -218,15 +334,7 @@ class QuestionnaireActivity : ComponentActivity() {
             HarkAudioBridge.startEngine()
             // 引擎重啟後原生端狀態歸零，把本頁的狀態全部重新套上
             applyGains()
-            HarkAudioService.sceneManager?.selectModeManual(currentMode)
-                ?: HarkAudioBridge.setSituationalMode(currentMode.id)
-            if (dspOn) {
-                HarkAudioBridge.setBypassMode(false)
-                HarkAudioBridge.setMuted(false)
-            } else {
-                HarkAudioBridge.setBypassMode(true)
-                HarkAudioBridge.setMuted(true)
-            }
+            assertQuestionnaireState()
         }, 200)
     }
 
@@ -256,9 +364,11 @@ class QuestionnaireActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        // 還原輔聽的低延遲串流組態（本頁為防斷續改 Shared + 16×burst）
+        HarkAudioService.experimentManualControl = false
+        // 還原輔聽的低延遲串流組態（本頁為防斷續改 Shared + Legacy 大緩衝）
         HarkAudioBridge.setStreamOverrides(0, 0)
         HarkAudioBridge.setOutputBufferBursts(4)
+        HarkAudioBridge.setOutputPerfModeOverride(0)
         // 離開問卷即停止即時引擎，回復進場前狀態（進場前本流程並未啟用輔聽）。
         if (engineStarted) {
             startService(Intent(this, HarkAudioService::class.java).apply {
@@ -272,7 +382,7 @@ class QuestionnaireActivity : ComponentActivity() {
         sessionId: Long,
         subjectName: String,
         earphoneModel: String?,
-        sceneAnswers: Map<String, ConditionAnswers>,
+        sceneDeltas: Map<String, Int>,
         overall: OverallAnswers
     ) {
         val db = SRTResultDbHelper(this).writableDatabase
@@ -281,26 +391,28 @@ class QuestionnaireActivity : ComponentActivity() {
         try {
             // 重測問卷＝覆蓋而非疊加：先清掉本 session_id 舊回覆，避免同一
             // 測試者流程留下重複的問卷紀錄混淆分析。
+            // ★ 必須同時比對 subject_name：流程換人若沿用了上一位的 sessionId
+            //（主控頁會還原持久化的 sessionId），只用 session_id 刪會把「上一位
+            // 測試者剛存的問卷」整組刪掉——07/19 阿汝與 Leo 的 v2 問卷即因此遺失。
             db.delete(
                 SRTResultContract.QuestionnaireEntry.TABLE_NAME,
-                "${SRTResultContract.QuestionnaireEntry.COLUMN_NAME_SESSION_ID} = ?",
-                arrayOf(sessionId.toString())
+                "${SRTResultContract.QuestionnaireEntry.COLUMN_NAME_SESSION_ID} = ? AND " +
+                "${SRTResultContract.QuestionnaireEntry.COLUMN_NAME_SUBJECT_NAME} = ?",
+                arrayOf(sessionId.toString(), subjectName)
             )
-            sceneAnswers.forEach { (sceneKey, ans) ->
-                listOf("OFF" to ans.off, "ON" to ans.on).forEach { (cond, r) ->
-                    if (r.comfort > 0 || r.noise > 0 || r.clarity > 0) {
-                        db.insert(SRTResultContract.QuestionnaireEntry.TABLE_NAME, null, ContentValues().apply {
-                            put(SRTResultContract.QuestionnaireEntry.COLUMN_NAME_SESSION_ID, sessionId)
-                            put(SRTResultContract.QuestionnaireEntry.COLUMN_NAME_TEST_TIMESTAMP, now)
-                            put(SRTResultContract.QuestionnaireEntry.COLUMN_NAME_SUBJECT_NAME, subjectName)
-                            put(SRTResultContract.QuestionnaireEntry.COLUMN_NAME_SCENE_KEY, sceneKey)
-                            put(SRTResultContract.QuestionnaireEntry.COLUMN_NAME_CONDITION, cond)
-                            if (r.clarity > 0) put(SRTResultContract.QuestionnaireEntry.COLUMN_NAME_CLARITY, r.clarity)
-                            if (r.comfort > 0) put(SRTResultContract.QuestionnaireEntry.COLUMN_NAME_COMFORT, r.comfort)
-                            if (r.noise > 0) put(SRTResultContract.QuestionnaireEntry.COLUMN_NAME_NOISE_INTERFERENCE, r.noise)
-                            earphoneModel?.let { put(SRTResultContract.QuestionnaireEntry.COLUMN_NAME_EARPHONE_MODEL, it) }
-                        })
-                    }
+            // v2 情境題：每情境一列，condition="DELTA"，分數存 scene_delta（−3～+3）
+            sceneDeltas.forEach { (sceneKey, delta) ->
+                if (delta != DELTA_UNANSWERED) {
+                    db.insert(SRTResultContract.QuestionnaireEntry.TABLE_NAME, null, ContentValues().apply {
+                        put(SRTResultContract.QuestionnaireEntry.COLUMN_NAME_SESSION_ID, sessionId)
+                        put(SRTResultContract.QuestionnaireEntry.COLUMN_NAME_TEST_TIMESTAMP, now)
+                        put(SRTResultContract.QuestionnaireEntry.COLUMN_NAME_SUBJECT_NAME, subjectName)
+                        put(SRTResultContract.QuestionnaireEntry.COLUMN_NAME_SCENE_KEY, sceneKey)
+                        put(SRTResultContract.QuestionnaireEntry.COLUMN_NAME_CONDITION, "DELTA")
+                        put(SRTResultContract.QuestionnaireEntry.COLUMN_NAME_SCENE_DELTA, delta)
+                        put(SRTResultContract.QuestionnaireEntry.COLUMN_NAME_VERSION, SRTResultContract.QuestionnaireEntry.CURRENT_VERSION)
+                        earphoneModel?.let { put(SRTResultContract.QuestionnaireEntry.COLUMN_NAME_EARPHONE_MODEL, it) }
+                    })
                 }
             }
             db.insert(SRTResultContract.QuestionnaireEntry.TABLE_NAME, null, ContentValues().apply {
@@ -309,12 +421,15 @@ class QuestionnaireActivity : ComponentActivity() {
                 put(SRTResultContract.QuestionnaireEntry.COLUMN_NAME_SUBJECT_NAME, subjectName)
                 put(SRTResultContract.QuestionnaireEntry.COLUMN_NAME_SCENE_KEY, "OVERALL")
                 put(SRTResultContract.QuestionnaireEntry.COLUMN_NAME_CONDITION, "NA")
+                put(SRTResultContract.QuestionnaireEntry.COLUMN_NAME_VERSION, SRTResultContract.QuestionnaireEntry.CURRENT_VERSION)
                 if (overall.delay > 0) put(SRTResultContract.QuestionnaireEntry.COLUMN_NAME_DELAY_FEEL, overall.delay)
                 put(SRTResultContract.QuestionnaireEntry.COLUMN_NAME_ARTIFACT_FLAG, if (overall.artifact) 1 else 0)
                 put(SRTResultContract.QuestionnaireEntry.COLUMN_NAME_ARTIFACT_NOTE, overall.artifactNote)
                 if (overall.naturalness > 0) put(SRTResultContract.QuestionnaireEntry.COLUMN_NAME_NATURALNESS, overall.naturalness)
                 if (overall.satisfaction > 0) put(SRTResultContract.QuestionnaireEntry.COLUMN_NAME_SATISFACTION, overall.satisfaction)
                 if (overall.willingness > 0) put(SRTResultContract.QuestionnaireEntry.COLUMN_NAME_WILLINGNESS, overall.willingness)
+                if (overall.ownVoice > 0) put(SRTResultContract.QuestionnaireEntry.COLUMN_NAME_OWN_VOICE, overall.ownVoice)
+                if (overall.loudness > 0) put(SRTResultContract.QuestionnaireEntry.COLUMN_NAME_LOUDNESS, overall.loudness)
                 put(SRTResultContract.QuestionnaireEntry.COLUMN_NAME_FREE_TEXT, overall.freeText)
                 earphoneModel?.let { put(SRTResultContract.QuestionnaireEntry.COLUMN_NAME_EARPHONE_MODEL, it) }
             })
@@ -325,11 +440,10 @@ class QuestionnaireActivity : ComponentActivity() {
     }
 }
 
-private data class Ratings(val clarity: Int = 0, val comfort: Int = 0, val noise: Int = 0)
-private data class ConditionAnswers(val off: Ratings, val on: Ratings)
 private data class OverallAnswers(
     val delay: Int, val artifact: Boolean, val artifactNote: String,
-    val naturalness: Int, val satisfaction: Int, val willingness: Int, val freeText: String
+    val naturalness: Int, val satisfaction: Int, val willingness: Int,
+    val ownVoice: Int, val loudness: Int, val freeText: String
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -339,15 +453,15 @@ private fun QuestionnaireScreen(
     onDspToggle: (Boolean) -> Unit,
     onMicToggle: (Boolean) -> Unit,
     onModeSelect: (SceneManager.Mode) -> Unit,
-    onSubmit: (Map<String, ConditionAnswers>, OverallAnswers) -> Unit,
+    onSubmit: (Map<String, Int>, OverallAnswers) -> Unit,
     onSkip: () -> Unit
 ) {
     var dspOn by remember { mutableStateOf(false) }   // 依施測順序，預設先 OFF
-    var useHeadsetMic by remember { mutableStateOf(true) }
+    var useHeadsetMic by remember { mutableStateOf(false) }   // 預設手機收音（與 Activity 端一致）
     var selectedMode by remember { mutableStateOf(SceneManager.Mode.CONVERSATION) }
-    // scene key → (OFF ratings, ON ratings)
-    val sceneStates = remember {
-        SCENES.associate { it.key to (mutableStateOf(Ratings()) to mutableStateOf(Ratings())) }
+    // scene key → v2 比較題分數（−3～+3；DELTA_UNANSWERED = 未作答）
+    val sceneDeltas = remember {
+        SCENES.associate { it.key to mutableIntStateOf(DELTA_UNANSWERED) }
     }
     var delay by remember { mutableIntStateOf(0) }
     var artifact by remember { mutableStateOf(false) }
@@ -355,6 +469,8 @@ private fun QuestionnaireScreen(
     var naturalness by remember { mutableIntStateOf(0) }
     var satisfaction by remember { mutableIntStateOf(0) }
     var willingness by remember { mutableIntStateOf(0) }
+    var ownVoice by remember { mutableIntStateOf(0) }
+    var loudness by remember { mutableIntStateOf(0) }
     var freeText by remember { mutableStateOf("") }
     var showExitDialog by remember { mutableStateOf(false) }
 
@@ -395,7 +511,7 @@ private fun QuestionnaireScreen(
             ) {
                 item {
                     Text(
-                        "測試者：$subjectName\n請針對每個情境，先回想「輔聽關閉（OFF）」再回想「輔聽開啟（ON）」聆聽時的感受作答。",
+                        "測試者：$subjectName\n每個情境：先關閉輔聽（OFF）聆聽約 30 秒 → 開啟輔聽（ON）再聽約 30 秒 → 立刻回答該情境的比較題（0＝兩者沒差別）。情境音由實驗者以喇叭播放；情境 4 為現場拍手。",
                         fontSize = 14.sp,
                         modifier = Modifier.padding(top = 12.dp)
                     )
@@ -451,8 +567,7 @@ private fun QuestionnaireScreen(
                     }
                 }
                 items(SCENES) { scene ->
-                    val (offState, onState) = sceneStates[scene.key]!!
-                    SceneCard(scene, offState, onState)
+                    SceneDeltaCard(scene, sceneDeltas[scene.key]!!)
                 }
                 item {
                     OverallCard(
@@ -462,6 +577,8 @@ private fun QuestionnaireScreen(
                         naturalness, { naturalness = it },
                         satisfaction, { satisfaction = it },
                         willingness, { willingness = it },
+                        ownVoice, { ownVoice = it },
+                        loudness, { loudness = it },
                         freeText, { freeText = it }
                     )
                 }
@@ -477,12 +594,9 @@ private fun QuestionnaireScreen(
                         }
                         Button(
                             onClick = {
-                                val answers = sceneStates.mapValues { (_, pair) ->
-                                    ConditionAnswers(pair.first.value, pair.second.value)
-                                }
                                 onSubmit(
-                                    answers,
-                                    OverallAnswers(delay, artifact, artifactNote, naturalness, satisfaction, willingness, freeText)
+                                    sceneDeltas.mapValues { (_, st) -> st.intValue },
+                                    OverallAnswers(delay, artifact, artifactNote, naturalness, satisfaction, willingness, ownVoice, loudness, freeText)
                                 )
                             },
                             modifier = Modifier.weight(1f),
@@ -496,27 +610,46 @@ private fun QuestionnaireScreen(
 }
 
 @Composable
-private fun SceneCard(scene: Scene, offState: MutableState<Ratings>, onState: MutableState<Ratings>) {
+private fun SceneDeltaCard(scene: Scene, state: androidx.compose.runtime.MutableIntState) {
     Card(shape = RoundedCornerShape(14.dp), elevation = CardDefaults.cardElevation(2.dp)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(scene.title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            Text("輔聽 OFF", fontWeight = FontWeight.SemiBold, color = Color(0xFF757575), fontSize = 13.sp)
-            RatingBlock(scene.hasClarity, offState)
-            Spacer(Modifier.height(4.dp))
-            Text("輔聽 ON", fontWeight = FontWeight.SemiBold, color = Color(0xFF1a56b0), fontSize = 13.sp)
-            RatingBlock(scene.hasClarity, onState)
+            scene.note?.let { Text(it, fontSize = 12.sp, color = Color(0xFF757575)) }
+            Text(scene.question, fontSize = 14.sp)
+
+            val answered = state.intValue != DELTA_UNANSWERED
+            // 有刻度的滑桿：−3～+3 共 7 檔（中間 5 個刻度點），snap 到整數。
+            // 未作答前滑桿停在 0 但顯示「尚未作答」，第一次拖動即記為作答
+            // ——0（沒差別）是合法答案，不能拿 0 當未答哨兵。
+            Slider(
+                value = if (answered) state.intValue.toFloat() else 0f,
+                onValueChange = { state.intValue = kotlin.math.round(it).toInt() },
+                valueRange = -3f..3f,
+                steps = 5,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Text("−3\n${scene.negLabel}", fontSize = 11.sp, color = Color(0xFF757575), modifier = Modifier.weight(1f))
+                Text("0 沒差別", fontSize = 11.sp, color = Color(0xFF757575),
+                    modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                Text("+3\n${scene.posLabel}", fontSize = 11.sp, color = Color(0xFF757575),
+                    modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
+            }
+            Text(
+                if (answered) {
+                    val v = state.intValue
+                    "已選：" + (if (v > 0) "+$v" else "$v") + when {
+                        v == 0 -> "（沒差別）"
+                        v > 0 -> "（${scene.posLabel.removePrefix("明顯")}方向）"
+                        else -> "（${scene.negLabel}方向）"
+                    }
+                } else "尚未作答——請拖動滑桿（可停在 0）",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = if (answered) Color(0xFF1a56b0) else Color(0xFFB26A00)
+            )
         }
     }
-}
-
-@Composable
-private fun RatingBlock(hasClarity: Boolean, state: MutableState<Ratings>) {
-    val r = state.value
-    if (hasClarity) {
-        RatingRow("聽得清楚嗎？", r.clarity) { state.value = r.copy(clarity = it) }
-    }
-    RatingRow("聽起來舒服嗎？", r.comfort) { state.value = state.value.copy(comfort = it) }
-    RatingRow("有被噪音干擾嗎？（5＝完全不受干擾）", r.noise) { state.value = state.value.copy(noise = it) }
 }
 
 @Composable
@@ -527,6 +660,8 @@ private fun OverallCard(
     naturalness: Int, onNaturalness: (Int) -> Unit,
     satisfaction: Int, onSatisfaction: (Int) -> Unit,
     willingness: Int, onWillingness: (Int) -> Unit,
+    ownVoice: Int, onOwnVoice: (Int) -> Unit,
+    loudness: Int, onLoudness: (Int) -> Unit,
     freeText: String, onFreeText: (String) -> Unit
 ) {
     Card(shape = RoundedCornerShape(14.dp), elevation = CardDefaults.cardElevation(2.dp)) {
@@ -545,6 +680,8 @@ private fun OverallCard(
                 )
             }
             RatingRow("處理後的聲音自然嗎？", naturalness, onNaturalness)
+            RatingRow("自己說話的聲音是否悶塞或怪異？（5＝完全正常）", ownVoice, onOwnVoice)
+            RatingRow("開啟後的整體音量感覺（1＝太小、3＝剛好、5＝太大）", loudness, onLoudness)
             RatingRow("整體滿意度", satisfaction, onSatisfaction)
             RatingRow("若有需求，願意日常使用嗎？", willingness, onWillingness)
             OutlinedTextField(

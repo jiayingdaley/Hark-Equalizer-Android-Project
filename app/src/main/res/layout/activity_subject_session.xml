@@ -25,7 +25,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="基準純音 → 設定模擬聽損 → 模擬聽損純音測試 → 語詞測驗 A/B → 問卷／匯出"
+            android:text="基準純音 → 設定模擬聽損 → 模擬聽損純音測試 → 語詞測驗 A/B → 問卷 → NLFC/DSP 效益驗證／匯出"
             android:textSize="14sp"
             android:textColor="#666666" />
 
@@ -89,7 +89,7 @@
             android:layout_width="match_parent"
             android:layout_height="8dp"
             android:layout_marginTop="24dp"
-            android:max="5"
+            android:max="6"
             android:progress="0"
             android:progressTint="#00796B"
             android:progressBackgroundTint="#CFD8DC" />
@@ -101,7 +101,7 @@
             android:layout_marginTop="4dp"
             android:textSize="12sp"
             android:textColor="#607D8B"
-            android:text="已完成 0 / 5 步" />
+            android:text="已完成 0 / 6 步" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -118,7 +118,9 @@
             <TextView android:id="@+id/stepText4" android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:text="④ 語詞測驗 A/B（安靜；噪音選用）" android:textSize="16sp" android:textStyle="bold" android:padding="4dp" android:alpha="0.4" />
             <TextView android:id="@+id/stepText5" android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="⑤ 環境輔聽問卷 / 匯出" android:textSize="16sp" android:textStyle="bold" android:padding="4dp" android:alpha="0.4" />
+                android:text="⑤ 環境輔聽問卷" android:textSize="16sp" android:textStyle="bold" android:padding="4dp" android:alpha="0.4" />
+            <TextView android:id="@+id/stepText6" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="⑥ NLFC/DSP 效益驗證 / 匯出" android:textSize="16sp" android:textStyle="bold" android:padding="4dp" android:alpha="0.4" />
         </LinearLayout>
 
         <TextView
@@ -188,6 +190,16 @@
                 android:background="@drawable/rounded_button"
                 android:enabled="false" />
         </LinearLayout>
+
+        <Button
+            android:id="@+id/buttonRetestAbc"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="8dp"
+            android:text="⑥ NLFC/DSP 效益驗證（測全部／補測 A／B／C）"
+            android:textSize="13sp"
+            android:background="@drawable/rounded_button"
+            android:enabled="false" />
 
         <TextView
             android:id="@+id/textSessionStatus"

@@ -72,6 +72,16 @@ class SSNAbTestActivity : AppCompatActivity(), DialogNavCallback {
     // 20→0 dB SL（原 25→5 有輔助條件全對之天花板效應，SL50 算不出）
     private val quietConditions = floatArrayOf(20f, 15f, 10f, 5f, 0f)
 
+    /**
+     * OFF（未輔助）區塊之位準組。聽損模擬器位準尺度修正後，S1 之未輔助
+     * 條件在 0–20 dB SL 幾乎全落於 50% 以下（實測：20 dB SL 僅 20%），
+     * 50% 交叉點在 20 dB SL 之上，SL50 內插不出（地板效應——與修正前
+     * ON 之天花板效應正好相反）。故 OFF 區塊上移至 10–30 dB SL；
+     * ON 維持 0–20（其 SL50 實測約 2.5 dB SL，範圍恰當）。
+     * 兩區塊各自內插自己的 SL50，位準組不同不影響 ΔSL50 之定義。
+     */
+    private val quietConditionsOff = floatArrayOf(30f, 25f, 20f, 15f, 10f)
+
     private var offFirst = true
     private var stage = 0            // 0=尚未開始, 1=第一階段進行中, 2=第二階段進行中, 3=完成
     private var srt50Off: Float? = null
@@ -218,7 +228,8 @@ class SSNAbTestActivity : AppCompatActivity(), DialogNavCallback {
             putExtra("EXTRA_SUBJECT", subjectName)
             putExtra("EXTRA_EARPHONE_MODEL", earphoneModel)
             putExtra("EXTRA_NOISELESS", noiseless)
-            putExtra("EXTRA_SNRS", snrConditions)
+            putExtra("EXTRA_SNRS",
+                if (noiseless && condition == "OFF") quietConditionsOff else snrConditions)
             putExtra("EXTRA_QUESTIONS_PER_SNR", questionsPerSnr)
             putExtra("EXTRA_AB_MODE", true)
             putExtra("EXTRA_AB_CONDITION", condition)
@@ -227,6 +238,10 @@ class SSNAbTestActivity : AppCompatActivity(), DialogNavCallback {
             putExtra("EXTRA_WORD_PARITY", if (condition == "OFF") 0 else 1)
             putExtra("EXTRA_HL_SIM_CHECK_ERR",
                 intent.getFloatExtra("EXTRA_HL_SIM_CHECK_ERR", Float.NaN))
+            // 逐頻原始資料一併透傳（本輪未檢核則沒有這些 extra，缺省為空字串）
+            putExtra("EXTRA_HLSIM_MEASURED_DBFS", intent.getStringExtra("EXTRA_HLSIM_MEASURED_DBFS") ?: "")
+            putExtra("EXTRA_HLSIM_TARGET_DB", intent.getStringExtra("EXTRA_HLSIM_TARGET_DB") ?: "")
+            putExtra("EXTRA_HLSIM_ERROR_DB", intent.getStringExtra("EXTRA_HLSIM_ERROR_DB") ?: "")
         }
 
     private fun launchOff() {
