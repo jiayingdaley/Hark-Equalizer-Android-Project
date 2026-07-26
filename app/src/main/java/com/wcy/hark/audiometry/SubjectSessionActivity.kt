@@ -414,12 +414,12 @@ class SubjectSessionActivity : AppCompatActivity() {
 
     /**
      * ⑥固定呈現位準（dB SL）——三格套同一個值，唯一變因是移頻/DSP 開關。
-     * 30 dB SL 沿用④ OFF 區塊的協定上限（見 SSNAbTestActivity 的 quietConditionsOff），
-     * 7 位測試者的 SL50 平均落在 20.5±2.6 dB SL，30 是已驗證過、大多數人在此位準
-     * 開始聽得吃力但還沒到完全聽不懂的上緣——超過這個值，純聽損條件也會趴天花板
-     * （實測：55 dB SL 時純聽損條件仍有 90% 正確率，測不出補償差異）。
+     * 20 dB SL：7 位測試者④ OFF（純聽損、無補償）區塊實測的 SL50 平均落在
+     * 20.5±2.6 dB SL，這裡直接取整用已經量測驗證過的數字，而不是憑空挑一個
+     * 值——理論上會讓純聽損條件的正確率落在 50% 附近，不像 55 dB SL 那樣
+     * 趴天花板（實測：純聽損條件仍有 90% 正確率，測不出補償差異）。
      */
-    private val abcLevelSlDb = 30f
+    private val abcLevelSlDb = 20f
     private val abcQuestionsPerCondition = 16
 
     private fun launchAbc(conditions: List<String>) {

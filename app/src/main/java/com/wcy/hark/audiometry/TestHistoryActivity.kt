@@ -1396,7 +1396,11 @@ data class SrtDiagnosticItem(
     val correctWord: String,
     val heardWord: String,
     val riskyFrequencies: List<Double>,
-    val confusionScore: Double
+    val confusionScore: Double,
+    /** 由詞表注音自動比對出的差異音素（如「第1字聲母 ㄅ↔ㄆ（送氣對比）」），
+     *  由 tools/srt_diagnostic/generate_srt_diagnostic.py 生成——顯示實際聽混
+     *  的注音，取代先前寫死的範例（曾因此顯示與錯題無關的注音）。 */
+    val contrasts: List<String> = emptyList()
 )
 
 private fun loadSrtDiagnosticDatabase(context: android.content.Context): Map<String, SrtDiagnosticItem> {
@@ -1418,13 +1422,22 @@ private fun loadSrtDiagnosticDatabase(context: android.content.Context): Map<Str
             for (i in 0 until riskyFreqsArray.length()) {
                 riskyFrequencies.add(riskyFreqsArray.getDouble(i))
             }
-            
+
+            val contrastsArray = itemObject.optJSONArray("contrasts")
+            val contrasts = mutableListOf<String>()
+            if (contrastsArray != null) {
+                for (i in 0 until contrastsArray.length()) {
+                    contrasts.add(contrastsArray.getString(i))
+                }
+            }
+
             database[key] = SrtDiagnosticItem(
                 questionId = questionId,
                 correctWord = correctWord,
                 heardWord = heardWord,
                 riskyFrequencies = riskyFrequencies,
-                confusionScore = confusionScore
+                confusionScore = confusionScore,
+                contrasts = contrasts
             )
         }
     } catch (e: Exception) {
@@ -1453,6 +1466,9 @@ private fun getAcousticDiagnostic(
     // 以受測題目自身的誘答組合為先驗，同時修正「單場僅施測部分題目」與
     // 「各題誘答之頻率組成不均」兩種偏差（全題庫先驗無法反映前者）。
     val freqExpected = mutableMapOf<Double, Double>()
+    // 實際聽混的音素對比（由詞表注音自動比對，generate_srt_diagnostic.py 生成），
+    // 累計出現次數供顯示——取代先前寫死的注音範例。
+    val contrastCounts = mutableMapOf<String, Int>()
     var validDataCount = 0
     substitutionRecords.forEach { record ->
         val item = diagnosticMap["${record.correctWord},${record.userAnswer}"] ?: return@forEach
@@ -1461,6 +1477,7 @@ private fun getAcousticDiagnostic(
         }
         if (alternatives.isEmpty()) return@forEach
         validDataCount++
+        item.contrasts.forEach { c -> contrastCounts[c] = (contrastCounts[c] ?: 0) + 1 }
         val w = (1.0 - item.confusionScore).coerceAtLeast(0.1)
         item.riskyFrequencies.forEach { freq ->
             freqWeight[freq] = (freqWeight[freq] ?: 0.0) + w
@@ -1518,6 +1535,16 @@ private fun getAcousticDiagnostic(
                 append(topFrequencies.joinToString { "${it.toInt()}Hz" })
             }
 
+            // 實際聽混的音素——由詞表注音自動比對而得（非固定範例），
+            // 依出現次數列前 4 項；聲調對比屬基頻線索，已於生成端標註不作 EQ 歸因。
+            if (contrastCounts.isNotEmpty()) {
+                val topContrasts = contrastCounts.entries
+                    .sortedByDescending { it.value }
+                    .take(4)
+                append("\n\n實際聽混之音素對比（依詞表注音比對）：\n")
+                append(topContrasts.joinToString("\n") { "  ${it.key} ×${it.value}" })
+            }
+
             append("\n\n")
             // 三區過度代表比相近時不硬選主導頻帶——沒有頻譜集中卻給出頻段建議，
             // 反而會誤導使用者調整不需要調整的頻率。
@@ -1526,13 +1553,13 @@ private fun getAcousticDiagnostic(
                 append("📌 觀察：您的錯誤並未明顯集中於特定頻帶（三區之過度代表比例相近），較可能反映整體可聽度、詞彙熟悉度或注意力等因素，而非特定頻率的解析缺陷。\n\n")
                 append("💡 參考建議：請以純音聽力檢測結果為主要依據；可先確認音量設定與耳機配戴狀況，暫不建議針對單一頻段調整 EQ。")
             } else if (highOR >= lowOR && highOR >= midOR) {
-                append("📌 觀察：您聽錯的詞對，其分辨線索多位於【高頻摩擦音區間】（如 ㄙ、ㄕ、ㄒ 等摩擦音，能量集中於 3150–8000Hz）。\n\n")
+                append("📌 觀察：您聽錯的詞對，其分辨線索多位於【高頻區間】（3150–8000Hz，擦音／塞擦音之頻譜重心所在；實際聽混之音素見上）。\n\n")
                 append("💡 參考建議：可對照純音聽力圖確認高頻閾值後，嘗試微調 4000–8000Hz（尤其 6300Hz 與 8000Hz）的 EQ 增益，觀察辨識是否改善；若增益已達上限仍無改善，可考慮開啟高頻移頻（NLFC）。")
             } else if (midOR >= lowOR && midOR >= highOR) {
-                append("📌 觀察：您聽錯的詞對，其分辨線索多位於【中頻人聲核心區間】（1000–2500Hz，語音共振峰與語意理解的關鍵頻帶）。\n\n")
+                append("📌 觀察：您聽錯的詞對，其分辨線索多位於【中頻區間】（1000–2500Hz，語音共振峰與送氣噪音的關鍵頻帶；實際聽混之音素見上）。\n\n")
                 append("💡 參考建議：可對照純音聽力圖後，嘗試微調 1000Hz、1600Hz 與 2000Hz 的 EQ 增益。")
             } else {
-                append("📌 觀察：您聽錯的詞對，其分辨線索多位於【低頻與母音/鼻音共鳴區間】（能量多低於 1000Hz）。\n\n")
+                append("📌 觀察：您聽錯的詞對，其分辨線索多位於【低頻區間】（1000Hz 以下，母音／鼻音共鳴所在；實際聽混之音素見上）。\n\n")
                 append("💡 參考建議：可嘗試微調 500Hz 與 800Hz 增益，並檢查耳塞密合度——密合不良會造成低頻嚴重衰減。")
             }
             append("\n\n※ 本分析為探索性參考：答錯也可能來自猜測（四選一有 25% 猜對率）、詞彙熟悉度或注意力，請以純音聽力檢測結果為主要依據。")

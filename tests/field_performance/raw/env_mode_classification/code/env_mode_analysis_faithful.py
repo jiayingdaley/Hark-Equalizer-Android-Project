@@ -49,10 +49,16 @@ QUIET_TOTAL = 0.001
 MOD_STD_CONV = 4.0
 LOW_RATIO_OUTDOOR = 0.6
 
+# mode_outdoor2 = 額外新錄的「大風戶外」樣本（ATH/AirPods Pro2/EarPods/HD 400U/
+# JBL/Pixel 9/Sony 各一段，檔名 "<耳機>-Windy.m4a"）——起因是現場觀察到強風時
+# OUTDOOR 判斷效果不佳，特地補錄驗證。Ground truth 仍是 OUTDOOR，但主流程另外
+# 保留 mode_outdoor（原始戶外，風較小）與 mode_outdoor2（大風）之區分，供分開
+# 統計「一般戶外 vs 大風戶外」的個別準確率（見 main() 內之 outdoor_wind_breakdown）。
 MODE_FOLDERS = {
     "mode_transparency_quiet": "TRANSPARENCY",
     "mode_conversation": "CONVERSATION",
     "mode_outdoor": "OUTDOOR",
+    "mode_outdoor2": "OUTDOOR",
     "mode_cinema_media": "CINEMA",
 }
 MODES = ["TRANSPARENCY", "CONVERSATION", "OUTDOOR", "CINEMA"]
@@ -62,12 +68,14 @@ HEADSET_ALIASES = {
     "earpods": "EarPods", "hd 400u": "HD 400U", "hd400u": "HD 400U",
     "hd400": "HD 400U", "jbl": "JBL", "pixel9": "Pixel 9",
     "pixel 9": "Pixel 9", "sony": "Sony",
+    "ath": "ATH",   # 僅見於 mode_outdoor2；reference_tone 無此耳機之校正錄音，
+                     # 麥克風靈敏度偏移無法扣除，結果另行標註、不與其他耳機直接比較。
 }
 
 
 def normalise_headset(filename: str) -> str:
     stem = Path(filename).stem.lower()
-    stem = re.sub(r"[-_ ](outdoor|conversation|cinema|transparency|quiet|pink|white|log|ists|raw).*", "", stem)
+    stem = re.sub(r"[-_ ](outdoor|windy|conversation|cinema|transparency|quiet|pink|white|log|ists|raw).*", "", stem)
     stem = stem.strip("-_ ")
     for alias, canonical in HEADSET_ALIASES.items():
         if alias in stem:
@@ -227,6 +235,7 @@ def main():
                 w["true_mode"] = true_mode
                 w["headset"] = normalise_headset(f.name)
                 w["file"] = f.name
+                w["source_folder"] = folder
             all_rows.extend(wins)
             print(f"{true_mode:14s} {f.name:35s} -> {len(wins)} windows")
 
@@ -281,6 +290,35 @@ def main():
 
     for r in all_rows:
         r["pred_mode_new"] = classify_new(r)
+
+    # ── 一般戶外（mode_outdoor）vs 大風戶外（mode_outdoor2）分開統計 ──
+    print("\n一般戶外 vs 大風戶外 分開比較（皆為 OUTDOOR ground truth）：")
+    print(f"{'':14s}{'n':>5s}{'舊門檻正確率':>14s}{'新門檻正確率':>14s}{'meanTotal中位':>16s}{'lowRatio中位':>14s}{'modStd中位':>12s}")
+    for folder, label in [("mode_outdoor", "一般戶外"), ("mode_outdoor2", "大風戶外")]:
+        rows_f = [r for r in all_rows if r["source_folder"] == folder]
+        if not rows_f:
+            print(f"{label:14s}  (無資料)")
+            continue
+        acc_old = sum(r["pred_mode"] == "OUTDOOR" for r in rows_f) / len(rows_f)
+        acc_new = sum(r["pred_mode_new"] == "OUTDOOR" for r in rows_f) / len(rows_f)
+        mt_med = np.median([r["mean_total"] for r in rows_f])
+        lr_med = np.median([r["low_ratio"] for r in rows_f])
+        ms_med = np.median([r["mod_std"] for r in rows_f])
+        print(f"{label:14s}{len(rows_f):5d}{acc_old:13.1%} {acc_new:13.1%} {mt_med:15.2e} {lr_med:13.2f} {ms_med:11.1f}")
+        # 誤判去向（新門檻）
+        wrong = [r for r in rows_f if r["pred_mode_new"] != "OUTDOOR"]
+        if wrong:
+            from collections import Counter
+            dest = Counter(r["pred_mode_new"] for r in wrong)
+            print(f"  → 新門檻誤判去向: {dict(dest)}（共 {len(wrong)}/{len(rows_f)} 窗誤判）")
+        # 逐耳機列出（大風戶外尤其需要看是否有特定耳機受風噪影響較大）
+        by_hs = {}
+        for r in rows_f:
+            by_hs.setdefault(r["headset"], []).append(r)
+        for hs, rs in sorted(by_hs.items()):
+            a = sum(r["pred_mode_new"] == "OUTDOOR" for r in rs) / len(rs)
+            note = "（未做麥克風校正）" if hs == "ATH" else ""
+            print(f"    {hs:14s} n={len(rs):3d}  新門檻正確率={a:.0%}{note}")
 
     mat_new = np.zeros((4, 4), dtype=int)
     for r in all_rows:
