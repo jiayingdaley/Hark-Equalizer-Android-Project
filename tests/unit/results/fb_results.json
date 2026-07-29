@@ -1,0 +1,8 @@
+{
+  "T-FB-01 Energy conservation": "PASS",
+  "T-FB-02 Sum flatness": "PASS",
+  "T-FB-03 16\u21928 mapping accuracy": "PASS",
+  "T-FB-04 16\u21928 mapping mixed gains": "PASS",
+  "T-FB-05 Band isolation (700Hz)": "PASS",
+  "T-FB-06 Prescription gain applied": "PASS"
+}

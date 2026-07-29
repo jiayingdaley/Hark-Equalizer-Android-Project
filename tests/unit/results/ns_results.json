@@ -1,0 +1,23 @@
+{
+  "T-NS-01 Wiener gain formula verification": {
+    "status": "PASS"
+  },
+  "T-NS-02 White noise suppression effectiveness": {
+    "status": "PASS"
+  },
+  "T-NS-03 Speech signal preservation": {
+    "status": "PASS"
+  },
+  "T-NS-04 Bypass mode pass-through": {
+    "status": "PASS"
+  },
+  "T-NS-05 Wind noise filter @150Hz": {
+    "status": "PASS"
+  },
+  "T-NS-06 Gain floor enforcement (≥0.20)": {
+    "status": "PASS"
+  },
+  "T-NS-07 Wiener gain curve (doc chart)": {
+    "status": "PASS"
+  }
+}

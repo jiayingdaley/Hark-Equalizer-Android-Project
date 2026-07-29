@@ -1,0 +1,23 @@
+{
+  "T-DYN-01 Unity gain below threshold": {
+    "status": "PASS"
+  },
+  "T-DYN-02 Compression ratio accuracy": {
+    "status": "PASS"
+  },
+  "T-DYN-03 Attack time envelope": {
+    "status": "PASS"
+  },
+  "T-DYN-04 Limiter hard ceiling -1.5dBFS": {
+    "status": "PASS"
+  },
+  "T-DYN-05 Expander disabled (ET=-100dB)": {
+    "status": "PASS"
+  },
+  "T-DYN-06 Gain smoothing no click artefacts": {
+    "status": "PASS"
+  },
+  "T-DYN-07 Time constant coefficient accuracy": {
+    "status": "PASS"
+  }
+}
