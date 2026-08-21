@@ -38,10 +38,15 @@ class HarkApplication : Application() {
         eqSettingsRepository = EqSettingsRepository(this)
         Timber.d("EqSettingsRepository initialized.")
         
+        // Initialize CrashlyticsMonitor for privacy-safe telemetry
+        com.wcy.hark.util.CrashlyticsMonitor.initialize(this)
+        
+        // Initialize FirebaseHelper for Analytics & Remote Config
+        com.wcy.hark.util.FirebaseHelper.initialize(this)
+
         // Firebase is auto-initialized if google-services.json is present.
-        // It's highly recommended to add it!
-        // (You can uncomment this when crashlytics is fully setup)
-        // com.google.firebase.crashlytics.FirebaseCrashlytics.getInstance().setCrashlyticsCollectionEnabled(!isDebuggable)
+        com.google.firebase.crashlytics.FirebaseCrashlytics.getInstance()
+            .setCrashlyticsCollectionEnabled(!isDebuggable)
     }
 }
 
@@ -52,11 +57,10 @@ class CrashReportingTree : Timber.Tree() {
             return
         }
 
-        // Fake FirebaseCrashlytics initialization check. In real code:
-        // val crashlytics = com.google.firebase.crashlytics.FirebaseCrashlytics.getInstance()
-        // crashlytics.log(message)
-        // if (t != null) {
-        //     crashlytics.recordException(t)
-        // }
+        val crashlytics = com.google.firebase.crashlytics.FirebaseCrashlytics.getInstance()
+        crashlytics.log(message)
+        if (t != null) {
+            crashlytics.recordException(t)
+        }
     }
 }

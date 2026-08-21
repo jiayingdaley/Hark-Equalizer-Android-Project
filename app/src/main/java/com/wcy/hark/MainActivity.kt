@@ -60,6 +60,7 @@ class MainActivity : ComponentActivity() {
     
     // User's *intent*: does the user want the engine running?
     private var isEngineRunningByUserIntent by mutableStateOf(false)
+    private var engineStartTimeMs = 0L
 
     // ── Screen Navigation State Machine ──────────────────────────────────────
     // "main"           → HarkMainScreen (主控制面板, default)
@@ -317,6 +318,18 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun updateAudioStates(isHeadphoneConnected: Boolean, deviceLabel: String) {
+        // Telemetry & Analytics logs
+        com.wcy.hark.util.CrashlyticsMonitor.setAudioRoute(deviceLabel)
+        com.wcy.hark.util.CrashlyticsMonitor.setDspStatus(
+            nsEnabled = viewModel.testNoiseReductionEnabled.value,
+            wdrcEnabled = viewModel.testCrossoverWdrcEnabled.value,
+            nlfcEnabled = viewModel.testFrequencyLoweringEnabled.value
+        )
+        if (isHeadphoneConnected) {
+            com.wcy.hark.util.FirebaseHelper.logHeadphoneConnection(deviceLabel)
+        }
+        com.wcy.hark.util.FirebaseHelper.logAudioSourceSelect(viewModel.currentSourceMode.value.name)
+
         viewModel.isHeadphoneConnected.value = isHeadphoneConnected
         val sourceMode = viewModel.currentSourceMode.value
 
@@ -328,6 +341,9 @@ class MainActivity : ComponentActivity() {
 
             // 1. Oboe Environment Hearing Aid (Microphone mode)
             if (isEngineRunningByUserIntent && isHeadphoneConnected) {
+                if (engineStartTimeMs == 0L) {
+                    engineStartTimeMs = System.currentTimeMillis()
+                }
                 val serviceIntent = Intent(this, HarkAudioService::class.java).apply {
                     action = HarkAudioService.ACTION_START
                 }
@@ -339,6 +355,11 @@ class MainActivity : ComponentActivity() {
                     updateEngineStatus(deviceLabel)
                 }
             } else {
+                if (engineStartTimeMs > 0L) {
+                    val durationSec = (System.currentTimeMillis() - engineStartTimeMs) / 1000L
+                    com.wcy.hark.util.FirebaseHelper.logSessionDuration(durationSec)
+                    engineStartTimeMs = 0L
+                }
                 val serviceIntent = Intent(this, HarkAudioService::class.java).apply {
                     action = HarkAudioService.ACTION_STOP
                 }

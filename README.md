@@ -267,7 +267,7 @@ Speaker Output (Bluetooth A2DP / BLE / Wired / USB, Stereo 48 kHz)
 本專案實作了一套符合 ISO 8253-1 純音聽力檢測標準的臨床聽力檢測與評估系統，包含純音聽力測試、語詞測試、歷史紀錄管理與客製化聽力圖繪製。
 
 ### 1. 改良型 Hughson-Westlake 純音聽力測試演算法
-- **實作路徑**：[PureToneTestActivity.kt](file:///Users/shrruei/Desktop/Gemini%20CLI/Hark/app/src/main/java/com/wcy/hark/audiometry/PureToneTestActivity.kt)
+- **實作路徑**：[PureToneTestActivity.kt](app/src/main/java/com/wcy/hark/audiometry/PureToneTestActivity.kt)
 - **臨床標準狀態機**：
   - **動態起始音量**：測試頻率順序為 `1000 Hz → 2000 Hz → 4000 Hz → 8000 Hz → 1000 Hz (重測) → 500 Hz → 250 Hz`。首個測試頻率（1000 Hz）預設為 40 dB HL，後續各頻率的起始分貝會基於前一頻率的聽閾值自動計算（`前一頻率聽閾 - 10 dB`），縮短測試耗時。
   - **升 5 降 10 策略**：當使用者點擊「聽到」按鈕時，音量立刻降低 10 dB，並切換至下降階段（Descending）；若沒聽到或倒數結束，音量調高 5 dB，並切換至上升階段（Ascending）。
@@ -280,27 +280,27 @@ Speaker Output (Bluetooth A2DP / BLE / Wired / USB, Stereo 48 kHz)
 - **獨佔式 AudioFocus 抗干擾**：每次撥放純音測試音軌時，App 會向系統申請 `AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE` 獨佔焦點。若被外界搶佔焦點（如來電、社群軟體通知音），測試會自動觸發 `pauseTest()` 暫停，避免外部干擾影響檢測精準度。
 
 ### 3. 語音語詞聽閾測試 (Speech Reception Threshold - SRT)
-- **實作路徑**：[SRTTestActivity.kt](file:///Users/shrruei/Desktop/Gemini%20CLI/Hark/app/src/main/java/com/wcy/hark/audiometry/SRTTestActivity.kt)
+- **實作路徑**：[SRTTestActivity.kt](app/src/main/java/com/wcy/hark/audiometry/SRTTestActivity.kt)
 - **測試流程**：
   - 專門為聽損輔助設計的 25 題單音節/雙音節測試（配有 4 選 1 自適應按鈕與「聽不清楚」選項）。
   - 測試前先引導使用者進行環境背景噪音檢測（SelectEarActivity），若噪音 > 50 dB SPL 則提出警告。
   - **DSP 保護隔離**：進入語詞與純音測試時，系統會自動將前景服務中運行的背景降噪與增益引擎進行 Bypass 或 Mute（靜音）處理，避免 App 自身的輔聽增益與測試音頻產生連鎖反饋與干擾。
 
 ### 4. 客製化聽力圖渲染系統 (Audiogram Custom Canvas)
-- **實作路徑**：[AudiogramView.kt](file:///Users/shrruei/Desktop/Gemini%20CLI/Hark/app/src/main/java/com/wcy/hark/audiometry/AudiogramView.kt)
+- **實作路徑**：[AudiogramView.kt](app/src/main/java/com/wcy/hark/audiometry/AudiogramView.kt)
 - **幾何繪圖對齊**：為了消除傳統文字繪圖所產生的 Baseline 偏差（例如 `drawText("X")` 中心偏上），本專案採用物理幾何方式繪製點位：
   - **右耳（紅色 O）**：使用 `canvas.drawCircle(x, y, 12f, paint)`。
   - **左耳（藍色 X）**：使用 `canvas.drawLine()` 計算對稱中心，以兩條交叉線繪製 X。
 - **加粗走勢線**：折線 `strokeWidth` 加粗為 `6f`，點位符號線寬為 `5f`，極具臨床圖表的高清晰度與美觀度。
 
 ### 5. 測試歷史紀錄與可視化聽力圖
-- **實作路徑**：[TestHistoryActivity.kt](file:///Users/shrruei/Desktop/Gemini%20CLI/Hark/app/src/main/java/com/wcy/hark/audiometry/TestHistoryActivity.kt)
+- **實作路徑**：[TestHistoryActivity.kt](app/src/main/java/com/wcy/hark/audiometry/TestHistoryActivity.kt)
 - **CSV 持久化儲存**：純音檢測數據會以 CSV 格式寫入外部儲存區，格式為 `Ear,Frequency (Hz),Threshold (dB HL)`，並在文件首段包含 `Environmental Noise` 與 `Reliability Warning` 欄位。
 - **內嵌聽力圖走勢**：當點選歷史紀錄中的純音測驗時，Dialog 會透過 `AndroidView` 動態實體化並渲染當次測試結果的 `AudiogramView` 聽力圖。
 - **信度警告卡片**：如果 CSV 被解析出 `Reliability Warning == true`，對話框最頂部會繪製一張醒目的橘黃色「⚠️ 信度警告卡片」，提醒開發人員或醫師此數據可能一致性較低。
 
 ### 6. 全專案 Edge-to-Edge 沉浸式視覺系統
-- **Compose 沉浸式**：全專案使用 `enableEdgeToEdge()` 開啟透明系統欄，並在 [HarkMainScreen.kt](file:///Users/shrruei/Desktop/Gemini%20CLI/Hark/app/src/main/java/com/wcy/hark/ui/screen/HarkMainScreen.kt) 的內部元件使用 `statusBarsPadding()`，使主面板背景自然延伸至狀態列後方，而內容自動下移避開前鏡頭。
+- **Compose 沉浸式**：全專案使用 `enableEdgeToEdge()` 開啟透明系統欄，並在 [HarkMainScreen.kt](app/src/main/java/com/wcy/hark/ui/screen/HarkMainScreen.kt) 的內部元件使用 `statusBarsPadding()`，使主面板背景自然延伸至狀態列後方，而內容自動下移避開前鏡頭。
 - **XML 沉浸式**：為 7 個 XML 佈局的最外層加裝 `android:fitsSystemWindows="true"` 防禦遮擋，同時設置底色為 `#F5F7FA`。在 Activity 中調用 `isAppearanceLightStatusBars = true` 並將 `window.statusBarColor` 設定為相同的 `#F5F7FA`，使狀態列時間和電量以深色呈現，徹底消除了頂部突兀的白色色塊，兼顧人機互動與高級視覺體驗。
 
 ---
@@ -398,25 +398,19 @@ mPrescriptionBaseTargets[b] = powf(10.0f, (avgDb + globalGainOffsetDb) / 20.0f);
 
 ## 白箱測試（離線 DSP 驗證）
 
-`tests/dsp_whitebox/` 包含一套 Python 離線測試腳本，可在不需要 Android 設備的情況下驗證 DSP 演算法行為：
+`tests/` 包含一套 Python 離線測試腳本，可在不需要 Android 設備的情況下驗證 DSP 演算法行為：
 
 ```bash
-cd tests/dsp_whitebox/
+cd tests/
 
-# 安裝依賴（numpy, scipy, matplotlib）
+# 安裝依賴（numpy, scipy, matplotlib, soundfile）
 pip install numpy scipy matplotlib soundfile
 
 # 執行所有測試
 python run_all_tests.py
-
-# 個別測試
-python test_lr4_crossover.py       # LR4 分頻器頻率響應
-python test_dynamics_processor.py  # WDRC 壓縮特性
-python test_signal_chain.py        # 端對端信號鏈驗證
-python test_noise_suppressor.py    # 降噪 SNR 量測
 ```
 
-測試報告輸出至 `tests/dsp_whitebox/report_figures/`。
+測試報告輸出至 `docs/whitebox_test/DSP_WHITEBOX_TEST_REPORT.md`。
 
 ---
 
@@ -437,7 +431,7 @@ python test_noise_suppressor.py    # 降噪 SNR 量測
 
 ## 許可
 
-本專案採 MIT 許可。詳見 [LICENSE](LICENSE) 文件。
+本專案採 Apache License 2.0 許可。詳見 [LICENSE](LICENSE) 文件。
 
 ---
 
@@ -453,6 +447,7 @@ python test_noise_suppressor.py    # 降噪 SNR 量測
 
 ## 聯絡方式
 
-**主要開發者**: Hark Audio Team  
+**主要開發者**: Joanne Wu  
 **問題回報**: GitHub Issues  
 **建議與反饋**: GitHub Discussions
+

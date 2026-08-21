@@ -34,6 +34,14 @@ import com.wcy.hark.audiometry.TestSelectActivity
 import com.wcy.hark.ui.components.SystemVolumeSlider
 import com.wcy.hark.ui.viewmodel.AudioSourceMode
 import com.wcy.hark.ui.viewmodel.EqViewModel
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
+import android.net.Uri
 
 /**
  * HarkMainScreen — 畫面 1 (PSAP 主控制面板)
@@ -70,6 +78,42 @@ fun HarkMainScreen(
     val context = LocalContext.current
     val scrollState = rememberScrollState()
     var showExperimentConfirm by remember { mutableStateOf(false) }
+
+    // ── Hidden Developer Info Card Gesture State ───────────────────────────
+    val density = LocalDensity.current
+    var isDeveloperCardVisible by remember { mutableStateOf(false) }
+    var overscrollAccumulator by remember { mutableFloatStateOf(0f) }
+
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                if (scrollState.value == 0) {
+                    if (available.y > 0) {
+                        overscrollAccumulator += available.y
+                        if (overscrollAccumulator > with(density) { 100.dp.toPx() }) {
+                            isDeveloperCardVisible = true
+                        }
+                    }
+                }
+                if (isDeveloperCardVisible && (consumed.y > 0 || available.y < 0)) {
+                    isDeveloperCardVisible = false
+                    overscrollAccumulator = 0f
+                }
+                return Offset.Zero
+            }
+        }
+    }
+
+    LaunchedEffect(scrollState.value) {
+        if (scrollState.value > 0 && isDeveloperCardVisible) {
+            isDeveloperCardVisible = false
+            overscrollAccumulator = 0f
+        }
+    }
 
     // ── State reads from ViewModel ─────────────────────────────────────────
     val situationalMode by viewModel.situationalMode
@@ -122,10 +166,19 @@ fun HarkMainScreen(
                 .fillMaxSize()
                 .statusBarsPadding()
                 .padding(top = if (isExperimentMode) 24.dp else 0.dp)
+                .nestedScroll(nestedScrollConnection)
                 .verticalScroll(scrollState)
                 .padding(horizontal = 20.dp, vertical = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // ── 下拉拉伸顯露之開發者與論文資訊卡片（隱藏式）──────────────────
+            AnimatedVisibility(
+                visible = isDeveloperCardVisible,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                DeveloperInfoCard()
+            }
 
             // ── App Title + 模式切換 ────────────────────────────────────────
             Row(
@@ -469,6 +522,113 @@ fun HarkMainScreen(
 // ─── Sub-Components ──────────────────────────────────────────────────────────
 
 /**
+ * DeveloperInfoCard — 隱藏式開發者與論文資訊卡片
+ * 在主頁最頂端大力下拉 (overscroll) 時展開顯露，向上滑動時縮合隱藏。
+ */
+@Composable
+private fun DeveloperInfoCard() {
+    val context = LocalContext.current
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp)),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = "開發者與論文資訊",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "開發者與論文資訊",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                )
+            }
+
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
+                thickness = 1.dp
+            )
+
+            Text(
+                text = "開發者：中原大學醫學工程學系 吳佳穎",
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            )
+
+            Text(
+                text = "論文名稱：〈以行動裝置配合耳機做為輔聽系統〉",
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            )
+
+            Text(
+                text = "授權說明：本軟體僅供公益合作研究測試使用。",
+                style = MaterialTheme.typography.bodySmall.copy(
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
+                )
+            )
+
+            Row(
+                modifier = Modifier.clickable {
+                    try {
+                        val intent = Intent(Intent.ACTION_SENDTO).apply {
+                            data = Uri.parse("mailto:daley25150937@gmail.com")
+                        }
+                        context.startActivity(intent)
+                    } catch (e: Exception) {
+                        // ignore if no email app installed
+                    }
+                },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Email,
+                    contentDescription = "Email",
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "聯絡信箱：daley25150937@gmail.com",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                )
+            }
+
+            Text(
+                text = "（如有任何使用反饋、改善建議或學術指教，歡迎來信聯繫。）",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
+                )
+            )
+        }
+    }
+}
+
+/**
  * PowerCard — 輔助聽力總開關大卡片
  * High-contrast card with a large Switch to match PureToneEqualizer style.
  */
@@ -478,6 +638,7 @@ private fun PowerCard(
     statusText: String,
     onToggle: (Boolean) -> Unit
 ) {
+    var debugClickCount by remember { mutableStateOf(0) }
     val cardGradient = if (isOn) {
         Brush.horizontalGradient(
             colors = listOf(
@@ -522,7 +683,17 @@ private fun PowerCard(
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = statusText,
-                    style = MaterialTheme.typography.bodySmall.copy(color = textColor.copy(alpha = 0.85f))
+                    style = MaterialTheme.typography.bodySmall.copy(color = textColor.copy(alpha = 0.85f)),
+                    modifier = Modifier.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        debugClickCount++
+                        if (debugClickCount >= 5) {
+                            com.google.firebase.crashlytics.FirebaseCrashlytics.getInstance().log("User triggered test crash via statusText click.")
+                            throw RuntimeException("Hark Crashlytics Test Crash")
+                        }
+                    }
                 )
             }
             Switch(
@@ -722,7 +893,10 @@ private fun PresetsCard(
                                 isDisabled = isDisabled,
                                 breatheBorderColor = borderColor,
                                 modifier = Modifier.weight(1f),
-                                onClick = { onModeSelect(mode) }
+                                onClick = { 
+                                    com.wcy.hark.util.FirebaseHelper.logSceneModeChange(mode.name)
+                                    onModeSelect(mode) 
+                                }
                             )
                         }
                     }

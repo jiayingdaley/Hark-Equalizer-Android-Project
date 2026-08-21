@@ -282,6 +282,7 @@ fun selectSituationalMode(mode: SceneManager.Mode) {
                     saveJobsLeft[bandIndex] = viewModelScope.launch {
                         kotlinx.coroutines.delay(200)
                         repository.saveBandGain("left", 0, bandIndex, coercedGain)
+                        com.wcy.hark.util.FirebaseHelper.logEqAdjustment(bandIndex, coercedGain)
                     }
                 }
             }

@@ -32,6 +32,21 @@ __pycache__/
 # macOS metadata
 .DS_Store
 
+# Signing keys and release build outputs
+*.jks
+*.keystore
+app/release/
+*.apk
+
 # AI Artifacts
 .artifacts/
+
+# Firebase & Internal Developer Management Documentation (Confidential)
+docs/FIREBASE_MANAGEMENT_GUIDE.md
+
+# Kotlin compiler caches
+.kotlin/
+
+# Local diagnostic audio tools
+tools/srt_diagnostic/nlfc_demo/
 
